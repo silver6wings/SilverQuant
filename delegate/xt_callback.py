@@ -96,7 +96,7 @@ class XtCustomCallback(XtBaseCallback):
             name=self.stock_names.get_name(code),
             order_type=side,
             remark=remark,
-            price=round(price, 2),
+            price=round(price, 3),
             volume=volume,
         )
 
