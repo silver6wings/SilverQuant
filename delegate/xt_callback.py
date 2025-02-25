@@ -75,6 +75,7 @@ class XtCustomCallback(XtBaseCallback):
         path_deal: str,
         path_held: str,
         path_maxp: str,
+        stock_traded_callback: Callable = None,
     ):
         super().__init__()
         self.account_id = '**' + str(account_id)[-4:]
@@ -84,6 +85,7 @@ class XtCustomCallback(XtBaseCallback):
         self.path_deal = path_deal
         self.path_held = path_held
         self.path_maxp = path_maxp
+        self.stock_traded_callback = stock_traded_callback
 
         self.stock_names = StockNames()
 
@@ -106,7 +108,8 @@ class XtCustomCallback(XtBaseCallback):
         traded_price = trade.traded_price
         # traded_time = trade.traded_time
         order_remark = trade.order_remark
-
+        name = self.stock_names.get_name(stock_code)
+        
         if trade.order_type == xtconstant.STOCK_SELL:
             del_key(self.lock_of_disk_cache, self.path_held, stock_code)
             del_key(self.lock_of_disk_cache, self.path_maxp, stock_code)
@@ -119,16 +122,14 @@ class XtCustomCallback(XtBaseCallback):
             #     side='卖出成交',
             #     remark=order_remark,
             # )
-
-            name = self.stock_names.get_name(stock_code)
+            
             self.ding_messager.send_text(
                 f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
                 f'{name} {traded_volume}股 {traded_price:.2f}元',
                 '[SELL]')
-            return
-
-        if trade.order_type == xtconstant.STOCK_BUY:
+            
+        elif trade.order_type == xtconstant.STOCK_BUY:
             new_held(self.lock_of_disk_cache, self.path_held, [stock_code])
 
             # self.record_order(
@@ -140,13 +141,16 @@ class XtCustomCallback(XtBaseCallback):
             #     remark=order_remark,
             # )
 
-            name = self.stock_names.get_name(stock_code)
             self.ding_messager.send_text(
                 f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
                 f'{name} {traded_volume}股 {traded_price:.2f}元',
                 '[BUY]')
-            return
+        
+        if self.stock_traded_callback is not None:
+            self.stock_traded_callback(trade)
+        
+        return
 
     def on_order_stock_async_response(self, res: XtOrderResponse):
         log = f'异步下单委托 {res.order_id} msg:{res.error_msg} remark:{res.order_remark}',
