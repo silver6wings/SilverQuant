@@ -291,11 +291,14 @@ def get_disk_trade_day_list_and_update_max_year() -> list:
     return trade_dates
 
 
-# 获取前n个交易日，返回格式 %Y%m%d
-def get_prev_trading_date(now: datetime.datetime, count: int) -> str:
+# 获取前n个交易日，返回格式 基本格式：%Y%m%d，扩展格式：%Y-%m-%d
+def get_prev_trading_date(now: datetime.datetime, count: int, basicformat = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
     trading_index = list(trading_day_list).index(now.strftime('%Y-%m-%d'))
-    return trading_day_list[trading_index - count].replace('-', '')
+    if basicformat:
+        return trading_day_list[trading_index - count].replace('-', '')
+    else:
+        return trading_day_list[trading_index - count]
 
 
 # 检查当日是否是交易日，使用sina数据源
