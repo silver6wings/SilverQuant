@@ -121,7 +121,7 @@ class ReturnSeller(BaseSeller):
                         logging.warning(f'[Sell]'
                                         f'cost_p:{cost_price} max_p:{max_price} '
                                         f'inc_min:{inc_min} inc_max:{inc_max}')
-                        self.order_sell(code, quote, sell_volume, f'回撤{int(fall_percentage * 100)}%')
+                        self.order_sell(code, quote, sell_volume, f'涨{int((inc_min - 1) * 100)}%回撤{int(fall_percentage * 100)}%')
                         return True
         return False
 
