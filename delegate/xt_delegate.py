@@ -275,23 +275,23 @@ class XtDelegate(BaseDelegate):
     # ORDER_PART_CANCEL = 53
 
     def order_cancel_all(self):
-        orders = self.check_orders()
+        orders = self.check_orders(cancelable_only = True)
         for order in orders:
             self.order_cancel_async(order.order_id)
 
     def order_cancel_buy(self, code: str):
-        orders = self.check_orders()
+        orders = self.check_orders(cancelable_only = True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_BUY:
-                if order.order_status in [50, 51, 52, 53]:
-                    self.order_cancel_async(order.order_id)
+                self.order_cancel_async(order.order_id)
+                break
 
     def order_cancel_sell(self, code: str):
-        orders = self.check_orders()
+        orders = self.check_orders(cancelable_only = True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_SELL:
-                if order.order_status in [50, 51, 52, 53]:
-                    self.order_cancel_async(order.order_id)
+                self.order_cancel_async(order.order_id)
+                break
 
 
 def is_position_holding(position: XtPosition) -> bool:
