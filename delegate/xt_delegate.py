@@ -165,7 +165,19 @@ class XtDelegate(BaseDelegate):
 
     def check_orders(self, cancelable_only = False) -> List[XtOrder]:
         if self.xt_trader is not None:
-            return self.xt_trader.query_stock_orders(self.account, cancelable_only)
+            orders = self.xt_trader.query_stock_orders(self.account, cancelable_only)
+            if cancelable_only:
+                '''
+                参考委托XtOrder数据结构说明，price_type为柜台返回的枚举值，且xtquant库未定义枚举值常量名。
+                以下常见情况不可取消委托，而GJ等柜台返回数据包含这部分数据需通过order的price_type值过滤掉。
+                BROKER_PRICE_PROP_SUBSCRIBE			54	申购
+                BROKER_PRICE_PROP_FUND_ENTRUST		79	基金申赎
+                BROKER_PRICE_PROP_ETF				81	ETF申购
+                BROKER_PRICE_PROP_DEBT_CONVERSION	91	债转股
+                '''
+                return [order for order in orders if order.price_type not in [54, 79, 81, 91]]
+            else:
+                return orders
         else:
             raise Exception('xt_trader为空')
 
