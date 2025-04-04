@@ -307,8 +307,8 @@ class XtSubscriber:
                 df = df[df['日期'] == today]
 
             if len(df) > 0:
-                title = f'{self.strategy_name} {today} 记录 {len(df)} 条'
-                txt = title
+                title = f'[{self.account_id}]{self.strategy_name} 交易{len(df)}单'
+                txt = f'{title}\n{today}'
                 for index, row in df.iterrows():
                     # ['日期', '时间', '代码', '名称', '类型', '注释', '成交价', '成交量']
                     txt += '\n\n> '
@@ -357,8 +357,8 @@ class XtSubscriber:
                            f'盈亏比:<font{color}>{(curr_price / open_price - 1) * 100:.2f}%</font> ' \
                            f'盈亏额:<font{color}>{(curr_price - open_price) * vol:.2f}</font>'
 
-            title = f'{self.strategy_name} {today} 持仓 {i} 支'
-            txt = title + txt
+            title = f'[{self.account_id}]{self.strategy_name} 持仓{i}支'
+            txt = f'{title}\n{today}\n{txt}'
 
             if self.ding_messager is not None:
                 self.ding_messager.send_markdown(title, txt)
