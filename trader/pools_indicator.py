@@ -4,9 +4,10 @@ import akshare as ak
 from mytt.MyTT_advance import *
 
 
-def get_ma_trend_indicator(
+# 指数MA均线指标择时
+def get_ma_index_indicator(
     symbol: str = '000985',
-    p: int = 5,
+    period: int = 5,
 ) -> (bool, dict):
     end_dt = datetime.datetime.now() - datetime.timedelta(days=0)
     start_dt = end_dt - datetime.timedelta(days=250)  # EMA 时间必须够长
@@ -17,17 +18,18 @@ def get_ma_trend_indicator(
         end_date=end_dt.strftime('%Y%m%d'),
     )
     close = df['收盘'].values
-    df['MA5'] = MA(close, p)
+    df['MA5'] = MA(close, period)
     df['SAFE'] = df['MA5'] < df['收盘']
     return df['SAFE'].values[-1], {'df': df}
 
 
-def get_macd_trend_indicator(
+# 指数MACD指标择时
+def get_macd_index_indicator(
     symbol: str = '000985',
-    fp: int = 10,
-    sp: int = 22,
-    ap: int = 7,
-    sa: int = 5,
+    fp: int = 12,
+    sp: int = 26,
+    ap: int = 9,
+    sa: int = 5,  # 斜率周期
 ) -> (bool, dict):
     end_dt = datetime.datetime.now() - datetime.timedelta(days=0)
     start_dt = end_dt - datetime.timedelta(days=250)  # EMA 时间必须够长
@@ -52,6 +54,6 @@ def get_macd_trend_indicator(
         M=ap,
     )
     df['SLOPE'] = SLOPE(df['MACD'], sa)
-    df['SAFE'] = (df['MACD'] > 0) & (df['SLOPE'] > 0) | (df['SLOPE'] > 8)
+    df['SAFE'] = (df['MACD'] > 0) & (df['SLOPE'] > 0) | (df['SLOPE'] > 8)  # MACD和斜率同时 > 0 或者 斜率大于8
 
     return df['SAFE'].values[-1], {'df': df}

@@ -5,9 +5,10 @@ import pywencai
 import akshare as ak
 
 from mytt.MyTT_advance import *
-from tools.utils_basic import pd_show_all, symbol_to_code
+from tools.utils_basic import symbol_to_code
 
 
+# （过时）筛选东方财富行业板块的公式
 def select_industry_sections(
     df: pd.DataFrame,
     fp: int = 10,
@@ -35,6 +36,7 @@ def select_industry_sections(
     return df['SAFE'].values[-1]
 
 
+# （过时）筛选东方财富行业板块的逻辑
 def select_dfcf_industry_sections(
     section_names: list[str],
     start_date: str = None,
@@ -78,8 +80,8 @@ def select_dfcf_industry_sections(
     return section_result
 
 
+# 选择东方财富的行业板块逻辑
 def get_dfcf_industry_sections(limit: int = 2000) -> list[str]:
-
     # 初筛板块
     df = ak.stock_board_industry_name_em()
     df['涨跌比'] = (df['上涨家数'] + 1) / (df['下跌家数'] + 1)
@@ -102,6 +104,7 @@ def get_dfcf_industry_sections(limit: int = 2000) -> list[str]:
     return section_names
 
 
+# 获取东方财富行业板块成份
 def get_dfcf_industry_stock_codes(section_result: list[str]) -> set:
     stock_list = set()
     for section_name in section_result:
@@ -112,6 +115,7 @@ def get_dfcf_industry_stock_codes(section_result: list[str]) -> set:
     return stock_list
 
 
+# 选择同花顺概念板块的逻辑
 def get_ths_concept_sections(limit: int = 2000, period: int = 0):
     assert period in {0, 3, 5, 10, 20}, '{"即时", "3日排行", "5日排行", "10日排行", "20日排行"}'
 
@@ -146,6 +150,7 @@ def get_ths_concept_sections(limit: int = 2000, period: int = 0):
     return section_names.values
 
 
+# 获取同花顺概念板块成份
 def get_ths_concept_stock_codes(section_names: list[str]):
     stock_list = set()
     for section_name in section_names:
@@ -158,9 +163,8 @@ def get_ths_concept_stock_codes(section_names: list[str]):
     return stock_list
 
 
-def get_sw_sections():
-    target_date = '20240809'
-
+# 获取申万指数列表
+def get_sw_sections(target_date='20240809'):
     df = ak.index_analysis_daily_sw(
         symbol="二级行业",
         start_date=target_date,
@@ -184,28 +188,3 @@ def get_sw_sections():
     })
     df = df.sort_values('switch_rate', ascending=False)
     print(df)
-
-
-def test_dfcf():
-    sections = get_dfcf_industry_sections()
-    print(sections)
-
-    codes = get_dfcf_industry_stock_codes(sections)
-    print(len(codes))
-    print({code for code in codes if code[:2] in {'00', '60'}})
-
-
-def test_ths():
-    names = get_ths_concept_sections()
-    print(names)
-
-    codes = get_ths_concept_stock_codes(names)
-    print(codes)
-
-
-if __name__ == '__main__':
-    pd_show_all()
-
-    test_dfcf()
-    # test_ths()
-    # get_sw_sections()

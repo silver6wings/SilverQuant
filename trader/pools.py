@@ -5,7 +5,7 @@ from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prefixes_stock_codes, get_index_constituent_codes
 from tools.utils_remote import get_wencai_codes
 
-from trader.pools_indicator import get_macd_trend_indicator, get_ma_trend_indicator
+from trader.pools_indicator import get_macd_index_indicator, get_ma_index_indicator
 from trader.pools_section import get_dfcf_industry_stock_codes, get_dfcf_industry_sections, \
     get_ths_concept_sections, get_ths_concept_stock_codes
 
@@ -76,6 +76,7 @@ class StocksPoolBlackEmpty(StockPool):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
 
+
 # -----------------------
 # Black Wencai
 # -----------------------
@@ -90,6 +91,7 @@ class StocksPoolBlackWencai(StockPool):
 
         codes = get_wencai_codes(self.black_prompts)
         self.cache_blacklist.update(codes)
+
 
 # -----------------------
 # White Wencai
@@ -106,10 +108,12 @@ class StocksPoolWhiteWencai(StocksPoolBlackWencai):
         codes = get_wencai_codes(self.white_prompts)
         self.cache_whitelist.update(codes)
 
+
 # -----------------------
 # White Custom
 # -----------------------
 
+# 自定义白名单股票列表
 class StocksPoolWhiteCustomSymbol(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
@@ -129,10 +133,12 @@ class StocksPoolWhiteCustomSymbol(StocksPoolBlackWencai):
                     codes.append(code)
             self.cache_whitelist.update(codes)
 
+
 # -----------------------
 # White Indexes
 # -----------------------
 
+# 自定义指数成份股
 class StocksPoolWhiteIndexes(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
@@ -146,6 +152,28 @@ class StocksPoolWhiteIndexes(StocksPoolBlackWencai):
             self.cache_whitelist.update(t_white_codes)
 
 
+# 自定义指数成份股 + 指数MA择时
+class StocksPoolWhiteIndexesMA(StocksPoolBlackWencai):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+        super().__init__(account_id, strategy_name, parameters, ding_messager)
+        self.white_indexes = parameters.white_prefixes
+        self.white_index_symbol = parameters.white_index_symbol         # 指数名称（默认中证全指000985）
+        self.white_ma_above_period = parameters.white_ma_above_period   # 均线周期（默认五日均线）
+
+    def refresh_white(self):
+        super().refresh_white()
+
+        allow, info = get_ma_index_indicator(
+            symbol=self.white_index_symbol,
+            period=self.white_ma_above_period,
+        )
+        if allow:
+            for index in self.white_indexes:
+                t_white_codes = get_index_constituent_codes(index)
+                self.cache_whitelist.update(t_white_codes)
+
+
+# 自定义指数成份股 + 指数群MACD择时
 class StocksPoolWhiteIndexesMACD(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
@@ -155,15 +183,17 @@ class StocksPoolWhiteIndexesMACD(StocksPoolBlackWencai):
         super().refresh_white()
 
         for index in self.white_indexes:
-            allow, info = get_macd_trend_indicator(symbol=index)
+            allow, info = get_macd_index_indicator(symbol=index)
             if allow:
                 t_white_codes = get_index_constituent_codes(index)
                 self.cache_whitelist.update(t_white_codes)
+
 
 # -----------------------
 # White Prefixes
 # -----------------------
 
+# 自定义前缀成份股
 class StocksPoolWhitePrefixes(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
@@ -176,21 +206,27 @@ class StocksPoolWhitePrefixes(StocksPoolBlackWencai):
         self.cache_whitelist.update(t_white_codes)
 
 
+# 自定义前缀成份股 + 指数MA择时
 class StocksPoolWhitePrefixesMA(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
-        self.white_index = parameters.white_index
+        self.white_index_symbol = parameters.white_index_symbol         # 指数名称（默认中证全指000985）
+        self.white_ma_above_period = parameters.white_ma_above_period   # 均线周期（默认五日均线）
 
     def refresh_white(self):
         super().refresh_white()
 
-        allow, info = get_ma_trend_indicator(symbol=self.white_index)
+        allow, info = get_ma_index_indicator(
+            symbol=self.white_index_symbol,
+            period=self.white_ma_above_period,
+        )
         if allow:
             t_white_codes = get_prefixes_stock_codes(self.white_prefixes)
             self.cache_whitelist.update(t_white_codes)
 
 
+# 自定义前缀成份股 + 东方财富行业板块上涨比例预筛
 class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
@@ -210,6 +246,7 @@ class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
         self.cache_whitelist.update(filter_codes)
 
 
+# 自定义前缀成份股 + 同花顺行业板块上涨个数预筛
 class StocksPoolWhitePrefixesConcept(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
