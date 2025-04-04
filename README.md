@@ -129,9 +129,9 @@ SilverQuant 基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.ht
 > 
 > 1. 新用户可以先拿手机号注册一个新的账号
 > 2. 在`系统设置`中找到 密钥管理(Token) 即 `GM_CLIENT_TOKEN`
-> 2. 在`账户管理`中添加仿真账户，并完成模拟入金和模拟交易费率设置
-> 3. 在账户管理中找到`复制账户ID`，获取 `GM_ACCOUNT_ID`
-> 4. 配置到`credentials.py`
+> 3. 在`账户管理`中添加仿真账户，并完成模拟入金和模拟交易费率设置
+> 4. 在账户管理中找到`复制账户ID`，获取 `GM_ACCOUNT_ID`
+> 5. 配置到`credentials.py`
 
 ### 启动脚本
 
@@ -218,10 +218,14 @@ run_shield.py
 run_sword.py
 适用于手动票池，价格上穿预定阈值后自动买入预设量额的场景需求
 ```
+```
+run_deepseek.py
+适用于进阶学习，公式选股的样板，请勿用于实盘，因为确实不赚钱
+```
 
 ## 组合卖出
 
-可以新建`GroupSeller`自行定义组合卖出的策略群
+可以选择拼接适合固定交易模式的数个卖出组件来构建自定义的`GroupSeller`组合卖出的策略群
 
 以下为预定义的卖出策略单元：
 
@@ -311,6 +315,7 @@ Upping Blocker: (需要历史数据) 双涨趋势阻断器
 ```
 
 ## 常见问题 Q & A
+
 About QMT
 ```
 如果出现程序在控制台没有持续输出，需要在QMT中检查行情源是否正确设置
@@ -319,6 +324,15 @@ About QMT
 About setup
 ```
 启动之前最好重启一下系统刷新所有的软件配置
+```
+
+About pywencai
+``` 
+pywencai的原理是去 https://www.iwencai.com/ 抓取数据，
+记得一定要先安装 Node.js，安装完毕至少要重启PyCharm一次
+否则会报错：'NoneType' object has no attribute 'get' 
+其次检查自己的选股提示词 (Prompt) 能不能在网页上搜到票
+$ pip install pywencai --upgrade 
 ```
 
 About akshare
@@ -334,15 +348,6 @@ About tushare
 ```
 tushare 作为 akshare 的备用数据源，需要配置对应的 token 才可以使用
 框架支持多个 token，请参考 reader/tushare_token_sample.py 
-```
-
-About pywencai
-``` 
-pywencai的原理是去 https://www.iwencai.com/ 抓取数据，
-记得一定要先安装 Node.js，安装完毕至少要重启PyCharm一次
-否则会报错：'NoneType' object has no attribute 'get' 
-其次检查自己的选股提示词 (Prompt) 能不能在网页上搜到票
-$ pip install pywencai --upgrade 
 ```
 
 ---
