@@ -9,7 +9,7 @@
 # 项目简介
 
  SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
-开发的 🇨🇳A股证券全自动交易框架，开箱即可运行
+开发的🇨🇳A股证券全自动交易框架，开箱即可运行
 
 旨在帮助新进入量化领域的同学解决大部分技术启动问题，支持在本地执行策略
 
