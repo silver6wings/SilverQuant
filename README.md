@@ -1,15 +1,15 @@
-来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！
+来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！:expressionless:
 
-提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！
+提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！:roll_eyes:
 
-如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！
+如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！:kissing_heart:	
 
 ---
 
 # 项目简介
 
-SilverQuant 基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
-开发的A股证券全自动交易实盘框架，开箱即可运行
+ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
+开发的:cn:A股证券全自动交易框架，开箱即可运行
 
 旨在帮助新进入量化领域的同学解决大部分技术启动问题，支持在本地执行策略
 
