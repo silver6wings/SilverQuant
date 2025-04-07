@@ -58,7 +58,7 @@
 > 
 > QMT 模拟 https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
 
-> 如果需要问财大模型相关功能，需要下载 Node.JS 版本大于v20
+> 如果需要问财大模型相关功能，需要下载 Node.JS 版本 v16 或更新
 >
 > https://nodejs.org/zh-cn
 
