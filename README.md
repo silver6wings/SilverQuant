@@ -1,15 +1,15 @@
-来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！😑
+来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！
 
-提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！🙄
+提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！
 
-如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！😘
+如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！
 
 ---
 
 # 项目简介
 
- SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
-开发的A股证券🇨🇳全自动交易框架，开箱即可运行
+SilverQuant 基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
+开发的A股证券全自动交易实盘框架，开箱即可运行
 
 旨在帮助新进入量化领域的同学解决大部分技术启动问题，支持在本地执行策略
 
@@ -58,7 +58,7 @@
 > 
 > QMT 模拟 https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
 
-> 如果需要问财大模型相关功能，需要下载 Node.JS 版本 v16 或更新
+> 如果需要问财大模型相关功能，需要下载 Node.JS 版本大于v20
 >
 > https://nodejs.org/zh-cn
 
@@ -216,7 +216,7 @@ run_shield.py
 ```
 ```
 run_sword.py
-适用于手动票池，价格上穿预定阈值后自动买入预设量额的场景需求
+票池打板的模板，当封板且满足封板要求的时候进行买入，需要优化
 ```
 ```
 run_deepseek.py
