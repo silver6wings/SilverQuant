@@ -13,7 +13,7 @@ from tools.utils_remote import append_ak_quote_dict, DataSource
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
 from trader.buyer import BaseBuyer as Buyer
-from trader.pools import StocksPoolWhitePrefixes as Pool
+from trader.pools import StocksPoolWhitePrefixesMA as Pool
 from trader.seller_groups import DeepseekGroupSeller as Seller
 
 from selector.selector_deepseek import select
@@ -46,6 +46,9 @@ def debug(*args):
 
 class PoolConf:
     white_prefixes = {'00', '60', '30'}
+    white_index_symbol = '000985'
+    white_ma_above_period = 10
+
     black_prompts = [
         'ST',
         '退市',
