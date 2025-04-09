@@ -171,11 +171,12 @@ class XtSubscriber:
             self.today_ticks[code].append([
                 tick_time,                          # 成交时间，格式：%H:%M:%S
                 round(quote['lastPrice'], 3),       # 成交价格
-                int(quote['volume']),          # 累计成交量（手）
+                int(quote['volume']),               # 累计成交量（手）
                 round(quote['askPrice'][0], 3),     # 卖一价
                 int(quote['askVol'][0]),            # 卖一量
                 round(quote['bidPrice'][0], 3),     # 买一价
                 int(quote['bidVol'][0]),            # 买一量
+                round(quote['amount'], 3),          # 累计成交额（元）
             ])
 
     def clean_ticks_history(self):

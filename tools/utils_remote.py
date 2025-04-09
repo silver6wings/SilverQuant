@@ -28,7 +28,7 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
 
 def pull_stock_codes(prefix: str, host: str, auth: str) -> (Optional[list[str]], str):
     key = f'{prefix}_{datetime.datetime.now().date().strftime("%Y%m%d")}'
-    response = requests.get(f'{host}/get_set/{key}?auth={auth}')
+    response = requests.get(f'{host}/stocks/get_list/{key}?auth={auth}')
     if response.status_code == 200:
         return response.json(), ''
     elif response.status_code == 404:

@@ -24,15 +24,10 @@ def select_industry_sections(
         M=ap,
     )
     df['SLOPE'] = SLOPE(df['MACD'], 5)
-
     df['AA'] = (df['SLOPE'] > 0) & (df['MACD'] > 0)
-
     df['BB'] = EMA(C, 5) > EMA(C, 10)
-
     df['CC'] = SLOPE(EMA(C, 5), 3) > 0
-
     df['SAFE'] = df['AA'] & df['BB'] & df['CC']
-
     return df['SAFE'].values[-1]
 
 
@@ -86,9 +81,7 @@ def get_dfcf_industry_sections(limit: int = 2000) -> list[str]:
     df = ak.stock_board_industry_name_em()
     df['涨跌比'] = (df['上涨家数'] + 1) / (df['下跌家数'] + 1)
     df = df.sort_values(by=['涨跌比'], ascending=False)
-
     df['总家数'] = df['上涨家数'] + df['下跌家数']
-
     df = df.drop(df[df['上涨家数'] / df['下跌家数'] <= 1.0].index)
     # print(df)
 
@@ -111,7 +104,6 @@ def get_dfcf_industry_stock_codes(section_result: list[str]) -> set:
         df = ak.stock_board_industry_cons_em(symbol=section_name)
         codes = {symbol_to_code(symbol) for symbol in df['代码'].values}
         stock_list.update(codes)
-
     return stock_list
 
 
