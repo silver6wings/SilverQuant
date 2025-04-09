@@ -5,14 +5,14 @@ import schedule
 
 from credentials import *
 
-from tools.utils_basic import logging_init, is_symbol
+from tools.utils_basic import logging_init, is_symbol, time_diff_seconds
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
 from trader.buyer import BaseBuyer as Buyer
-from trader.pools import StocksPoolWhiteIndexes as Pool
+from trader.pools import StocksPoolWhiteCustomSymbol as Pool
 from trader.seller_groups import ShieldGroupSeller as Seller
 
 
@@ -41,8 +41,14 @@ def debug(*args):
 
 
 class PoolConf:
-    white_indexes = []
+    white_codes_filepath = './_cache/_pool_whitelist.txt'
     black_prompts = []
+
+    # 忽略监控列表
+    ignore_stocks = [
+        '000001.SZ',        # 深交所股票尾部加.SZ
+        '600000.SH',        # 上交所股票尾部加.SH
+    ]
 
 
 class BuyConf:
@@ -50,39 +56,25 @@ class BuyConf:
     interval = 1            # 扫描买入间隔，60的约数：1-6, 10, 12, 15, 20, 30
     order_premium = 0.00    # 保证市价单成交的溢价，单位（元）
 
-    # 股票代码: [突破价, 溢价倍数, 是否向上突破, 买入量, 买入额]
-    break_targets = {
-        '000001.SZ': [20.00, 1.03, True, None, 10000.00],
-    }
+    slot_count = 5          # 持股数量上限
+    slot_capacity = 5000    # 每个仓的资金上限
+    once_buy_limit = 5      # 单次选股最多买入股票数量（若单次未买进当日不会再买这只
+
+    # 开始时间，结束时间，封板量突破点，封板额突破点
+    # start_time, end_time, block_volume, block_amount
+    blocks = [
+        ['09:31', '11:30', 1000, 10000],
+        ['13:01', '14:55', 1000, 10000],
+    ]
+
+    # 封板秒数要求
+    block_seconds = 3
 
 
 class SellConf:
     time_ranges = [['09:31', '11:30'], ['13:00', '14:57']]
     interval = 1                    # 扫描买入间隔，60的约数：1-6, 10, 12, 15, 20, 30
     order_premium = 0.03            # 保证市价单成交的溢价，单位（元）
-
-    hard_time_range = ['09:31', '14:57']
-    earn_limit = 9.999              # 硬性止盈率
-    risk_limit = 1 - 0.03           # 硬性止损率
-    risk_tight = 0.003              # 硬性止损率每日上移
-
-    # 涨幅超过建仓价xA，并小于建仓价xB 时，回撤涨幅的C倍卖出
-    # (A, B, C)
-    return_time_range = ['09:31', '14:57']
-    return_of_profit = [      # 至少保留收益范围
-        (1.11, 9.99, 0.100),  # [9.900 % ~ 809.100 %)
-        (1.08, 1.11, 0.300),  # [5.600 % ~ 7.700 %)
-        (1.05, 1.08, 0.600),  # [2.000 % ~ 3.200 %)
-        (1.03, 1.05, 0.800),  # [0.600 % ~ 1.000 %)
-        (1.02, 1.03, 0.900),  # [0.200 % ~ 0.300 %)
-    ]
-
-    # 利润从最高点回撤卖出
-    fall_time_range = ['09:31', '14:57']
-    fall_from_top = [         # 至少保留收益范围
-        (1.05, 9.99, 0.02),  # [2.900 % ~ 879.020 %)
-        (1.02, 1.05, 0.05),  # [-3.100 % ~ -0.250 %)
-    ]
 
 
 # ======== 盘前 ========
@@ -103,81 +95,154 @@ def refresh_code_list():
         return
 
     my_pool.refresh()
-    code_list = [code for code in BuyConf.break_targets.keys() if is_symbol(code)]
-    my_suber.update_code_list(my_pool.get_code_list() + code_list)
+    positions = my_delegate.check_positions()
+    hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
+    full_list = my_pool.get_code_list() + hold_list
+    target_list = [code for code in full_list if code not in PoolConf.ignore_stocks]
+
+    my_suber.update_code_list(target_list)
 
 
 # ======== 买点 ========
 
 
-def select_stocks(quotes: Dict) -> List[Dict[str, any]]:
+def check_is_blocking(quote: dict, curr_time: str) -> (bool, int, float):
+    ask_vol = quote['askVol'][0]
+    bid_vol = quote['bidVol'][0]
+    curr_price = quote['lastPrice']
+    bid_amount = bid_vol * curr_price
+
+    is_limiting_up = ask_vol < 0.001
+    if not is_limiting_up:
+        return False, 0, 0
+
+    for block in BuyConf.blocks:
+        if block[0] <= curr_time < block[1]:
+            block_volume = block[2]
+            block_amount = block[3]
+
+            is_volume_stab = bid_vol > block_volume
+            is_amount_stab = bid_amount > block_amount
+            if is_volume_stab and is_amount_stab:
+                return True, bid_vol, bid_amount
+
+    return False, bid_vol, bid_amount
+
+
+def check_block_ticks(
+    quote: dict,
+    curr_time: str,
+    curr_seconds: str,
+    ticks: list,
+) -> bool:
+    curr_price = quote['lastPrice']
+
+    # 获取一段之前的最大价格
+    max_price = curr_price
+    i = len(ticks) - 1
+    now_seconds = datetime.datetime.strptime(f'{curr_time}:{curr_seconds}', '%H:%M:%S')
+    while i >= 0:
+        i_seconds = datetime.datetime.strptime(ticks[i][0], '%H:%M:%S')
+        if time_diff_seconds(now_seconds, i_seconds) > BuyConf.block_seconds:
+            break
+        i_price = ticks[i][1]
+        if i_price < max_price:  # 保证时间段内的价格都是最大
+            return False
+
+        max_price = max(max_price, i_price)
+        i -= 1
+
+    # 最后还要保证没有已经炸板的情况
+    return curr_price >= max_price
+
+
+def select_stocks(
+    quotes: Dict,
+    curr_date: str,
+    curr_time: str,
+    curr_seconds: str,
+) -> List[Dict[str, any]]:
     selections = []
+
     for code in quotes:
-        if code not in BuyConf.break_targets.keys():
-            debug(code, f'不在监控名单')
+        if code not in my_pool.cache_whitelist:
+            # debug(code, f'不在白名单')
             continue
 
-        # e.g. [20.00, 1.03, True, None, 10000.00]
-        target_price = BuyConf.break_targets[code][0]
-        target_price_ratio = BuyConf.break_targets[code][1]
-        target_is_up_cross = BuyConf.break_targets[code][2]
-        target_volume = BuyConf.break_targets[code][3]
-        target_amount = BuyConf.break_targets[code][4]
+        if code in my_pool.cache_blacklist:
+            # debug(code, f'在黑名单')
+            continue
 
         quote = quotes[code]
-        curr_price = quote['lastPrice']
-        if target_is_up_cross:
-            if curr_price > target_price:  # 上穿
-                selection = {
-                    'code': code,
-                    'price': curr_price * target_price_ratio,
-                    'volume': target_volume,
-                    'amount': target_amount,
-                    'lastClose': quote['lastClose'],
-                }
-                selections.append(selection)
-        else:
-            if curr_price < target_price:  # 下穿
-                selection = {
-                    'code': code,
-                    'price': curr_price * target_price_ratio,
-                    'volume': target_volume,
-                    'amount': target_amount,
-                    'lastClose': quote['lastClose'],
-                }
-                selections.append(selection)
+
+        # 是否涨停封住
+        limiting_up, bid_vol, bid_amt = check_is_blocking(quote, curr_time)
+        if not limiting_up:
+            # if bid_vol > 0 and bid_amt > 0:
+            #     debug(code, f'封单量{bid_vol} 封单额{bid_amt}')
+            continue
+
+        # 检查封板时间足够
+        block_enough = check_block_ticks(quote, curr_time, curr_seconds, my_suber.today_ticks[code])
+        if not block_enough:
+            continue
+
+        selection = {
+            'code': code,
+            'price': round(max(quote['askPrice'] + [quote['lastPrice']]), 3),
+            'lastClose': round(quote['lastClose'], 3),
+            'bidVol': bid_vol,
+            'curr_date': curr_date,
+        }
+        selections.append(selection)
 
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
-    selections = select_stocks(quotes)
+def scan_buy(
+    quotes: Dict,
+    curr_date: str,
+    curr_time: str,
+    curr_seconds: str,
+    positions: List,
+) -> None:
+    selections = select_stocks(quotes, curr_date, curr_time, curr_seconds)
+    # debug(f'本次扫描:{len(quotes)}, 选股{selections})
 
     # 选出一个以上的股票
     if len(selections) > 0:
         position_codes = [position.stock_code for position in positions]
+        position_count = get_holding_position_count(positions)
+        available_cash = my_delegate.check_asset().cash
+        available_slot = available_cash // BuyConf.slot_capacity
+
+        buy_count = max(0, BuyConf.slot_count - position_count)     # 确认剩余的仓位
+        buy_count = min(buy_count, available_slot)                  # 确认现金够用
+        buy_count = min(buy_count, len(selections))                 # 确认选出的股票够用
+        buy_count = min(buy_count, BuyConf.once_buy_limit)          # 限制一秒内下单数量
+        buy_count = int(buy_count)
 
         for i in range(len(selections)):  # 依次买入
-            selection = selections[i]
+            # logging.info(f'买数相关：持仓{position_count} 现金{available_cash} 已选{len(selections)}')
+            if buy_count > 0:
+                code = selections[i]['code']
+                price = selections[i]['price']
+                last_close = selections[i]['lastClose']
+                buy_volume = math.floor(BuyConf.slot_capacity / price / 100) * 100
 
-            code = selection['code']
-            price = selection['price']
-            last_close = selection['lastClose']
-
-            if selection['volume'] is None:
-                buy_volume = math.floor(selection['volume'] / price / 100) * 100
+                if buy_volume <= 0:
+                    debug(f'{code} 不够一手')
+                elif code in position_codes:
+                    debug(f'{code} 正在持仓')
+                elif curr_date in cache_selected and code in cache_selected[curr_date]:
+                    debug(f'{code} 今日已选')
+                else:
+                    buy_count = buy_count - 1
+                    # 如果今天未被选股过 and 目前没有持仓则记录（意味着不会加仓
+                    my_buyer.order_buy(code=code, price=price, last_close=last_close,
+                                       volume=buy_volume, remark='买入委托')
             else:
-                buy_volume = selection['volume']
-
-            if buy_volume <= 0:
-                debug(f'{code} 不够一手')
-            elif code in position_codes:
-                debug(f'{code} 正在持仓')
-            elif curr_date in cache_selected and code in cache_selected[curr_date]:
-                debug(f'{code} 今日已选')
-            else:
-                my_buyer.order_buy(code=code, price=price, last_close=last_close,
-                                   volume=buy_volume, remark='买入委托')
+                break
 
     # 记录选股历史
     if curr_date not in cache_selected:
@@ -198,7 +263,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
     for time_range in BuyConf.time_ranges:
         if time_range[0] <= curr_time <= time_range[1]:
             if int(curr_seconds) % BuyConf.interval == 0:
-                scan_buy(curr_quotes, curr_date, positions)
+                scan_buy(curr_quotes, curr_date, curr_time, curr_seconds, positions)
                 return True
 
     return False
@@ -210,7 +275,7 @@ if __name__ == '__main__':
     print(f'正在启动 {STRATEGY_NAME}...')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
-        from delegate.xt_delegate import XtDelegate
+        from delegate.xt_delegate import XtDelegate, get_holding_position_count
 
         my_callback = XtCustomCallback(
             account_id=QMT_ACCOUNT_ID,
@@ -228,7 +293,7 @@ if __name__ == '__main__':
         )
     else:
         from delegate.gm_callback import GmCallback
-        from delegate.gm_delegate import GmDelegate
+        from delegate.gm_delegate import GmDelegate, get_holding_position_count
 
         my_callback = GmCallback(
             account_id=QMT_ACCOUNT_ID,
