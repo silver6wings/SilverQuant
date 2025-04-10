@@ -396,8 +396,13 @@ def check_is_open_day(curr_date: str) -> bool:
 
 # 获取指数成份symbol
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
-    df = ak.index_stock_cons_csindex(symbol=index_symbol)
-    return [str(code).zfill(6) for code in df['成分券代码'].values]
+    # # 中证指数接口
+    # df = ak.index_stock_cons_csindex(symbol=index_symbol)
+    # return [str(code).zfill(6) for code in df['成分券代码'].values]
+
+    # 普通指数接口
+    df = ak.index_stock_cons(symbol=index_symbol)
+    return [str(code).zfill(6) for code in df['品种代码'].values]
 
 
 # 获取指数成份code
