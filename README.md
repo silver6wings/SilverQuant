@@ -4,6 +4,8 @@
 
 如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！
 
+国内镜像：https://gitee.com/silver6wings/SilverQuant
+
 ---
 
 # 项目简介
