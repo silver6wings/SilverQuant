@@ -1,8 +1,8 @@
-来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！
+来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！😑
 
-提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！
+提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！🙄
 
-如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！
+如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！😘
 
 国内镜像：https://gitee.com/silver6wings/SilverQuant
 
@@ -10,8 +10,8 @@
 
 # 项目简介
 
-SilverQuant 基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html) 
-开发的A股证券全自动交易实盘框架，开箱即可运行
+SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html)
+开发的A股证券🇨🇳全自动交易框架，开箱即可运行
 
 旨在帮助新进入量化领域的同学解决大部分技术启动问题，支持在本地执行策略
 
@@ -217,11 +217,11 @@ run_shield.py
 适用于手动买入，量化卖出的半自动场景需求
 ```
 ```
-run_sword.py
+run_swords.py
 票池打板的模板，当封板且满足封板要求的时候进行买入，需要优化
 ```
 ```
-run_deepseek.py
+run_ai_gen.py
 适用于进阶学习，公式选股的样板，请勿用于实盘，因为确实不赚钱
 ```
 
