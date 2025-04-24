@@ -8,6 +8,7 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
+from tools.utils_remote import get_wencai_codes
 
 from delegate.xt_delegate import xt_get_ticks
 from delegate.xt_subscriber import XtSubscriber, update_position_held
@@ -16,7 +17,7 @@ from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhiteIndexes as Pool
 from trader.seller_groups import ClassicGroupSeller as Seller
 
-from selector.select_wencai import get_wencai_codes_prices, get_prompt
+from selector.select_wencai import get_prompt
 
 select_prompt = get_prompt()
 
@@ -117,7 +118,7 @@ def refresh_code_list():
 
 
 def pull_stock_codes() -> List[str]:
-    codes_wencai = get_wencai_codes_prices(select_prompt)
+    codes_wencai = get_wencai_codes(select_prompt)
     codes_top = []
 
     for code in codes_wencai:
