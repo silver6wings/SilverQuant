@@ -62,7 +62,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > QMT 模拟 https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
 
-> 如果需要问财大模型相关功能，需要下载 Node.JS 版本大于v20
+> 如果需要问财大模型相关功能，需要下载 Node.JS 版本大于v16
 >
 > https://nodejs.org/zh-cn
 
@@ -328,6 +328,16 @@ About QMT
 About setup
 ```
 启动之前最好重启一下系统刷新所有的软件配置
+```
+
+About node.js
+
+```
+如果出现类似如下错误，说明在使用pywencai的过程中node版本过高，非严重问题
+可以通过降低版本，或者配置系统环境变量 NODE_NO_WARNINGS=1 解决报警输出
+
+(node:44993) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
 About pywencai
