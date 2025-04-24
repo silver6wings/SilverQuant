@@ -22,9 +22,11 @@ class HardSeller(BaseSeller):
         self.risk_limit = parameters.risk_limit
         self.risk_tight = parameters.risk_tight
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (held_day > 0) and (self.hard_time_range[0] <= curr_time < self.hard_time_range[1]):
             curr_price = quote['lastPrice']
             cost_price = position.open_price
@@ -51,9 +53,11 @@ class SwitchSeller(BaseSeller):
         self.switch_hold_days = parameters.switch_hold_days
         self.switch_demand_daily_up = parameters.switch_demand_daily_up
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (held_day >= self.switch_hold_days) and (self.switch_time_range[0] <= curr_time < self.switch_time_range[1]):
             curr_price = quote['lastPrice']
             cost_price = position.open_price
@@ -76,9 +80,11 @@ class FallSeller(BaseSeller):
         self.fall_time_range = parameters.fall_time_range
         self.fall_from_top = parameters.fall_from_top
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if max_price is not None:
             if (held_day > 0) and (self.fall_time_range[0] <= curr_time < self.fall_time_range[1]):
                 curr_price = quote['lastPrice']
@@ -107,9 +113,11 @@ class ReturnSeller(BaseSeller):
         self.return_time_range = parameters.return_time_range
         self.return_of_profit = parameters.return_of_profit
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if max_price is not None:
             if (held_day > 0) and (self.return_time_range[0] <= curr_time < self.return_time_range[1]):
                 curr_price = quote['lastPrice']
@@ -164,9 +172,11 @@ class OpenDaySeller(BaseSeller):
         self.open_low_rate = parameters.open_low_rate
         self.open_vol_rate = parameters.open_vol_rate
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if history is not None:
             if 0 < held_day < len(history):
                 sell_volume = position.can_use_volume
@@ -199,9 +209,11 @@ class MASeller(BaseSeller):
         self.ma_time_range = parameters.ma_time_range
         self.ma_above = parameters.ma_above
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if history is not None:
             if (held_day > 0) and (self.ma_time_range[0] <= curr_time < self.ma_time_range[1]):
                 sell_volume = position.can_use_volume
@@ -230,9 +242,11 @@ class CCISeller(BaseSeller):
         self.cci_upper = parameters.cci_upper
         self.cci_lower = parameters.cci_lower
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (history is not None) and (self.cci_time_range[0] <= curr_time < self.cci_time_range[1]):
             if (held_day > 0) and int(curr_time[-2:]) % 5 == 0:  # 每隔5分钟 CCI 卖出
                 sell_volume = position.can_use_volume
@@ -262,9 +276,11 @@ class WRSeller(BaseSeller):
         self.wr_time_range = parameters.wr_time_range
         self.wr_cross = parameters.wr_cross
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (history is not None) and (self.wr_time_range[0] <= curr_time < self.wr_time_range[1]):
             if held_day > 0 and int(curr_time[-2:]) % 5 == 0:  # 每隔5分钟 WR 卖出
                 sell_volume = position.can_use_volume
@@ -292,9 +308,11 @@ class VolumeDropSeller(BaseSeller):
         self.next_volume_dec_minute = parameters.vol_dec_time
         self.next_volume_dec_limit = parameters.vol_dec_limit
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (history is not None) and (self.next_time_range[0] <= curr_time < self.next_time_range[1]):
             cost_price = position.open_price
             sell_volume = position.can_use_volume
@@ -323,22 +341,24 @@ class DropSeller(BaseSeller):
         self.drop_time_range = parameters.drop_time_range
         self.drop_out_limits = parameters.drop_out_limits
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if (held_day > 0) and (self.drop_time_range[0] <= curr_time < self.drop_time_range[1]):
             sell_volume = position.can_use_volume
 
             if quote['lastPrice'] < quote['open']:
-                o = round(quote['open'], 3)
-                l = round(quote['low'], 3)
-                h = round(quote['high'], 3)
-                c = round(quote['lastPrice'], 3)
+                opn = round(quote['open'], 3)
+                low = round(quote['low'], 3)
+                hgh = round(quote['high'], 3)
+                clz = round(quote['lastPrice'], 3)
 
-                if c == l and (h - o < o - c):  # 下跌过程且实心大于上影线
+                if clz == low and (hgh - opn < opn - clz):  # 下跌过程且实心大于上影线
                     last_close = quote['lastClose']
-                    open_price = o
-                    drop_price = o - c
+                    open_price = opn
+                    drop_price = opn - clz
 
                     for inc_min, inc_max, drop_threshold in self.drop_out_limits:  # 逐级高开卖出
                         if last_close * inc_min <= open_price < last_close * inc_max \
@@ -358,9 +378,11 @@ class IncBlocker(BaseSeller):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('上涨过程禁卖', end=' ')
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if held_day > 0:
             if quote['lastPrice'] > quote['open'] \
                     and round(quote['high'], 3) == round(quote['lastPrice'], 3) \
@@ -377,9 +399,11 @@ class UppingBlocker(BaseSeller):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('上行趋势禁卖', end=' ')
 
-    def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-                   held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
         if history is not None:
             if held_day > 0:
                 df = append_ak_quote_dict(history, quote, curr_date)

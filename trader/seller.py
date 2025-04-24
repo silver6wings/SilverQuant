@@ -59,8 +59,16 @@ class BaseSeller:
         positions: List[XtPosition],
         held_days: Dict[str, int],
         max_prices: Dict[str, float],
-        cache_history: Dict[str, pd.DataFrame]
+        cache_history: Dict[str, pd.DataFrame],
+        today_ticks: Dict[str, list] = None,
+        extra_datas: Dict[str, any] = None,
     ) -> None:
+        if today_ticks is None:
+            today_ticks = {}
+
+        if extra_datas is None:
+            extra_datas = {}
+
         for position in positions:
             code = position.stock_code
 
@@ -75,11 +83,13 @@ class BaseSeller:
                     held_day=held_days[code],
                     max_price=max_prices[code] if code in max_prices else None,
                     history=cache_history[code] if code in cache_history else None,
+                    ticks=today_ticks[code] if code in today_ticks else None,
+                    extra=extra_datas[code] if code in today_ticks else None,
                 )
 
     def check_sell(
         self, code: str, quote: Dict, curr_date: str, curr_time: str,
         position: XtPosition, held_day: int, max_price: Optional[float],
-        history: Optional[pd.DataFrame],
+        history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
     ) -> bool:
         return False  # False 表示没有卖过，不阻挡其他Seller卖出
