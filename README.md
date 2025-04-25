@@ -346,6 +346,7 @@ pywencai的原理是去 https://www.iwencai.com/ 抓取数据，
 记得一定要先安装 Node.js，安装完毕至少要重启PyCharm一次
 否则会报错：'NoneType' object has no attribute 'get' 
 其次检查自己的选股提示词 (Prompt) 能不能在网页上搜到票
+最后，间隔建议设置为30秒，否则容易被封IP
 $ pip install pywencai --upgrade 
 ```
 
@@ -382,7 +383,7 @@ tushare 作为 akshare 的备用数据源，需要配置对应的 token 才可�
 
 使用过程中若遇到任何深度的问题，资源或项目有意向寻求合作
 
-欢迎联系作者的 WX 工作号: `junchaoyu_`
+欢迎联系作者的 WX 工作号: `junchaoyu_` 加入技术支持群
 
 （添加的时候记得注明来意哦，亲~）
 
