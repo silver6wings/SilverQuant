@@ -303,6 +303,17 @@ class XtDelegate(BaseDelegate):
             if order.stock_code == code and order.order_type == STOCK_SELL:
                 self.order_cancel_async(order.order_id)
 
+    def check_ipo_data(self) -> dict:
+        if self.xt_trader is not None:
+            return self.xt_trader.query_ipo_data()
+        else:
+            raise Exception('xt_trader为空')
+        
+    def check_new_purchase_limit(self) -> dict:
+        if self.xt_trader is not None:
+            return self.xt_trader.query_new_purchase_limit(self.account)
+        else:
+            raise Exception('xt_trader为空')
 
 def is_position_holding(position: XtPosition) -> bool:
     return position.volume > 0
