@@ -346,7 +346,7 @@ pywencai的原理是去 https://www.iwencai.com/ 抓取数据，
 记得一定要先安装 Node.js，安装完毕至少要重启PyCharm一次
 否则会报错：'NoneType' object has no attribute 'get' 
 其次检查自己的选股提示词 (Prompt) 能不能在网页上搜到票
-最后，间隔建议设置为30秒，否则容易被封IP
+最后，间隔建议设置为30秒或者更长，否则容易被封IP
 $ pip install pywencai --upgrade 
 ```
 
@@ -363,6 +363,13 @@ About tushare
 ```
 tushare 作为 akshare 的备用数据源，需要配置对应的 token 才可以使用
 框架支持多个 token，请参考 reader/tushare_token_sample.py 
+```
+
+About mytt
+
+框架内置 [MyTT](https://github.com/mpquant/MyTT) 的部分代码
+```
+同时针对部分核心函数不支持动态参数的局限添加改进后的强化版本
 ```
 
 ---
@@ -388,3 +395,8 @@ tushare 作为 akshare 的备用数据源，需要配置对应的 token 才可�
 （添加的时候记得注明来意哦，亲~）
 
 PS: 目前暂未建立任何付费分享渠道，请明辨真假，谨防冒牌货
+
+# 鸣谢
+
+* 感谢 [@owen590](https://github.com/owen590) 同学从第一行代码开始提供的宝贵意见
+* 感谢 [@dominicx](https://github.com/dominicx) 同学提交的PR，修复作者未覆盖的场景
