@@ -1,6 +1,6 @@
 import datetime
 import threading
-from typing import Optional, Dict
+from typing import Optional
 
 from gmtrade.api import *
 from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
@@ -16,27 +16,30 @@ class GmCallback:
         account_id: str,
         strategy_name: str,
         ding_messager: DingMessager,
-        lock_of_disk_cache: threading.Lock,
+        disk_lock: threading.Lock,
         path_deal: str,
         path_held: str,
-        path_maxp: str,
+        path_max_prices: str,
+        path_min_prices: str,
         debug: bool = False,
     ):
         super().__init__()
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
         self.ding_messager = ding_messager
-        self.lock_of_disk_cache = lock_of_disk_cache
+        self.disk_lock = disk_lock
         self.path_deal = path_deal
         self.path_held = path_held
-        self.path_maxp = path_maxp
+        self.path_max_prices = path_max_prices
+        self.path_min_prices = path_min_prices
 
         self.stock_names = StockNames()
         self.debug: bool = debug
 
         GmCache.gm_callback = self
 
-    def register_callback(self):
+    @staticmethod
+    def register_callback():
         file_name = str('delegate.gm_callback.py').split('\\')[-1]
         # print(file_name)
         status = start(filename=file_name)
@@ -47,13 +50,14 @@ class GmCallback:
             print(f'[掘金]:订阅回调失败')
             # stop()
 
-    def unregister_callback(self):
+    @staticmethod
+    def unregister_callback():
         print(f'[掘金]:取消订阅回调')
         # stop()
 
     def record_order(self, order_time: str, code: str, price: float, volume: int, side: str, remark: str):
         record_deal(
-            lock=self.lock_of_disk_cache,
+            lock=self.disk_lock,
             path=self.path_deal,
             timestamp=order_time,
             code=code,
@@ -121,8 +125,9 @@ class GmCallback:
             traded_price = order.price
 
             if order.side == OrderSide_Sell:
-                del_key(self.lock_of_disk_cache, self.path_held, stock_code)
-                del_key(self.lock_of_disk_cache, self.path_maxp, stock_code)
+                del_key(self.disk_lock, self.path_held, stock_code)
+                del_key(self.disk_lock, self.path_max_prices, stock_code)
+                del_key(self.disk_lock, self.path_min_prices, stock_code)
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text(
@@ -131,7 +136,7 @@ class GmCallback:
                     '[SELL]')
 
             if order.side == OrderSide_Buy:
-                new_held(self.lock_of_disk_cache, self.path_held, [stock_code])
+                new_held(self.disk_lock, self.path_held, [stock_code])
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text(
@@ -141,6 +146,7 @@ class GmCallback:
 
         else:
             print(order.status, order.symbol)
+
 
 class GmCache:
     gm_callback: Optional[GmCallback] = None

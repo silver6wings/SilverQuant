@@ -73,27 +73,30 @@ class XtCustomCallback(XtBaseCallback):
         account_id: str,
         strategy_name: str,
         ding_messager: DingMessager,
-        lock_of_disk_cache: threading.Lock,
+        disk_lock: threading.Lock,
         path_deal: str,
         path_held: str,
-        path_maxp: str,
+        path_max_prices: str,
+        path_min_prices: str,
         stock_traded_callback: Callable = None,
     ):
         super().__init__()
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
         self.ding_messager = ding_messager
-        self.lock_of_disk_cache = lock_of_disk_cache
+        self.disk_lock = disk_lock
         self.path_deal = path_deal
         self.path_held = path_held
-        self.path_maxp = path_maxp
+        self.path_max_prices = path_max_prices
+        self.path_min_prices = path_min_prices
+
         self.stock_traded_callback = stock_traded_callback
 
         self.stock_names = StockNames()
 
     def record_order(self, order_time: str, code: str, price: float, volume: int, side: str, remark: str):
         record_deal(
-            lock=self.lock_of_disk_cache,
+            lock=self.disk_lock,
             path=self.path_deal,
             timestamp=order_time,
             code=code,
@@ -113,8 +116,9 @@ class XtCustomCallback(XtBaseCallback):
         name = self.stock_names.get_name(stock_code)
 
         if trade.order_type == xtconstant.STOCK_SELL:
-            del_key(self.lock_of_disk_cache, self.path_held, stock_code)
-            del_key(self.lock_of_disk_cache, self.path_maxp, stock_code)
+            del_key(self.disk_lock, self.path_held, stock_code)
+            del_key(self.disk_lock, self.path_max_prices, stock_code)
+            del_key(self.disk_lock, self.path_min_prices, stock_code)
 
             # self.record_order(
             #     order_datetime=traded_time,
@@ -133,7 +137,7 @@ class XtCustomCallback(XtBaseCallback):
                     '[SELL]')
 
         elif trade.order_type == xtconstant.STOCK_BUY:
-            new_held(self.lock_of_disk_cache, self.path_held, [stock_code])
+            new_held(self.disk_lock, self.path_held, [stock_code])
 
             # self.record_order(
             #     order_datetime=traded_time,

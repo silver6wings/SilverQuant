@@ -30,11 +30,12 @@ PATH_BASE = CACHE_BASE_PATH
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
 PATH_HELD = PATH_BASE + '/held_days.json'       # 记录持仓日期
-PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录历史最高
+PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
+PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 用来存储选股和委托操作
 PATH_INFO = PATH_BASE + '/tmp_{}.pkl'           # 用来缓存当天的指标信息
 
-lock_of_disk_cache = threading.Lock()           # 操作磁盘文件缓存的锁
+disk_lock = threading.Lock()           # 操作磁盘文件缓存的锁
 
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 
@@ -106,8 +107,8 @@ def held_increase() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
         return
 
-    update_position_held(lock_of_disk_cache, my_delegate, PATH_HELD)
-    if all_held_inc(lock_of_disk_cache, PATH_HELD):
+    update_position_held(disk_lock, my_delegate, PATH_HELD)
+    if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'All held stock day +1!')
 
@@ -267,7 +268,7 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 
 
 def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_days = update_max_prices(lock_of_disk_cache, quotes, positions, PATH_MAXP, PATH_HELD)
+    max_prices, held_days = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_days, max_prices, my_suber.cache_history)
 
 
@@ -303,10 +304,11 @@ if __name__ == '__main__':
             account_id=QMT_ACCOUNT_ID,
             strategy_name=STRATEGY_NAME,
             ding_messager=DING_MESSAGER,
-            lock_of_disk_cache=lock_of_disk_cache,
+            disk_lock=disk_lock,
             path_deal=PATH_DEAL,
             path_held=PATH_HELD,
-            path_maxp=PATH_MAXP,
+            path_max_prices=PATH_MAXP,
+            path_min_prices=PATH_MINP,
         )
         my_delegate = XtDelegate(
             account_id=QMT_ACCOUNT_ID,
@@ -321,10 +323,11 @@ if __name__ == '__main__':
             account_id=QMT_ACCOUNT_ID,
             strategy_name=STRATEGY_NAME,
             ding_messager=DING_MESSAGER,
-            lock_of_disk_cache=lock_of_disk_cache,
+            disk_lock=disk_lock,
             path_deal=PATH_DEAL,
             path_held=PATH_HELD,
-            path_maxp=PATH_MAXP,
+            path_max_prices=PATH_MAXP,
+            path_min_prices=PATH_MINP,
         )
         my_delegate = GmDelegate(
             account_id=QMT_ACCOUNT_ID,

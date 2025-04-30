@@ -220,6 +220,7 @@ def update_max_prices(
     quotes: dict,
     positions: list,
     path_max_prices: str,
+    path_min_prices: str,
     path_held_days: str,
     ignore_open_day: bool = True,  # 是否忽略开仓日，从次日开始计算最高价
 ):
@@ -227,9 +228,11 @@ def update_max_prices(
 
     with lock:
         max_prices = load_json(path_max_prices)
+        min_prices = load_json(path_min_prices)
 
-    # 更新历史最高
-    updated = False
+    max_updated = False
+    min_updated = False
+
     for position in positions:
         code = position.stock_code
         if code in held_days:  # 只更新持仓超过一天的
@@ -237,21 +240,37 @@ def update_max_prices(
                 held_day = held_days[code]
                 if held_day <= 0:
                     continue
+
             if code in quotes:
                 quote = quotes[code]
-                high_price = quote['high']
 
+                # 更新历史最高
+                high_price = quote['high']
                 if code in max_prices:
                     if max_prices[code] < high_price:
                         max_prices[code] = round(high_price, 3)
-                        updated = True
+                        max_updated = True
                 else:
                     max_prices[code] = round(high_price, 3)
-                    updated = True
+                    max_updated = True
 
-    if updated:
+                # 更新历史最低
+                low_price = quote['low']
+                if code in min_prices:
+                    if min_prices[code] < low_price:
+                        min_prices[code] = round(low_price, 3)
+                        min_updated = True
+                else:
+                    min_prices[code] = round(low_price, 3)
+                    min_updated = True
+
+    if max_updated:
         with lock:
             save_json(path_max_prices, max_prices)
+
+    if min_updated:
+        with lock:
+            save_json(path_min_prices, min_prices)
 
     return max_prices, held_days
 
