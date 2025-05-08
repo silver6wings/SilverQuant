@@ -390,6 +390,8 @@ if __name__ == '__main__':
         while True:
             schedule.run_pending()
             time.sleep(1)
+    except KeyboardInterrupt:
+        print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
     finally:
         schedule.clear()
         my_delegate.shutdown()
