@@ -1,7 +1,8 @@
 akshare>=1.16.0
+gmtrade>=3.0.6
 numpy==2.2.4
 pandas==2.2.3
 pywencai>=0.12.3
-schedule>=1.2.1
-typing>=3.7.4.3
 requests>=2.31.0
+schedule>=1.2.1
+tushare>=1.4.21
