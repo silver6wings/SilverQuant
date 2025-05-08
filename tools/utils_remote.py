@@ -1,14 +1,9 @@
 import datetime
-import time
 
 import requests
 import pandas as pd
 from typing import Optional
 
-import akshare as ak
-import pywencai
-
-from reader.tushare_agent import get_tushare_pro
 from tools.utils_basic import is_stock, code_to_symbol
 
 
@@ -18,6 +13,7 @@ class DataSource:
 
 
 def get_wencai_codes(queries: list[str]) -> list[str]:
+    import pywencai
     result = set()
     for query in queries:
         df = pywencai.get(query=query, perpage=100, loop=True)
@@ -92,6 +88,7 @@ def get_ak_daily_history(
     if not is_stock(code):
         return None
 
+    import akshare as ak
     try:
         df = ak.stock_zh_a_hist(
             symbol=code_to_symbol(code),
@@ -145,6 +142,7 @@ def get_ts_daily_history(
     if not is_stock(code):
         return None
 
+    from reader.tushare_agent import get_tushare_pro
     try_times = 0
     df = None
     while (df is None or len(df) <= 0) and try_times < 3:
@@ -173,6 +171,7 @@ def get_ts_daily_histories(
     columns: list[str] = None,
 ) -> dict[str, pd.DataFrame]:
 
+    from reader.tushare_agent import get_tushare_pro
     try_times = 0
     df = None
     while (df is None or len(df) <= 0) and try_times < 3:

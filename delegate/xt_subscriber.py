@@ -7,7 +7,7 @@ import threading
 import os
 import pandas as pd
 
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 
 from xtquant import xtdata
 
@@ -24,7 +24,7 @@ class XtSubscriber:
         self,
         account_id: str,
         strategy_name: str,
-        delegate: XtDelegate,
+        delegate: Optional[XtDelegate],
         path_deal: str,
         path_assets: str,
         execute_strategy: Callable,     # 策略回调函数
@@ -276,6 +276,9 @@ class XtSubscriber:
         self.check_asset(today=curr_date)
 
     def check_asset(self, today):
+        if self.delegate is None:
+            return
+
         asset = self.delegate.check_asset()
         title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
         txt = title
@@ -321,6 +324,9 @@ class XtSubscriber:
                     self.ding_messager.send_markdown(title, txt)
 
     def today_hold_report(self, today):
+        if self.delegate is None:
+            return
+
         if self.open_today_hold_report:
             positions = self.delegate.check_positions()
             txt = ''
