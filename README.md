@@ -52,9 +52,9 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > *注：[VSCode](https://code.visualstudio.com/) 因为配置过程更复杂，所以不做新手推荐*
 
-> 下载国金证券 QMT（推荐国金证券的券商版 QMT，用其他券商QMT可以下载他们对应的券商版 QMT）
+> 下载对应的券商版 QMT（需要提前找券商客户经理开通账户的 QMT 权限）
 > 
-> 截至2024年，国金开通后半年，有50万入金即可找客服开通免五
+> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以GJZQ为例：
 > 
 > WinRAR下载 https://www.win-rar.com/start.html?&L=0
 > 
