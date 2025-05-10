@@ -27,8 +27,8 @@ def logging_init(path=None, level=logging.DEBUG, file_line=False):
 
 
 # 多文件 logger的配置
-def logger_init(path=None) -> logging.Logger:
-    logger = logging.getLogger('a')
+def logger_init(path=None, name='a') -> logging.Logger:
+    logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
     # 移除已存在的处理器
