@@ -67,7 +67,7 @@ class StockNames:
 
 
 # 获取股票的中文名称
-def get_stock_code_and_names_sina():
+def get_stock_code_and_names_sina(retention_day: int = 7):
     cache_available = False
     df = pd.DataFrame(columns=['代码', '名称', '日期'])
     if os.path.exists(CODE_NAME_CACHE_PATH):
@@ -75,7 +75,7 @@ def get_stock_code_and_names_sina():
         cache_date_str = df['日期'].head(1).values[0]
         cache_date = datetime.datetime.strptime(cache_date_str, '%Y-%m-%d')
         curr_date = datetime.datetime.today()
-        if curr_date - cache_date < datetime.timedelta(days=90):
+        if curr_date - cache_date < datetime.timedelta(days=retention_day):
             cache_available = True
 
     if not cache_available:
@@ -349,7 +349,7 @@ def get_disk_trade_day_list_and_update_max_year() -> list:
 
 # 获取前n个交易日，返回格式 基本格式：%Y%m%d，扩展格式：%Y-%m-%d
 # 如果为非交易日，则取上一个交易日为前0天
-def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool=True) -> str:
+def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
     today = now.strftime('%Y-%m-%d')
     try:
@@ -415,13 +415,17 @@ def check_is_open_day(curr_date: str) -> bool:
 
 # 获取指数成份symbol
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
-    # # 中证指数接口
-    # df = ak.index_stock_cons_csindex(symbol=index_symbol)
-    # return [str(code).zfill(6) for code in df['成分券代码'].values]
+    if index_symbol[:2] == '00' or index_symbol[:2] == '93':
+        # 中证指数接口
+        df = ak.index_stock_cons_csindex(symbol=index_symbol)
+    else:
+        # 普通指数接口：有重复不全，需要注意
+        df = ak.index_stock_cons(symbol=index_symbol)
 
-    # 普通指数接口
-    df = ak.index_stock_cons(symbol=index_symbol)
-    return [str(code).zfill(6) for code in df['品种代码'].values]
+    if '品种代码' in df.columns:
+        return [str(code).zfill(6) for code in df['品种代码'].values]
+    else:
+        return [str(code).zfill(6) for code in df['成分券代码'].values]
 
 
 # 获取指数成份code

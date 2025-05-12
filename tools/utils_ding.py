@@ -59,31 +59,16 @@ class DingMessager(object):
             traceback.print_exc()
             return {'errmsg': 'Exception!'}
 
-    def send_text(self, msg: str, output: str = '', alert: bool = False, to_markdown: bool = True) -> bool:
-        if to_markdown:
-            title = msg.split('\n')[0]
-            text = msg.replace('\n', '\n>\n>')
-
-            res = self.send_message(data={
-                'msgtype': 'markdown',
-                'markdown': {
-                    'title': title,
-                    'text': text,
-                },
-                'at': {
-                    'isAtAll': alert,
-                }
-            })
-        else:
-            res = self.send_message(data={
-                "msgtype": "text",
-                "text": {
-                    "content": msg,
-                },
-                "at": {
-                    "isAtAll": alert,
-                },
-            })
+    def send_text(self, msg: str, output: str = '', alert: bool = False) -> bool:
+        res = self.send_message(data={
+            "msgtype": "text",
+            "text": {
+                "content": msg,
+            },
+            "at": {
+                "isAtAll": alert,
+            },
+        })
 
         if res['errmsg'] == 'ok':
             print(output, end='')

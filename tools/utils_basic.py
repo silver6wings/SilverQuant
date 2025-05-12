@@ -1,10 +1,10 @@
 import datetime
 import logging
-import pandas as pd
 
 
 # pandas dataframe 显示配置优化
 def pd_show_all() -> None:
+    import pandas as pd
     pd.set_option('display.width', None)
     pd.set_option('display.min_rows', 1000)
     pd.set_option('display.max_rows', 5000)
@@ -27,7 +27,7 @@ def logging_init(path=None, level=logging.DEBUG, file_line=False):
 
 
 # 多文件 logger的配置
-def logger_init(path=None, name='a') -> logging.Logger:
+def logger_init(path=None, name='default') -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
@@ -50,7 +50,7 @@ def logger_init(path=None, name='a') -> logging.Logger:
 
 
 # 六位数symbol代码转换成带交易所后缀code格式
-def symbol_to_code(symbol: str|int) -> str:
+def symbol_to_code(symbol: str | int) -> str:
     symbol = str(symbol) if type(symbol) == int else symbol
 
     if symbol[:2] in ['00', '30', '15', '12']:
@@ -73,7 +73,7 @@ def code_to_symbol(code: str) -> str:
 # ==========
 # 掘金系列代码
 # ==========
-def symbol_to_gmsymbol(symbol: str|int) -> str:
+def symbol_to_gmsymbol(symbol: str | int) -> str:
     symbol = str(symbol) if type(symbol) == int else symbol
 
     if symbol[:2] in ['00', '30', '15', '12']:
@@ -111,34 +111,52 @@ def is_symbol(code_or_symbol: str):
     ]
 
 
-# 判断是不是股票代码
-def is_stock(code_or_symbol: str|int):
+def is_stock(code_or_symbol: str | int):
+    """ 判断是不是股票代码 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
-    return code_or_symbol[:2] in [
-        '00', '30', '60', '68', '82', '83', '87', '88', '43', '92',
-    ]
+    return code_or_symbol[:2] in ['00', '30', '60', '68', '82', '83', '87', '88', '43', '92']
 
 
-# 判断是不是科创证券
-def is_stock_kc(code_or_symbol: str|int):
+def is_stock_10cm(code_or_symbol: str | int):
+    """ 判断是不是10cm票 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    return code_or_symbol[:2] in ['00', '60']
+
+
+def is_stock_20cm(code_or_symbol: str | int):
+    """ 判断是不是20cm票 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    return code_or_symbol[:2] in ['30', '68']
+
+
+def is_stock_cy(code_or_symbol: str | int):
+    """ 判断是不是创业板 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    return code_or_symbol[:2] == '30'
+
+
+def is_stock_kc(code_or_symbol: str | int):
+    """ 判断是不是科创板 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
     return code_or_symbol[:2] == '68'
 
 
-# 判断是不是etf代码
-def is_fund_etf(code_or_symbol: str|int):
+def is_stock_bj(code_or_symbol: str | int):
+    """ 判断是不是北交所 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
-    return code_or_symbol[:2] in [
-        '15', '51', '52', '53', '56', '58'
-    ]
+    return code_or_symbol[:2] in ['82', '83', '87', '88', '43', '92']
 
 
-# 判断是不是可转债
-def is_bond(code_or_symbol: str|int):
+def is_fund_etf(code_or_symbol: str | int):
+    """ 判断是不是etf代码 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
-    return code_or_symbol[:2] in [
-        '11', '12'
-    ]
+    return code_or_symbol[:2] in ['15', '51', '52', '53', '56', '58']
+
+
+def is_bond(code_or_symbol: str | int):
+    """ 判断是不是可转债 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    return code_or_symbol[:2] in ['11', '12']
 
 
 # 获取symbol的交易所简称
@@ -190,7 +208,7 @@ def get_current_time_percentage(time: str) -> float:
     return float(tsc) / 3600 / 4
 
 
-# 获取涨停率
+# 获取涨停幅
 def get_limiting_up_rate(code: str) -> float:
     if code[:2] == '30' or code[:2] == '68':
         return 1.2
@@ -200,7 +218,7 @@ def get_limiting_up_rate(code: str) -> float:
         return 1.1
 
 
-# 计算一只股票第二天的涨停价
+# 获取涨停价
 def get_limit_up_price(code: str, pre_close: float) -> float:
     if pre_close == 0:
         return 0
@@ -211,7 +229,7 @@ def get_limit_up_price(code: str, pre_close: float) -> float:
     return float(limit)
 
 
-# 获取跌停率
+# 获取跌停幅
 def get_limiting_down_rate(code: str) -> float:
     if code[:2] == '30' or code[:2] == '68':
         return 0.8
@@ -221,7 +239,7 @@ def get_limiting_down_rate(code: str) -> float:
         return 0.9
 
 
-# 计算一只股票第二天的跌停价
+# 获取跌停价
 def get_limit_down_price(code: str, pre_close: float) -> float:
     if pre_close == 0:
         return 0
@@ -233,7 +251,7 @@ def get_limit_down_price(code: str, pre_close: float) -> float:
 
 
 def time_diff_seconds(later_time: datetime.datetime.time, early_time: datetime.datetime.time):
-    # 将时间转换为总秒数
+    """ 将时间转换为总秒数 """
     total_seconds_time1 = later_time.hour * 3600 + later_time.minute * 60 + later_time.second
     total_seconds_time2 = early_time.hour * 3600 + early_time.minute * 60 + early_time.second
 
@@ -241,13 +259,3 @@ def time_diff_seconds(later_time: datetime.datetime.time, early_time: datetime.d
     diff_seconds = abs(total_seconds_time1 - total_seconds_time2)
 
     return diff_seconds
-
-
-if __name__ == '__main__':
-    # logging_init()
-    # logging.warning('123456')
-    # print(map_num_to_chr(6300))
-    # print(get_current_time_percentage('13:01:00'))
-
-    print(get_limit_up_price('301000', 10.00))
-    print(get_limit_down_price('301000', 10.00))
