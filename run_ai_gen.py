@@ -383,7 +383,7 @@ if __name__ == '__main__':
         if '08:15' < temp_time < '14:57':
             prepare_history()  # 重启时防止没有数据在这先加载历史数据
 
-        if '09:25' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
+        if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
             my_suber.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 
     try:

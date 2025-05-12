@@ -380,7 +380,7 @@ class XtSubscriber:
             schedule.every().day.at('09:10').do(self.clean_ticks_history)
             schedule.every().day.at('15:10').do(self.save_tick_history)
 
-        schedule.every().day.at('09:25').do(self.subscribe_tick)
+        schedule.every().day.at('09:15').do(self.subscribe_tick)
         schedule.every().day.at('11:30').do(self.unsubscribe_tick, False)
 
         schedule.every().day.at('13:00').do(self.subscribe_tick, False)
