@@ -34,7 +34,10 @@ class IndexSymbol:
     INDEX_ZZ_ALL = '000985'     # 中证全指
     INDEX_CY_ZS = '399006'      # 创业指数
     INDEX_KC_50 = '000688'      # 科创50
+    INDEX_BZ_50 = '899050'      # 北证50
     INDEX_ZX_100 = '399005'     # 中小100
+    INDEX_ZZ_A50 = '000050'     # 中证A50
+    INDEX_ZZ_A500 = '000510'     # 中证A500
 
 
 # 查询股票名称
@@ -67,7 +70,7 @@ class StockNames:
 
 
 # 获取股票的中文名称
-def get_stock_code_and_names_sina(retention_day: int = 7):
+def load_stock_code_and_names(retention_day: int = 1):
     cache_available = False
     df = pd.DataFrame(columns=['代码', '名称', '日期'])
     if os.path.exists(CODE_NAME_CACHE_PATH):
@@ -79,12 +82,17 @@ def get_stock_code_and_names_sina(retention_day: int = 7):
             cache_available = True
 
     if not cache_available:
-        df = ak.stock_zh_a_spot()
+        df = ak.stock_info_a_code_name()
+        df = df.rename(columns={'code': '代码', 'name': '名称'})
+
+        if len(df) == 0:
+            df = ak.stock_zh_a_spot() # 这个接口容易封IP，留作备用
+            df['代码'] = df['代码'].str[2:]
+
         df = df[['代码', '名称']]
-        df['代码'] = df['代码'].str[2:]
         df = df.sort_values(by='代码')
         df['日期'] = datetime.datetime.today().strftime('%Y-%m-%d')
-        # print(df)
+
         df.to_csv(CODE_NAME_CACHE_PATH)
 
     return df
@@ -107,7 +115,7 @@ def get_stock_codes_and_names() -> Dict[str, str]:
             ans[arr['code']] = arr['name']
 
     # df = ak.stock_zh_a_spot_em()
-    df = get_stock_code_and_names_sina()
+    df = load_stock_code_and_names()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     ans.update(dict(zip(df['代码'], df['名称'])))
     return ans
@@ -415,7 +423,7 @@ def check_is_open_day(curr_date: str) -> bool:
 
 # 获取指数成份symbol
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
-    if index_symbol[:2] == '00' or index_symbol[:2] == '93':
+    if index_symbol[:2] in ['00', '93', '89']:
         # 中证指数接口
         df = ak.index_stock_cons_csindex(symbol=index_symbol)
     else:
