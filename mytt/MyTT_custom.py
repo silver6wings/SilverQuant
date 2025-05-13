@@ -3,7 +3,8 @@ import pandas as pd
 
 
 def INT(S: pd.Series):
-    return S.astype(int)
+    S_filtered = np.nan_to_num(S, nan=0.0)  # 或者使用其他合适的值
+    return S_filtered.astype(int)
 
 
 def NOT(S: pd.Series):
