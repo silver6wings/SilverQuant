@@ -51,7 +51,7 @@ class ClassicMAGroupSeller(GroupSellers, HardSeller, FallSeller, ReturnSeller, M
 
 
 # 监控卖出
-class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller, ReturnSeller):
+class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller):
     def __init__(self, strategy_name, delegate, parameters):
         super().__init__()
         self.group_init(strategy_name, delegate, parameters)
