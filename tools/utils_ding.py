@@ -59,11 +59,11 @@ class DingMessager(object):
             traceback.print_exc()
             return {'errmsg': 'Exception!'}
 
-    def send_text(self, msg: str, output: str = '', alert: bool = False) -> bool:
+    def send_text(self, text: str, output: str = '', alert: bool = False) -> bool:
         res = self.send_message(data={
             "msgtype": "text",
             "text": {
-                "content": msg,
+                "content": text,
             },
             "at": {
                 "isAtAll": alert,
@@ -71,13 +71,22 @@ class DingMessager(object):
         })
 
         if res['errmsg'] == 'ok':
-            print(output, end='')
+            if len(output) > 0:
+                print(output, end='')
+            else:
+                print('Ding message send success!')
             return True
         else:
             print('Ding message send failed: ', res['errmsg'])
             return False
 
-    def send_markdown(self, title: str, text: str, alert: bool = False) -> bool:
+    def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
+        title = text.split('\n')[0]
+        text = text.replace('\n', '\n>\n>')
+
+        return self.send_markdown(title, text, output, alert)
+
+    def send_markdown(self, title: str, text: str, output: str = '', alert: bool = False) -> bool:
         # my_data = {
         #     "msgtype": "markdown",
         #     "markdown": {
@@ -104,7 +113,10 @@ class DingMessager(object):
         res = self.send_message(data=my_data)
 
         if res['errmsg'] == 'ok':
-            print('Ding markdown send success!')
+            if len(output) > 0:
+                print(output, end='')
+            else:
+                print('Ding markdown send success!')
             return True
         else:
             print('Ding markdown send failed: ', res['errmsg'])

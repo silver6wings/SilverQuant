@@ -117,7 +117,7 @@ class GmCallback:
 
     def on_order_status(self, order: Order):
         if order.status == OrderStatus_Rejected:
-            self.ding_messager.send_text(f'订单已拒绝:{order.symbol} {order.ord_rej_reason_detail}')
+            self.ding_messager.send_text_as_md(f'订单已拒绝:{order.symbol} {order.ord_rej_reason_detail}')
 
         elif order.status == OrderStatus_Filled:
             stock_code = gmsymbol_to_code(order.symbol)
@@ -130,7 +130,7 @@ class GmCallback:
                 del_key(self.disk_lock, self.path_min_prices, stock_code)
 
                 name = self.stock_names.get_name(stock_code)
-                self.ding_messager.send_text(
+                self.ding_messager.send_text_as_md(
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖出成交 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[SELL]')
@@ -139,7 +139,7 @@ class GmCallback:
                 new_held(self.disk_lock, self.path_held, [stock_code])
 
                 name = self.stock_names.get_name(stock_code)
-                self.ding_messager.send_text(
+                self.ding_messager.send_text_as_md(
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 买入成交 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[BUY]')

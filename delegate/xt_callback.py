@@ -130,7 +130,7 @@ class XtCustomCallback(XtBaseCallback):
             # )
 
             if self.ding_messager is not None:
-                self.ding_messager.send_text(
+                self.ding_messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
@@ -149,7 +149,7 @@ class XtCustomCallback(XtBaseCallback):
             # )
 
             if self.ding_messager is not None:
-                self.ding_messager.send_text(
+                self.ding_messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
@@ -172,7 +172,7 @@ class XtCustomCallback(XtBaseCallback):
         log = f'异步撤单委托 {res.order_id} msg:{res.error_msg} result:{res.cancel_result} ',
         logging.warning(log)
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name} 低封撤单\n'
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤成\n'
                 '[CANCEL]')

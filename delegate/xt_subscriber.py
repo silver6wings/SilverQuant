@@ -117,7 +117,7 @@ class XtSubscriber:
 
         if now - self.last_callback_time > datetime.timedelta(minutes=1):
             if self.ding_messager is not None:
-                self.ding_messager.send_text(
+                self.ding_messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name}:中断\n请检查QMT数据源 ',
                     alert=True,
                 )
@@ -135,8 +135,8 @@ class XtSubscriber:
             return
 
         if self.ding_messager is not None:
-            self.ding_messager.send_text(f'[{self.account_id}]{self.strategy_name}:'
-                                         f'{"启动" if notice else "恢复"} {len(self.code_list)}支')
+            self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                               f'{"启动" if notice else "恢复"} {len(self.code_list)}支')
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
         xtdata.enable_hello = False
         print('[启动行情订阅]', end='')
@@ -147,8 +147,8 @@ class XtSubscriber:
 
         if 'sub_seq' in self.cache_limits:
             if self.ding_messager is not None:
-                self.ding_messager.send_text(f'[{self.account_id}]{self.strategy_name}:'
-                                             f'{"关闭" if notice else "暂停"}')
+                self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                                   f'{"关闭" if notice else "暂停"}')
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
             print('\n[关闭行情订阅]')
 
@@ -172,11 +172,11 @@ class XtSubscriber:
                 tick_time,                          # 成交时间，格式：%H:%M:%S
                 round(quote['lastPrice'], 3),       # 成交价格
                 int(quote['volume']),               # 累计成交量（手）
-                round(quote['askPrice'][0], 3),     # 卖一价
-                int(quote['askVol'][0]),            # 卖一量
-                round(quote['bidPrice'][0], 3),     # 买一价
-                int(quote['bidVol'][0]),            # 买一量
                 round(quote['amount'], 3),          # 累计成交额（元）
+                [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['askPrice']],  # 卖价
+                [int(v) if isinstance(v, (int, float)) else v for v in quote['askVol']],         # 卖量
+                [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
+                [int(v) if isinstance(v, (int, float)) else v for v in quote['bidVol']],         # 买量
             ])
 
     def clean_ticks_history(self):
@@ -252,7 +252,8 @@ class XtSubscriber:
             self.cache_history.update(temp_indicators)
             print(f'{len(self.cache_history)} histories loaded from {cache_path}')
             if self.ding_messager is not None:
-                self.ding_messager.send_text(f'[{self.account_id}]{self.strategy_name}:加载{len(self.cache_history)}支')
+                self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                                   f'加载{len(self.cache_history)}支')
         else:
             # 如果没缓存就刷新白名单
             self.cache_history.clear()
@@ -261,7 +262,8 @@ class XtSubscriber:
             save_pickle(cache_path, self.cache_history)
             print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
             if self.ding_messager is not None:
-                self.ding_messager.send_text(f'[{self.account_id}]{self.strategy_name}:下载{len(self.cache_history)}支')
+                self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                                   f'下载{len(self.cache_history)}支')
 
     # -----------------------
     # 盘后报告总结
@@ -275,32 +277,6 @@ class XtSubscriber:
         self.today_hold_report(today=curr_date)
         self.check_asset(today=curr_date)
 
-    def check_asset(self, today):
-        if self.delegate is None:
-            return
-
-        asset = self.delegate.check_asset()
-        title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
-        txt = title
-
-        increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
-        if increase is not None:
-            txt += '\n>\n> '
-            txt += f'当日变动: {"+" if increase > 0 else ""}{round(increase, 2)}元' \
-                   f'({"+" if increase > 0 else ""}{round(increase * 100 / asset.total_asset, 2)}%)'
-
-        txt += '\n>\n> '
-        txt += f'持仓市值: {round(asset.market_value, 2)}元'
-
-        txt += '\n>\n> '
-        txt += f'剩余现金: {round(asset.cash, 2)}元'
-
-        txt += f'\n>\n>'
-        txt += f'资产总计: {round(asset.total_asset, 2)}元'
-
-        if self.ding_messager is not None:
-            self.ding_messager.send_markdown(title, txt)
-
     def today_deal_report(self, today):
         if self.open_today_deal_report:
             if not os.path.exists(self.path_deal):
@@ -311,17 +287,17 @@ class XtSubscriber:
                 df = df[df['日期'] == today]
 
             if len(df) > 0:
-                title = f'[{self.account_id}]{self.strategy_name} 交易{len(df)}单'
-                txt = f'{title}\n\n{today}'
+                title = f'[{self.account_id}]{self.strategy_name} 委托统计'
+                text = f'{title}\n\n[{today}] 交易{len(df)}单'
                 for index, row in df.iterrows():
                     # ['日期', '时间', '代码', '名称', '类型', '注释', '成交价', '成交量']
-                    txt += '\n\n> '
-                    txt += f'{row["时间"]} {row["注释"]} {code_to_symbol(row["代码"])} '
-                    txt += '\n>\n> '
-                    txt += f'{row["名称"]} {row["成交量"]}股 {row["成交价"]}元 '
+                    text += '\n\n> '
+                    text += f'{row["时间"]} {row["注释"]} {code_to_symbol(row["代码"])} '
+                    text += '\n>\n> '
+                    text += f'{row["名称"]} {row["成交量"]}股 {row["成交价"]}元 '
 
                 if self.ding_messager is not None:
-                    self.ding_messager.send_markdown(title, txt)
+                    self.ding_messager.send_markdown(title, text)
 
     def today_hold_report(self, today):
         if self.delegate is None:
@@ -329,7 +305,7 @@ class XtSubscriber:
 
         if self.open_today_hold_report:
             positions = self.delegate.check_positions()
-            txt = ''
+            text = ''
             i = 0
             for position in positions:
                 if position.volume > 0:
@@ -346,12 +322,12 @@ class XtSubscriber:
                     vol = position.volume
 
                     i += 1
-                    txt += '\n\n>'
-                    txt += f'' \
-                           f'{code_to_symbol(code)} ' \
-                           f'{self.stock_names.get_name(code)} ' \
-                           f'{curr_price * vol:.2f}元'
-                    txt += '\n>\n>'
+                    text += '\n\n>'
+                    text += f'' \
+                            f'{code_to_symbol(code)} ' \
+                            f'{self.stock_names.get_name(code)} ' \
+                            f'{curr_price * vol:.2f}元'
+                    text += '\n>\n>'
 
                     color = ''
                     # （红色RGB为：220、40、50，绿色RGB为：22、188、80）
@@ -360,15 +336,41 @@ class XtSubscriber:
                     if curr_price < open_price:
                         color = ' color="#16BC50"'
 
-                    txt += f'' \
-                           f'盈亏比:<font{color}>{(curr_price / open_price - 1) * 100:.2f}%</font> ' \
-                           f'盈亏额:<font{color}>{(curr_price - open_price) * vol:.2f}</font>'
+                    text += f'' \
+                            f'盈亏比:<font{color}>{(curr_price / open_price - 1) * 100:.2f}%</font> ' \
+                            f'盈亏额:<font{color}>{(curr_price - open_price) * vol:.2f}</font>'
 
-            title = f'[{self.account_id}]{self.strategy_name} 持仓{i}支'
-            txt = f'{title}\n\n{today}\n{txt}'
+            title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
+            text = f'{title}\n\n[{today}] 持仓{i}支\n{text}'
 
             if self.ding_messager is not None:
-                self.ding_messager.send_markdown(title, txt)
+                self.ding_messager.send_markdown(title, text)
+
+    def check_asset(self, today):
+        if self.delegate is None:
+            return
+
+        asset = self.delegate.check_asset()
+        title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
+        text = title
+
+        increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
+        if increase is not None:
+            text += '\n>\n> '
+            text += f'当日变动: {"+" if increase > 0 else ""}{round(increase, 2)}元' \
+                    f'({"+" if increase > 0 else ""}{round(increase * 100 / asset.total_asset, 2)}%)'
+
+        text += '\n>\n> '
+        text += f'持仓市值: {round(asset.market_value, 2)}元'
+
+        text += '\n>\n> '
+        text += f'剩余现金: {round(asset.cash, 2)}元'
+
+        text += f'\n>\n>'
+        text += f'资产总计: {round(asset.total_asset, 2)}元'
+
+        if self.ding_messager is not None:
+            self.ding_messager.send_markdown(title, text)
 
     # -----------------------
     # 定时器

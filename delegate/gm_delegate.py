@@ -114,7 +114,7 @@ class GmDelegate(BaseDelegate):
         """
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
                 f'{code}市买{volume}股{price:.2f}元',
                 '')
@@ -140,7 +140,7 @@ class GmDelegate(BaseDelegate):
     ):
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
                 f'{code}市卖{volume}股{price:.2f}元',
                 '')
@@ -190,7 +190,7 @@ class GmDelegate(BaseDelegate):
         """
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
                 f'{code}限买{volume}股{price:.2f}元',
                 '')
@@ -215,7 +215,7 @@ class GmDelegate(BaseDelegate):
     ):
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
                 f'{code}限卖{volume}股{price:.2f}元',
                 '')

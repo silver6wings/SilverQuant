@@ -31,7 +31,7 @@ class StockPool:
         print(f'Total list refreshed {len(self.get_code_list())} codes.')
 
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name}:更新{len(self.get_code_list())}支\n'
                 f'白名单: {len(self.cache_whitelist)} '
                 f'黑名单: {len(self.cache_blacklist)}')
@@ -65,7 +65,7 @@ class StockPool:
         print(f'{len(remove_list)} codes filter out.')
 
         if self.ding_messager is not None:
-            self.ding_messager.send_text(f'[{self.account_id}]{self.strategy_name}:筛除{len(remove_list)}支\n')
+            self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:筛除{len(remove_list)}支\n')
 
 
 # -----------------------
@@ -237,7 +237,7 @@ class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
 
         section_names = get_dfcf_industry_sections()
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name} 行业板块\n'
                 f'{section_names}')
         t_white_codes = get_dfcf_industry_stock_codes(section_names)
@@ -257,7 +257,7 @@ class StocksPoolWhitePrefixesConcept(StocksPoolBlackWencai):
 
         section_names = get_ths_concept_sections()
         if self.ding_messager is not None:
-            self.ding_messager.send_text(
+            self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name} 概念板块\n'
                 f'{section_names}')
         t_white_codes = get_ths_concept_stock_codes(section_names)
