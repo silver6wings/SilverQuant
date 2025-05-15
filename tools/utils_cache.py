@@ -457,10 +457,10 @@ def get_prefixes_stock_codes(prefixes: Set[str]) -> List[str]:
     """
     prefixes: 六位数的两位数前缀
     """
-    df = ak.stock_zh_a_spot_em()
+    df = ak.stock_info_a_code_name()
     return [
         symbol_to_code(symbol)
-        for symbol in df['代码'].values
+        for symbol in df['code'].values
         if symbol[:2] in prefixes
     ]
 
