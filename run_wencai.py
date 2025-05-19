@@ -61,6 +61,7 @@ class BuyConf:
     slot_count = 10         # 持股数量上限
     slot_capacity = 10000   # 每个仓的资金上限
     once_buy_limit = 10     # 单次选股最多买入股票数量（若单次未买进当日不会再买这只
+    inc_limit = 1.20        # 相对于昨日收盘的涨幅限制
 
 
 class SellConf:
@@ -140,10 +141,14 @@ def check_stock_codes(selected_codes: list[str], quotes: Dict) -> List[Dict[str,
         quote = quotes[code]
         curr_price = quote['lastPrice']
 
+        last_close = quote['lastClose']
+        if curr_price > last_close * BuyConf.inc_limit:
+            continue
+
         selection = {
             'code': code,
             'price': round(max(quote['askPrice'] + [curr_price]), 2),
-            'lastClose': round(quote['lastClose'], 2),
+            'lastClose': round(last_close, 2),
         }
         selections.append(selection)
 
