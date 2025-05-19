@@ -4,7 +4,7 @@
 
 如果觉得好用就给个星星反馈一下，好让作者有动力更新吖！😘
 
-Github 因某些原因不便境内服务器部署，请移步：[国内镜像](https://gitee.com/silver6wings/silverQuant)
+Github 因某些原因不便境内服务器部署，这里有：[国内镜像](https://gitee.com/silver6wings/silverQuant)
 
 ---
 
@@ -62,7 +62,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > QMT 模拟 https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
 
-> 如果需要问财大模型相关功能，需要下载 Node.JS 版本大于v16
+> 如果需要问财大模型相关功能，需要下载 Node.JS 版本 v16+
 >
 > https://nodejs.org/zh-cn
 
