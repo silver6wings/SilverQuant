@@ -209,42 +209,42 @@ def get_current_time_percentage(time: str) -> float:
 
 
 # 获取涨停幅
-def get_limiting_up_rate(code: str) -> float:
-    if code[:2] == '30' or code[:2] == '68':
+def get_limiting_up_rate(code_or_symbol: str) -> float:
+    if code_or_symbol[:2] == '30' or code_or_symbol[:2] == '68':
         return 1.2
-    elif code[:1] == '8' or code[:1] == '9' or code[:1] == '4':
+    elif code_or_symbol[:1] == '8' or code_or_symbol[:1] == '9' or code_or_symbol[:1] == '4':
         return 1.3
     else:
         return 1.1
 
 
 # 获取涨停价
-def get_limit_up_price(code: str, pre_close: float) -> float:
+def get_limit_up_price(code_or_symbol: str, pre_close: float) -> float:
     if pre_close == 0:
         return 0
 
-    limit_rate = get_limiting_up_rate(code)
+    limit_rate = get_limiting_up_rate(code_or_symbol)
     limit = pre_close * limit_rate
     limit = '%.2f' % limit
     return float(limit)
 
 
 # 获取跌停幅
-def get_limiting_down_rate(code: str) -> float:
-    if code[:2] == '30' or code[:2] == '68':
+def get_limiting_down_rate(code_or_symbol: str) -> float:
+    if code_or_symbol[:2] == '30' or code_or_symbol[:2] == '68':
         return 0.8
-    elif code[:1] == '8' or code[:1] == '9' or code[:1] == '4':
+    elif code_or_symbol[:1] == '8' or code_or_symbol[:1] == '9' or code_or_symbol[:1] == '4':
         return 0.7
     else:
         return 0.9
 
 
 # 获取跌停价
-def get_limit_down_price(code: str, pre_close: float) -> float:
+def get_limit_down_price(code_or_symbol: str, pre_close: float) -> float:
     if pre_close == 0:
         return 0
 
-    limit_rate = get_limiting_down_rate(code)
+    limit_rate = get_limiting_down_rate(code_or_symbol)
     limit = pre_close * limit_rate
     limit = '%.2f' % limit
     return float(limit)
