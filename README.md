@@ -54,7 +54,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 > 下载对应的券商版 QMT（需要提前找券商客户经理开通账户的 QMT 权限）
 > 
-> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以GJZQ为例：
+> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以[GJZQ](https://miniqmt.com/)为例：
 > 
 > WinRAR下载 https://www.win-rar.com/start.html?&L=0
 > 
