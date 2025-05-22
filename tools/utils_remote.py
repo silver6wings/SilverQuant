@@ -33,7 +33,7 @@ def pull_stock_codes(prefix: str, host: str, auth: str) -> (Optional[list[str]],
         return None, 'Unknown Error'
 
 
-def append_ak_spot_dict(source_df: pd.DataFrame, row:pd.Series, curr_date: str) -> pd.DataFrame:
+def append_ak_spot_dict(source_df: pd.DataFrame, row: pd.Series, curr_date: str) -> pd.DataFrame:
     df = source_df._append({
         'datetime': curr_date,
         'open': row['今开'],
@@ -57,6 +57,20 @@ def append_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -
         'amount': quote['amount'],
     }, ignore_index=True)
     return df
+
+
+def concat_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
+    record = {
+        'datetime': curr_date,
+        'open': quote['open'],
+        'high': quote['high'],
+        'low': quote['low'],
+        'close': quote['lastPrice'],
+        'volume': quote['volume'],
+        'amount': quote['amount'],
+    }
+    new_row_df = pd.DataFrame([record.values()], columns=list(record.keys()))
+    return pd.concat([source_df, new_row_df], ignore_index=True)
 
 
 def append_ak_daily_row(source_df: pd.DataFrame, row: dict) -> pd.DataFrame:
