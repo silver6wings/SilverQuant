@@ -16,7 +16,6 @@ class BaseSeller:
         self.order_premium = parameters.order_premium
 
     def order_sell(self, code, quote, volume, remark, log=True) -> None:
-        # TODO: 20cm
         if volume > 0:
             order_price = quote['lastPrice'] - self.order_premium
             limit_price = get_limit_down_price(code, quote['lastClose'])

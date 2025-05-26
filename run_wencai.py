@@ -66,7 +66,7 @@ class BuyConf:
 
 class SellConf:
     time_ranges = [['09:31', '11:30'], ['13:00', '14:57']]
-    interval = 1                    # 扫描买入间隔，60的约数：1-6, 10, 12, 15, 20, 30
+    interval = 1                    # 扫描卖出间隔，60的约数：1-6, 10, 12, 15, 20, 30
     order_premium = 0.02            # 保证市价单成交的溢价，单位（元）
 
     hard_time_range = ['09:31', '14:57']
