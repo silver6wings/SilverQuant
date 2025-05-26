@@ -46,21 +46,37 @@ def append_ak_spot_dict(source_df: pd.DataFrame, row: pd.Series, curr_date: str)
     return df
 
 
-def append_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
-    df = source_df._append({
-        'datetime': curr_date,
-        'open': quote['open'],
-        'high': quote['high'],
-        'low': quote['low'],
-        'close': quote['lastPrice'],
+def adjust_list(input_list: list, target_length: int) -> list:
+    adjusted = input_list[:target_length]      # 截断超过目标长度的尾部
+    adjusted += [0] * (target_length - len(adjusted))  # 补0直到达到目标长度
+    return adjusted
+
+
+def quote_to_tick(quote: dict):
+    ans = {
+        'time': datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S'),
+        'price': quote['lastPrice'],
         'volume': quote['volume'],
         'amount': quote['amount'],
-    }, ignore_index=True)
-    return df
+    }
+
+    ap = adjust_list(quote['askPrice'], 5)
+    ans.update({f"askPrice{i+1}": ap[i] for i in range(min(5, len(ap)))})
+
+    av = adjust_list(quote['askVol'], 5)
+    ans.update({f"askVol{i+1}": av[i] for i in range(min(5, len(av)))})
+
+    bp = adjust_list(quote['bidPrice'], 5)
+    ans.update({f"bidPrice{i+1}": bp[i] for i in range(min(5, len(bp)))})
+
+    bv = adjust_list(quote['bidVol'], 5)
+    ans.update({f"bidVol{i+1}": bv[i] for i in range(min(5, len(bv)))})
+
+    return ans
 
 
-def concat_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
-    record = {
+def quote_to_day_kline(quote: dict, curr_date: str) -> dict:
+    return {
         'datetime': curr_date,
         'open': quote['open'],
         'high': quote['high'],
@@ -69,6 +85,15 @@ def concat_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -
         'volume': quote['volume'],
         'amount': quote['amount'],
     }
+
+
+def append_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
+    df = source_df._append(quote_to_day_kline(quote, curr_date=curr_date), ignore_index=True)
+    return df
+
+
+def concat_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
+    record = quote_to_day_kline(quote, curr_date=curr_date)
     new_row_df = pd.DataFrame([record.values()], columns=list(record.keys()))
     return pd.concat([source_df, new_row_df], ignore_index=True)
 
@@ -202,6 +227,7 @@ def get_ts_daily_histories(
         for code in codes:
             temp_df = df[df['ts_code'] == code]
             temp_df = ts_to_standard(temp_df)
+            temp_df['datetime'] = temp_df['datetime'].astype(str)
 
             if columns is None:
                 ans[code] = temp_df

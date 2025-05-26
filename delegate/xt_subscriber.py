@@ -1,4 +1,5 @@
 import json
+import pickle
 import datetime
 import time
 
@@ -16,7 +17,7 @@ from tools.utils_basic import code_to_symbol
 from tools.utils_cache import check_is_open_day, get_total_asset_increase, \
     load_pickle, save_pickle, load_json, save_json, StockNames
 from tools.utils_ding import DingMessager
-from tools.utils_remote import get_daily_history, DataSource
+from tools.utils_remote import DataSource, get_daily_history, quote_to_tick
 
 
 class XtSubscriber:
@@ -31,6 +32,7 @@ class XtSubscriber:
         execute_interval: int = 1,      # 策略执行间隔，单位（秒）
         ding_messager: DingMessager = None,
         open_tick_memory_cache: bool = False,
+        tick_memory_data_frame: bool = False,
         open_today_deal_report: bool = False,
         open_today_hold_report: bool = False,
     ):
@@ -52,17 +54,17 @@ class XtSubscriber:
             'prev_seconds': '',                     # 限制每秒一次跑策略扫描的缓存
             'prev_minutes': '',                     # 限制每分钟屏幕心跳换行的缓存
         }
-        self.cache_history: Dict[str, pd.DataFrame] = {}     # 记录历史日线行情的信息 { code: DataFrame }
+        self.cache_history: Dict[str, pd.DataFrame] = {}    # 记录历史日线行情的信息 { code: DataFrame }
 
         self.open_tick = open_tick_memory_cache
-        self.quick_ticks: bool = False              # 是否开启quick tick模式
-        self.today_ticks: Dict[str, list] = {}      # 记录tick的历史信息
-        # [ 成交时间, 成交价格, 累计成交量 ]
+        self.is_ticks_df = tick_memory_data_frame
+        self.quick_ticks: bool = False                          # 是否开启quick tick模式
+        self.today_ticks: Dict[str, list | pd.DataFrame] = {}   # 记录tick的历史信息
 
         self.open_today_deal_report = open_today_deal_report
         self.open_today_hold_report = open_today_hold_report
 
-        self.code_list = ['SH', 'SZ']
+        self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
         self.last_callback_time = datetime.datetime.now()
 
@@ -153,31 +155,44 @@ class XtSubscriber:
             print('\n[关闭行情订阅]')
 
     def update_code_list(self, code_list: list[str]):
-        # 防止没数据不打点
-        code_list += ['000001.SH']
-        self.code_list = code_list
+        # 加上证指数防止没数据不打点
+        self.code_list = ['000001.SH'] + code_list
 
     # -----------------------
     # 盘中实时的tick历史
     # -----------------------
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史
-        for code in quotes:
-            if code not in self.today_ticks:
-                self.today_ticks[code] = []
+        if self.is_ticks_df:
+            tick_df_cols = ['time', 'price', 'volume', 'amount'] \
+                + [f'askPrice{i}' for i in range(1, 6)] \
+                + [f'askVol{i}' for i in range(1, 6)] \
+                + [f'bidPrice{i}' for i in range(1, 6)] \
+                + [f'bidVol{i}' for i in range(1, 6)]
+            for code in quotes:
+                if code not in self.today_ticks:
+                    self.today_ticks[code] = pd.DataFrame(columns=tick_df_cols)
+                quote = quotes[code]
+                tick = quote_to_tick(quote)
+                df = self.today_ticks[code]
+                df.loc[len(df)] = tick.values()     # 加入最后一行
+        else:
+            for code in quotes:
+                if code not in self.today_ticks:
+                    self.today_ticks[code] = []
 
-            quote = quotes[code]
-            tick_time = datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S')
-            self.today_ticks[code].append([
-                tick_time,                          # 成交时间，格式：%H:%M:%S
-                round(quote['lastPrice'], 3),       # 成交价格
-                int(quote['volume']),               # 累计成交量（手）
-                round(quote['amount'], 3),          # 累计成交额（元）
-                [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['askPrice']],  # 卖价
-                [int(v) if isinstance(v, (int, float)) else v for v in quote['askVol']],         # 卖量
-                [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
-                [int(v) if isinstance(v, (int, float)) else v for v in quote['bidVol']],         # 买量
-            ])
+                quote = quotes[code]
+                tick_time = datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S')
+                self.today_ticks[code].append([
+                    tick_time,                          # 成交时间，格式：%H:%M:%S
+                    round(quote['lastPrice'], 3),       # 成交价格
+                    int(quote['volume']),               # 累计成交量（手）
+                    round(quote['amount'], 3),          # 累计成交额（元）
+                    [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['askPrice']],  # 卖价
+                    [int(v) if isinstance(v, (int, float)) else v for v in quote['askVol']],         # 卖量
+                    [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
+                    [int(v) if isinstance(v, (int, float)) else v for v in quote['bidVol']],         # 买量
+                ])
 
     def clean_ticks_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -189,10 +204,17 @@ class XtSubscriber:
     def save_tick_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
-        json_file = './_cache/debug/tick_history.json'
-        with open(json_file, 'w') as file:
-            json.dump(self.today_ticks, file, indent=4)
-        print(f"当日tick数据已存储为 {json_file} 文件")
+
+        if self.is_ticks_df:
+            pickle_file = './_cache/debug/tick_history.pkl'
+            with open(pickle_file, 'wb') as f:
+                pickle.dump(self.today_ticks, f)
+            print(f"当日tick数据已存储为 {pickle_file} 文件")
+        else:
+            json_file = './_cache/debug/tick_history.json'
+            with open(json_file, 'w') as file:
+                json.dump(self.today_ticks, file, indent=4)
+            print(f"当日tick数据已存储为 {json_file} 文件")
 
     # -----------------------
     # 盘前下载数据缓存
