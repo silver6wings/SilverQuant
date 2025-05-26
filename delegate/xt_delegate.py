@@ -1,6 +1,6 @@
 import time
 from threading import Thread
-from typing import List
+from typing import List, Optional
 
 from xtquant import xtconstant
 from xtquant.xtconstant import STOCK_BUY, STOCK_SELL
@@ -22,9 +22,15 @@ default_wait_duration = 15
 
 
 class XtDelegate(BaseDelegate):
-    def __init__(self, account_id: str = None, client_path: str = None, callback: object = None):
+    def __init__(
+        self,
+        account_id: str = None,
+        client_path: str = None,
+        callback: object = None,
+        keep_run: bool = True,
+    ):
         super().__init__()
-        self.xt_trader = None
+        self.xt_trader: Optional[XtQuantTrader] = None
 
         if client_path is None:
             client_path = default_client_path
@@ -35,8 +41,9 @@ class XtDelegate(BaseDelegate):
         self.account = StockAccount(account_id=account_id, account_type='STOCK')
         self.callback = callback
         self.connect(self.callback)
-        # 保证QMT持续连接
-        Thread(target=self.keep_connected).start()
+        if keep_run:
+            # 保证QMT持续连接
+            Thread(target=self.keep_connected).start()
 
     def connect(self, callback: object) -> (XtQuantTrader, bool):
         session_id = int(time.time())  # 生成session id 整数类型 同时运行的策略不能重复
