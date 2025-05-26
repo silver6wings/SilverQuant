@@ -8,52 +8,72 @@ import traceback
 import urllib.parse
 import urllib.request
 
-def get_markdown_card(title, text):
+
+def get_feishu_markdown_card(title, text):
+    # 飞书富文本 json 1.0 结构
     card_style = {
-        "schema": "2.0",
-        "config": {
-            "update_multi": True,
-            "style": {
-                "text_size": {
-                    "normal_v2": {
-                        "default": "normal",
-                        "pc": "normal",
-                        "mobile": "heading"
-                    }
-                }
-            }
-        },
-        "body": {
-            "direction": "vertical",
-            "padding": "12px 12px 12px 12px",
-            "elements": [
-                {
-                    "tag": "markdown",
-                    "content": text,
-                    # "content": "飞书emoji :OK::THUMBSUP:\n*斜体* **粗体** ~~删除线~~ \n<font color='red'>这是红色文本</font>\n<text_tag color='blue'>标签</text_tag>\n<number_tag>1</number_tag>\n[文字链接](https://open.feishu.cn/server-docs/im-v1/message-reaction/emojis-introduce)\n<link icon='chat_outlined' url='https://open.feishu.cn' pc_url='' ios_url='' android_url=''>带图标的链接</link>\n<at id=all></at>\n- 无序列表1\n    - 无序列表 1.1\n- 无序列表2\n1. 有序列表1\n    1. 有序列表 1.1\n2. 有序列表2\n```JSON\n{\"This is\": \"JSON demo\"}\n```\n`inline-code`\n# 一级标题\n## 二级标题\n> 这是一段引用\n\n | Syntax | Description |\n| -------- | -------- |\n| Header | Title |\n| Paragraph | Text |",
-                    "text_align": "left",
-                    "text_size": "normal_v2",
-                    "margin": "0px 0px 0px 0px"
-                }
-                # {
-                #     "tag": "hr",
-                #     "margin": "0px 0px 0px 0px"
-                # }
-            ]
-        },
         "header": {
+            "template": "blue",
             "title": {
                 "tag": "plain_text",
-                "content": title
-            },
-            # "subtitle": {
-            #     "tag": "plain_text",
-            #     "content": text
-            # },
-            "template": "blue",
-            "padding": "12px 12px 12px 12px"
-        }
+                "content": title,
+            }},
+
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": text,
+                "text_align": "left",
+                "text_size": "normal"
+            }]
+
     }
+    # 飞书富文本 json 2.0 结构
+    # card_style = {
+    #     "schema": "2.0",
+    #     "config": {
+    #         "update_multi": True,
+    #         "style": {
+    #             "text_size": {
+    #                 "normal_v2": {
+    #                     "default": "normal",
+    #                     "pc": "normal",
+    #                     "mobile": "heading"
+    #                 }
+    #             }
+    #         }
+    #     },
+    #     "body": {
+    #         "direction": "vertical",
+    #         "padding": "12px 12px 12px 12px",
+    #         "elements": [
+    #             {
+    #                 "tag": "markdown",
+    #                 "content": text,
+    #                 # "content": "飞书emoji :OK::THUMBSUP:\n*斜体* **粗体** ~~删除线~~ \n<font color='red'>这是红色文本</font>\n<text_tag color='blue'>标签</text_tag>\n<number_tag>1</number_tag>\n[文字链接](https://open.feishu.cn/server-docs/im-v1/message-reaction/emojis-introduce)\n<link icon='chat_outlined' url='https://open.feishu.cn' pc_url='' ios_url='' android_url=''>带图标的链接</link>\n<at id=all></at>\n- 无序列表1\n    - 无序列表 1.1\n- 无序列表2\n1. 有序列表1\n    1. 有序列表 1.1\n2. 有序列表2\n```JSON\n{\"This is\": \"JSON demo\"}\n```\n`inline-code`\n# 一级标题\n## 二级标题\n> 这是一段引用\n\n | Syntax | Description |\n| -------- | -------- |\n| Header | Title |\n| Paragraph | Text |",
+    #                 "text_align": "left",
+    #                 "text_size": "normal_v2",
+    #                 "margin": "0px 0px 0px 0px"
+    #             }
+    #             # {
+    #             #     "tag": "hr",
+    #             #     "margin": "0px 0px 0px 0px"
+    #             # }
+    #         ]
+    #     },
+    #     "header": {
+    #         "title": {
+    #             "tag": "plain_text",
+    #             "content": title
+    #         },
+    #         # "subtitle": {
+    #         #     "tag": "plain_text",
+    #         #     "content": text
+    #         # },
+    #         "template": "blue",
+    #         "padding": "12px 12px 12px 12px"
+    #     }
+    # }
     return card_style
 
 
@@ -157,18 +177,23 @@ class FeishuMessager(object):
     def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
         title = text.split('\n')[0]
         text = text.replace('\n', '\n>\n>')
-
         return self.send_markdown(title, text, output, alert)
 
     def send_markdown(self, title: str, text: str, output: str = '', alert: bool = False) -> bool:
+        #飞书 markdown颜色
+        color_replace_dic = {"#DC2832": "red", "#16BC50": "green"}
+        for a, b in color_replace_dic.items():
+            text = text.replace(a, b)
+            
         text += "\n<at id=all></at>" if alert else ""
         timestamp = round(time.time())
         sign = self.gen_sign(timestamp, self.secret)
+
         my_data = {
             "timestamp": timestamp,
             "sign": sign,
             'msg_type': 'interactive',
-            "card": get_markdown_card(title, text)
+            "card": get_feishu_markdown_card(title, text)
         }
         res = self.send_message(data=my_data)
         if res['msg'] == 'success':
