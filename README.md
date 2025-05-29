@@ -326,6 +326,12 @@ Upping Blocker: (需要历史数据) 双涨趋势阻断器
 日内均价和MACD同时上升时，不执行后续的卖出策略（注意GroupSeller的继承顺序）
 ```
 
+## 架构示意
+
+以下为示意图，帮助二次开发的朋友们更好地了解和快速上手
+
+![image](https://github.com/silver6wings/SilverQuant/blob/main/architecture.png)
+
 ## 常见问题 Q & A
 
 About QMT
