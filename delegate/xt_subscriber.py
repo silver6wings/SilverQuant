@@ -13,9 +13,11 @@ from typing import Dict, Callable, Optional
 from xtquant import xtdata
 
 from delegate.xt_delegate import XtDelegate
+from reader.daily_history import DailyHistoryCache
+
 from tools.utils_basic import code_to_symbol
-from tools.utils_cache import check_is_open_day, get_total_asset_increase, \
-    load_pickle, save_pickle, load_json, save_json, StockNames
+from tools.utils_cache import StockNames,check_is_open_day, get_total_asset_increase
+from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource, get_daily_history, quote_to_tick
 
@@ -266,26 +268,44 @@ class XtSubscriber:
         columns: list[str],
         data_source: int = DataSource.AKSHARE,
     ):
-        temp_indicators = load_pickle(cache_path)
-        if temp_indicators is not None and len(temp_indicators) > 0:
-            # 如果有缓存就读缓存
-            self.cache_history.clear()
-            self.cache_history = {}
-            self.cache_history.update(temp_indicators)
-            print(f'{len(self.cache_history)} histories loaded from {cache_path}')
+        if data_source == DataSource.AKSHARE:
+            temp_indicators = load_pickle(cache_path)
+            if temp_indicators is not None and len(temp_indicators) > 0:
+                # 如果有缓存就读缓存
+                self.cache_history.clear()
+                self.cache_history = {}
+                self.cache_history.update(temp_indicators)
+                print(f'{len(self.cache_history)} histories loaded from {cache_path}')
+                if self.ding_messager is not None:
+                    self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                                       f'加载{len(self.cache_history)}支')
+            else:
+                # 如果没缓存就刷新白名单
+                self.cache_history.clear()
+                self.cache_history = {}
+                self.download_from_remote(code_list, start, end, adjust, columns, data_source)
+                save_pickle(cache_path, self.cache_history)
+                print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
+                if self.ding_messager is not None:
+                    self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                                       f'下载{len(self.cache_history)}支')
+        elif data_source == DataSource.TUSHARE:
+            hc = DailyHistoryCache()
+            hc.daily_history.download_recent_daily(5)
+
+            # 计算两个日期之间的差值
+            start_date = datetime.datetime.strptime(start, '%Y%m%d')
+            end_date = datetime.datetime.strptime(end, '%Y%m%d')
+            delta = abs(end_date - start_date)
+
+            self.cache_history = hc.daily_history.get_subset_copy(None, delta.days + 1)
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                                   f'加载{len(self.cache_history)}支')
+                                                   f'更新{len(self.cache_history)}支')
         else:
-            # 如果没缓存就刷新白名单
-            self.cache_history.clear()
-            self.cache_history = {}
-            self.download_from_remote(code_list, start, end, adjust, columns, data_source)
-            save_pickle(cache_path, self.cache_history)
-            print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                                   f'下载{len(self.cache_history)}支')
+                                                   f'无法识别数据源')
 
     # -----------------------
     # 盘后报告总结

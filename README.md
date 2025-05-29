@@ -56,11 +56,19 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以[GX券商](https://miniqmt.com/)为例：
 > 
-> WinRAR下载 https://www.win-rar.com/start.html?&L=0
+> WinRAR下载
 > 
-> QMT 实盘 https://download.gjzq.com.cn/gjty/organ/gjzqqmt.rar
+> https://www.win-rar.com/start.html?&L=0
 > 
-> QMT 模拟 https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
+> https://www.rarlab.com/download.htm
+> 
+> 某券商版 QMT 实盘
+> 
+> https://download.gjzq.com.cn/gjty/organ/gjzqqmt.rar
+> 
+> 某券商版 QMT 模拟
+> 
+> https://download.gjzq.com.cn/temp/organ/gjzqqmt_ceshi.rar
 
 > 如果需要问财大模型相关功能，需要下载 Node.JS 版本 v16+
 >
