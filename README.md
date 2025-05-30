@@ -6,7 +6,13 @@
 
 Github 因某些原因不便境内服务器部署，这里有：[国内镜像](https://gitee.com/silver6wings/silverQuant)
 
----
+# 鸣谢
+
+> 感谢 [@owen590](https://github.com/owen590) 从第一行代码开始至今提供的宝贵意见
+> 
+> 感谢 [@dominicx](https://github.com/dominicx) 提交的PR，修复作者未覆盖的交易场景
+> 
+> 感谢 [@nackel](https://github.com/nackel) 提交的PR，添加飞书机器人模块的支持
 
 # 项目简介
 
@@ -17,7 +23,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 组件化设计可以快速根据策略思路搭建原型并建立模拟测试，还能一键切换实盘
 
-术的层面有千百门战法，回归道的层面，交易的游戏总结起来只分为四个关卡：
+术的层面有千百门战法，回归道的层面，交易的游戏总结起来就只有四个关卡：
 
 1. 保住本金不大幅亏损
 2. 可以实现阶段性获利
@@ -32,7 +38,6 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 希望您也可以在修罗场里的磨砺中，能打造出属于自己合适的交易模式，共勉
 
----
 
 # 安装说明
 
@@ -409,8 +414,3 @@ About mytt
 这里有卧虎藏龙的技术支持群讨论各种问题，欢迎各路英雄好汉
 
 PS: 目前暂未建立任何付费分享渠道，请明辨真假，谨防冒牌货
-
-# 鸣谢
-
-* 感谢 [@owen590](https://github.com/owen590) 同学从第一行代码开始提供的宝贵意见
-* 感谢 [@dominicx](https://github.com/dominicx) 同学提交的PR，修复作者未覆盖的场景

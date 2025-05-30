@@ -16,7 +16,7 @@ from delegate.xt_delegate import XtDelegate
 from reader.daily_history import DailyHistoryCache
 
 from tools.utils_basic import code_to_symbol
-from tools.utils_cache import StockNames,check_is_open_day, get_total_asset_increase
+from tools.utils_cache import StockNames, check_is_open_day, get_total_asset_increase
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource, get_daily_history, quote_to_tick
@@ -140,7 +140,7 @@ class XtSubscriber:
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                               f'{"启动" if notice else "恢复"} {len(self.code_list)}支')
+                                               f'{"启动" if notice else "恢复"} {len(self.code_list) - 1}支')
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
         xtdata.enable_hello = False
         print('[启动行情订阅]', end='')
