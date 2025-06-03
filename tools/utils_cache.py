@@ -37,7 +37,7 @@ class IndexSymbol:
     INDEX_BZ_50 = '899050'      # 北证50
     INDEX_ZX_100 = '399005'     # 中小100
     INDEX_ZZ_A50 = '000050'     # 中证A50
-    INDEX_ZZ_A500 = '000510'     # 中证A500
+    INDEX_ZZ_A500 = '000510'    # 中证A500
 
 
 # 查询股票名称
@@ -86,7 +86,7 @@ def load_stock_code_and_names(retention_day: int = 1):
         df = df.rename(columns={'code': '代码', 'name': '名称'})
 
         if len(df) == 0:
-            df = ak.stock_zh_a_spot() # 这个接口容易封IP，留作备用
+            df = ak.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
             df['代码'] = df['代码'].str[2:]
 
         df = df[['代码', '名称']]

@@ -13,7 +13,6 @@ from delegate.xt_subscriber import XtSubscriber, update_position_held
 
 from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhiteCustomSymbol as Pool
-from trader.seller_groups import ClassicGroupSeller as Seller
 
 
 STRATEGY_NAME = '进攻监控'
@@ -70,12 +69,6 @@ class BuyConf:
 
     # 封板秒数要求
     block_seconds = 3
-
-
-class SellConf:
-    time_ranges = [['09:31', '11:30'], ['13:00', '14:57']]
-    interval = 1                    # 扫描卖出间隔，60的约数：1-6, 10, 12, 15, 20, 30
-    order_premium = 0.03            # 保证市价单成交的溢价，单位（元）
 
 
 # ======== 盘前 ========
@@ -324,11 +317,6 @@ if __name__ == '__main__':
         strategy_name=STRATEGY_NAME,
         delegate=my_delegate,
         parameters=BuyConf,
-    )
-    my_seller = Seller(
-        strategy_name=STRATEGY_NAME,
-        delegate=my_delegate,
-        parameters=SellConf,
     )
     my_suber = XtSubscriber(
         account_id=QMT_ACCOUNT_ID,

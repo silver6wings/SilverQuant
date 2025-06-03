@@ -250,6 +250,26 @@ def get_limit_down_price(code_or_symbol: str, pre_close: float) -> float:
     return float(limit)
 
 
+# TODO
+def get_st_limit_up_rate():
+    return
+
+
+# TODO
+def get_st_limit_up_price():
+    return
+
+
+# TODO
+def get_st_limit_down_rate():
+    return
+
+
+# TODO
+def get_st_limit_down_price():
+    return
+
+
 def time_diff_seconds(later_time: datetime.datetime.time, early_time: datetime.datetime.time):
     """ 将时间转换为总秒数 """
     total_seconds_time1 = later_time.hour * 3600 + later_time.minute * 60 + later_time.second
