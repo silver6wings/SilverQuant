@@ -26,7 +26,7 @@ class DailyHistoryCache:
 
 
 class DailyHistory:
-    default_init_day_count: int = 550
+    default_init_day_count: int = 550  # 不要超过8000，这个是tushare的上限，不是代码的上限
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
     def __init__(self, root_path: str = './_cache/_daily', init_day_count: int = default_init_day_count):
@@ -35,6 +35,8 @@ class DailyHistory:
         self.cache_history: dict[str, pd.DataFrame] = {}
 
     def __getitem__(self, item) -> pd.DataFrame:
+        if item not in self.cache_history:
+            self.cache_history[item] = pd.DataFrame(columns=self.default_columns)
         return self.cache_history[item]
 
     def get_subset_copy(self, codes: list[str], days: int) -> dict[str, pd.DataFrame]:
@@ -113,7 +115,6 @@ class DailyHistory:
                     df.to_csv(f'{self.root_path}/{code}.csv', index=False)
                     downloaded_count += 1
             print(f'[{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
-
         print(f'Download finished with {len(download_failure)} fails: {download_failure}')
 
     def download_all_to_disk(self, data_source: DataSource = DataSource.TUSHARE) -> None:
@@ -140,11 +141,11 @@ class DailyHistory:
         code_list = self.get_code_list()
 
         now = datetime.datetime.now()
-        updated_codes = []
+        updated_codes = set()
         for forward_day in range(days, 0, -1):
             target_date = get_prev_trading_date(now, forward_day)
             print(f'Updating {target_date}', end='')
-
+            updated_count = 0
             group_size = 1000
             for i in range(0, len(code_list), group_size):
                 group_codes = [sub_code for sub_code in code_list[i:i + group_size]]
@@ -156,19 +157,21 @@ class DailyHistory:
                     columns=self.default_columns,
                 )
 
+                # 填补缺失的日期
                 for code in dfs:
                     df = dfs[code]
                     if len(df) == 1 and (not (self[code]['datetime'] == target_date).any()):
-                        updated_codes.append(code)
+                        updated_codes.add(code)
+                        updated_count += 1
                         self.cache_history[code] = pd.concat([self.cache_history[code], df], ignore_index=True)
                 print('.', end='')
-            print('Completed!')
+            print(f'{updated_count} Updated!')
 
         print('Sort and Save all history data ', end='')
         i = 0
         for code in updated_codes:
             i += 1
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
