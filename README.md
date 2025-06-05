@@ -335,7 +335,7 @@ Upping Blocker: (需要历史数据) 双涨趋势阻断器
 
 以下为示意图，帮助二次开发的朋友们更好地了解和快速上手
 
-![image](https://github.com/silver6wings/SilverQuant/blob/main/architecture.png)
+![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/architecture.png)
 
 ## 常见问题 Q & A
 
@@ -414,3 +414,7 @@ About mytt
 这里有卧虎藏龙的技术支持群讨论各种问题，欢迎各路英雄好汉
 
 PS: 目前暂未建立任何付费分享渠道，请明辨真假，谨防冒牌货
+
+pss: 如果有土豪榜一大哥执意想要投喂，那这里先谢过各位义父
+
+![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/recipt.jpg)
