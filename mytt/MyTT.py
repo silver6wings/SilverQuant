@@ -197,7 +197,8 @@ def MACD(CLOSE, SHORT=12, LONG=26, M=9):  # EMA的关系，S取120日，和雪�
 
 
 def KDJ(CLOSE, HIGH, LOW, N=9, M1=3, M2=3):  # KDJ指标
-    RSV = (CLOSE - LLV(LOW, N)) / (HHV(HIGH, N) - LLV(LOW, N)) * 100
+    LLN = LLV(LOW, N)
+    RSV = (CLOSE - LLN) / (HHV(HIGH, N) - LLN) * 100
     K = EMA(RSV, (M1 * 2 - 1));
     D = EMA(K, (M2 * 2 - 1));
     J = K * 3 - D * 2
@@ -210,21 +211,26 @@ def RSI(CLOSE, N=24):  # RSI指标,和通达信小数点2位相同
 
 
 def WR(CLOSE, HIGH, LOW, N=10):  # W&R 威廉指标
-    WR = (HHV(HIGH, N) - CLOSE) / (HHV(HIGH, N) - LLV(LOW, N)) * 100
+    HHN = HHV(HIGH, N)
+    WR = (HHN - CLOSE) / (HHN - LLV(LOW, N)) * 100
     return RD(WR)
 
 
 def BIAS(CLOSE, L1=6, L2=12, L3=24):  # BIAS乖离率
-    BIAS1 = (CLOSE - MA(CLOSE, L1)) / MA(CLOSE, L1) * 100
-    BIAS2 = (CLOSE - MA(CLOSE, L2)) / MA(CLOSE, L2) * 100
-    BIAS3 = (CLOSE - MA(CLOSE, L3)) / MA(CLOSE, L3) * 100
+    MA1 = MA(CLOSE, L1)
+    MA2 = MA(CLOSE, L2)
+    MA3 = MA(CLOSE, L3)
+    BIAS1 = (CLOSE - MA1) / MA1 * 100
+    BIAS2 = (CLOSE - MA2) / MA2 * 100
+    BIAS3 = (CLOSE - MA3) / MA3 * 100
     return RD(BIAS1), RD(BIAS2), RD(BIAS3)
 
 
 def BOLL(CLOSE, N=20, P=2):  # BOLL指标，布林带
     MID = MA(CLOSE, N)
-    UPPER = MID + STD(CLOSE, N) * P
-    LOWER = MID - STD(CLOSE, N) * P
+    WIDTH = STD(CLOSE, N) * P
+    UPPER = MID + WIDTH
+    LOWER = MID - WIDTH
     return RD(UPPER), RD(MID), RD(LOWER)
 
 
