@@ -60,6 +60,12 @@ class StockNames:
         self._data = get_stock_codes_and_names()
         print('Complete!')
 
+    def get_code_list(self) -> list:
+        return list(self._data.keys())
+
+    def get_name_list(self) -> list:
+        return list(self._data.values())
+
     def get_name(self, code) -> str:
         if self._data is None:
             self.load_codes_and_names()

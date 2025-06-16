@@ -162,7 +162,8 @@ def ts_to_standard(df: pd.DataFrame) -> pd.DataFrame:
         'trade_date': 'datetime',
     })
     df['volume'] = df['volume'].astype(int)
-    df['amount'] *= 1000
+    df['amount'] = df['amount'] * 1000
+    df['amount'] = df['amount'].round(2)
     df = df[::-1]
     df.reset_index(drop=True, inplace=True)
     return df

@@ -13,6 +13,10 @@ Github 因某些原因不便境内服务器部署，这里有：[国内镜像](h
 > 感谢 [@dominicx](https://github.com/dominicx) 提交的PR，修复作者未覆盖的交易场景
 > 
 > 感谢 [@nackel](https://github.com/nackel) 提交的PR，添加飞书机器人模块的支持
+> 
+> 感谢 [@vipally](https://github.com/vipally) 提交的PR，优化部分MyTT公式和vscode配置
+
+---
 
 # 项目简介
 

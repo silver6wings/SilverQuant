@@ -65,12 +65,23 @@ class DailyHistory:
         else:
             return []
 
-    def load_history_from_disk_to_memory(self) -> None:
+    def load_history_from_disk_to_memory(self, data_source: DataSource = DataSource.TUSHARE) -> None:
         code_list = self.get_code_list()
         if len(code_list) == 0:
             self.download_all_to_disk()
 
         code_list = self.get_code_list()
+
+        print(f'Checking {len(code_list)} codes...', end='')
+        missing_codes = []
+        for code in code_list:
+            path = f'{self.root_path}/{code}.csv'
+            if not os.path.exists(path):
+                missing_codes.append(code)
+
+        print(f'Downloading {len(missing_codes)} codes...', end='')
+        self._download_codes(missing_codes, self.init_day_count, data_source)
+
         print(f'Loading {len(code_list)} codes...', end='')
         error_count = 0
         i = 0
@@ -79,14 +90,14 @@ class DailyHistory:
             if i % 1000 == 0:
                 print('.', end='')
             path = f'{self.root_path}/{code}.csv'
-            if os.path.exists(path):
+            try:
                 df = pd.read_csv(path, dtype={'datetime': str})
                 self.cache_history[code] = df
-            else:
+            except:
                 error_count += 1
-        print(f'\nLoading finished with {error_count}/{i} missed')
+        print(f'\nLoading finished with {error_count}/{i} errors')
 
-    def _download_codes(self, code_list: list[str], day_count: int, data_source: DataSource):
+    def _download_codes(self, code_list: list[str], day_count: int, data_source: DataSource = DataSource.TUSHARE):
         now = datetime.datetime.now()
         forward_day = 1  # 不算今天
         start_date = get_prev_trading_date(now, forward_day + day_count)
@@ -125,12 +136,12 @@ class DailyHistory:
     def download_gap_to_disk(self, data_source: DataSource = DataSource.TUSHARE) -> None:
         prev_code_list = self.get_code_list()
         curr_code_list = self.get_code_list(force_download=True)
-        code_list = []
+        gap_codes = []
         for code in curr_code_list:
             if code not in prev_code_list:
-                code_list.append(code)
-        print(f'Downloading {len(code_list)} gap codes data of {self.init_day_count} days...')
-        self._download_codes(code_list, self.init_day_count, data_source)
+                gap_codes.append(code)
+        print(f'Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
+        self._download_codes(gap_codes, self.init_day_count, data_source)
 
     def download_recent_daily(self, days: int) -> None:
         if len(self.cache_history) == 0:
@@ -163,7 +174,10 @@ class DailyHistory:
                     if len(df) == 1 and (not (self[code]['datetime'] == target_date).any()):
                         updated_codes.add(code)
                         updated_count += 1
-                        self.cache_history[code] = pd.concat([self.cache_history[code], df], ignore_index=True)
+                        if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
+                            self.cache_history[code] = df  # concat len = 0 的 df 会报 warning
+                        else:
+                            self.cache_history[code] = pd.concat([self.cache_history[code], df], ignore_index=True)
                 print('.', end='')
             print(f'{updated_count} Updated!')
 

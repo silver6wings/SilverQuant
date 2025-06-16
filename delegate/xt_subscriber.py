@@ -2,6 +2,8 @@ import json
 import pickle
 import datetime
 import time
+import functools
+import random
 
 import schedule
 import threading
@@ -22,6 +24,26 @@ from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource, get_daily_history, quote_to_tick
 
 
+def check_open_day(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return                      # 非开放日直接 return，不执行函数
+        return func(*args, **kwargs)    # 开放日正常执行
+    return wrapper
+
+
+def colour_text(text: str, to_red: bool, to_green: bool):
+    color = '#3366FF'
+    # （红色RGB为：220、40、50，绿色RGB为：22、188、80）
+    if to_red:
+        color = '#DC2832'
+    if to_green:
+        color = '#16BC50'
+
+    return f'<font color="{color}">{text}</font>'
+
+
 class XtSubscriber:
     def __init__(
         self,
@@ -30,8 +52,10 @@ class XtSubscriber:
         delegate: Optional[XtDelegate],
         path_deal: str,
         path_assets: str,
-        execute_strategy: Callable,     # 策略回调函数
-        execute_interval: int = 1,      # 策略执行间隔，单位（秒）
+        execute_strategy: Callable,         # 策略回调函数
+        execute_interval: int = 1,          # 策略执行间隔，单位（秒）
+        before_trade_day: Callable = None,  # 盘前函数
+        finish_trade_day: Callable = None,  # 盘后函数
         ding_messager: DingMessager = None,
         open_tick_memory_cache: bool = False,
         tick_memory_data_frame: bool = False,
@@ -47,6 +71,8 @@ class XtSubscriber:
 
         self.execute_strategy = execute_strategy
         self.execute_interval = execute_interval
+        self.before_trade_day = before_trade_day
+        self.finish_trade_day = finish_trade_day
         self.ding_messager = ding_messager
 
         self.lock_quotes_update = threading.Lock()  # 聚合实时打点缓存的锁
@@ -260,7 +286,7 @@ class XtSubscriber:
 
     def download_cache_history(
         self,
-        cache_path: str,
+        cache_path: str,  # DATA SOURCE 是tushare的时候不需要
         code_list: list[str],
         start: str,
         end: str,
@@ -371,16 +397,18 @@ class XtSubscriber:
                             f'{curr_price * vol:.2f}元'
                     text += '\n>\n>'
 
-                    color = ''
-                    # （红色RGB为：220、40、50，绿色RGB为：22、188、80）
-                    if curr_price > open_price:
-                        color = ' color="#DC2832"'
-                    if curr_price < open_price:
-                        color = ' color="#16BC50"'
+                    total_change = colour_text(
+                        f"{(curr_price - open_price) * vol:.2f}",
+                        curr_price > open_price,
+                        curr_price < open_price,
+                    )
+                    ratio_change = colour_text(
+                        f'{(curr_price / open_price - 1) * 100:.2f}%',
+                        curr_price > open_price,
+                        curr_price < open_price,
+                    )
 
-                    text += f'' \
-                            f'盈亏比:<font{color}>{(curr_price / open_price - 1) * 100:.2f}%</font> ' \
-                            f'盈亏额:<font{color}>{(curr_price - open_price) * vol:.2f}</font>'
+                    text += f'盈亏比:{ratio_change}</font> 盈亏额:{total_change}</font>'
 
             title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
             text = f'{title}\n\n[{today}] 持仓{i}支\n{text}'
@@ -399,8 +427,18 @@ class XtSubscriber:
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
             text += '\n>\n> '
-            text += f'当日变动: {"+" if increase > 0 else ""}{round(increase, 2)}元' \
-                    f'({"+" if increase > 0 else ""}{round(increase * 100 / asset.total_asset, 2)}%)'
+
+            total_change = colour_text(
+                f'{"+" if increase > 0 else ""}{round(increase, 2)}',
+                increase > 0,
+                increase < 0,
+            )
+            ratio_change = colour_text(
+                f'{"+" if increase > 0 else ""}{round(increase * 100 / asset.total_asset, 2)}%',
+                increase > 0,
+                increase < 0,
+            )
+            text += f'当日变动: {total_change}元({ratio_change})'
 
         text += '\n>\n> '
         text += f'持仓市值: {round(asset.market_value, 2)}元'
@@ -417,28 +455,105 @@ class XtSubscriber:
     # -----------------------
     # 定时器
     # -----------------------
-    def start_scheduler(self):
-        schedule.every().day.at('08:00').do(prev_check_open_day)
+    @check_open_day
+    def before_trade_day_wrapper(self):
+        if self.before_trade_day is not None:
+            self.before_trade_day()
+
+    @check_open_day
+    def finish_trade_day_wrapper(self):
+        if self.finish_trade_day is not None:
+            self.finish_trade_day()
+
+    def start_scheduler(self, use_ap: bool = False):
+        # 默认定时任务列表
+        cron_jobs = [
+            ['08:00', prev_check_open_day, None],
+            ['09:15', self.subscribe_tick, None],
+            ['11:30', self.unsubscribe_tick, (False,)],
+            ['13:00', self.subscribe_tick, (True,)],
+            ['15:00', self.unsubscribe_tick, None],
+            ['15:01', self.daily_summary, None],
+        ]
+
+        if self.before_trade_day is not None:
+            cron_jobs.append([f'08:{random.randint(0, 25) + 5}', self.before_trade_day_wrapper, None])
+
+        if self.finish_trade_day is not None:
+            cron_jobs.append([f'16:{random.randint(0, 10) + 5}', self.finish_trade_day_wrapper, None])
 
         if self.open_tick:
-            schedule.every().day.at('09:10').do(self.clean_ticks_history)
-            schedule.every().day.at('15:10').do(self.save_tick_history)
+            cron_jobs.append(['09:10', self.clean_ticks_history, None])
+            cron_jobs.append(['15:10', self.save_tick_history, None])
 
-        schedule.every().day.at('09:15').do(self.subscribe_tick)
-        schedule.every().day.at('11:30').do(self.unsubscribe_tick, False)
-
-        schedule.every().day.at('13:00').do(self.subscribe_tick, False)
-        schedule.every().day.at('15:00').do(self.unsubscribe_tick)
-        schedule.every().day.at('15:01').do(self.daily_summary)
-
+        # 数据源中断检查时间点
         monitor_time_list = [
             '09:35', '09:45', '09:55', '10:05', '10:15', '10:25',
             '10:35', '10:45', '10:55', '11:05', '11:15', '11:25',
             '13:05', '13:15', '13:25', '13:35', '13:45', '13:55',
             '14:05', '14:15', '14:25', '14:35', '14:45', '14:55',
         ]
-        for monitor_time in monitor_time_list:
-            schedule.every().day.at(monitor_time).do(self.callback_monitor)
+
+        temp_now = datetime.datetime.now()
+        temp_date = temp_now.strftime('%Y-%m-%d')
+        temp_time = temp_now.strftime('%H:%M')
+
+        if use_ap:
+            # 新版 apscheduler
+            from apscheduler.schedulers.blocking import BlockingScheduler
+            scheduler = BlockingScheduler()
+
+            for cron_job in cron_jobs:
+                [hr, mn] = cron_job[0].split(':')
+                if cron_job[2] is None:
+                    scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn)
+                else:
+                    scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
+
+            for monitor_time in monitor_time_list:
+                [hr, mn] = monitor_time.split(':')
+                scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
+
+            # 盘中执行需要补齐
+            if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
+                self.before_trade_day_wrapper()
+                if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
+                    self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
+
+            # 启动定时器
+            try:
+                scheduler.start()
+            except KeyboardInterrupt:
+                print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+            finally:
+                self.delegate.shutdown()
+        else:
+            # 旧版 schedule
+            for cron_job in cron_jobs:
+                if cron_job[2] is None:
+                    schedule.every().day.at(cron_job[0]).do(cron_job[1])
+                else:
+                    schedule.every().day.at(cron_job[0]).do(cron_job[1], list(cron_job[2])[0])
+
+            for monitor_time in monitor_time_list:
+                schedule.every().day.at(monitor_time).do(self.callback_monitor)
+
+            # 盘中执行需要补齐，旧代码都放在策略文件里了这里就不重复执行破坏老代码
+            # if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
+            #     self._before_trade_day()
+            #     if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
+            #         self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
+
+            # 旧代码还有别的要执行，没有放在 before_trade_day 所以这里虽然不优雅单也先注释掉
+            # try:
+            #     while True:
+            #         schedule.run_pending()
+            #         time.sleep(1)
+            # except KeyboardInterrupt:
+            #     print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+            # finally:
+            #     schedule.clear()
+            #     self.delegate.shutdown()
 
 
 # -----------------------

@@ -360,38 +360,8 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
         ding_messager=DING_MESSAGER,
+        open_tick_memory_cache=True,
         open_today_deal_report=True,
         open_today_hold_report=True,
     )
-    my_suber.start_scheduler()
-
-    temp_now = datetime.datetime.now()
-    temp_date = temp_now.strftime('%Y-%m-%d')
-    temp_time = temp_now.strftime('%H:%M')
-
-    # 定时任务启动
-    schedule.every().day.at('08:05').do(held_increase)
-    schedule.every().day.at('08:10').do(refresh_code_list)
-    schedule.every().day.at('08:15').do(prepare_history)    # 必须先 refresh code list
-
-    if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
-        held_increase()
-
-        if '08:10' < temp_time < '14:57':
-            refresh_code_list()
-
-        if '08:15' < temp_time < '14:57':
-            prepare_history()  # 重启时防止没有数据在这先加载历史数据
-
-        if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
-            my_suber.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
-
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
-    finally:
-        schedule.clear()
-        my_delegate.shutdown()
+    my_suber.start_scheduler(use_ap=True)
