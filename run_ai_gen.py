@@ -359,9 +359,10 @@ if __name__ == '__main__':
         path_deal=PATH_DEAL,
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
+        use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_tick_memory_cache=True,
         open_today_deal_report=True,
         open_today_hold_report=True,
     )
-    my_suber.start_scheduler(use_ap=True)
+    my_suber.start_scheduler()

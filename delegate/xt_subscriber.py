@@ -5,7 +5,6 @@ import time
 import functools
 import random
 
-import schedule
 import threading
 import os
 import pandas as pd
@@ -56,11 +55,13 @@ class XtSubscriber:
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
         finish_trade_day: Callable = None,  # 盘后函数
+        use_ap_scheduler: bool = False,     # 默认使用旧版 schedule
         ding_messager: DingMessager = None,
         open_tick_memory_cache: bool = False,
         tick_memory_data_frame: bool = False,
         open_today_deal_report: bool = False,
         open_today_hold_report: bool = False,
+
     ):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
@@ -95,6 +96,11 @@ class XtSubscriber:
         self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
         self.last_callback_time = datetime.datetime.now()
+
+        self.use_ap_scheduler = use_ap_scheduler
+        if self.use_ap_scheduler:
+            from apscheduler.schedulers.blocking import BlockingScheduler
+            self.scheduler = BlockingScheduler()
 
     # -----------------------
     # 策略触发主函数
@@ -465,7 +471,7 @@ class XtSubscriber:
         if self.finish_trade_day is not None:
             self.finish_trade_day()
 
-    def start_scheduler(self, use_ap: bool = False):
+    def start_scheduler(self):
         # 默认定时任务列表
         cron_jobs = [
             ['08:00', prev_check_open_day, None],
@@ -498,21 +504,18 @@ class XtSubscriber:
         temp_date = temp_now.strftime('%Y-%m-%d')
         temp_time = temp_now.strftime('%H:%M')
 
-        if use_ap:
+        if self.use_ap_scheduler:
             # 新版 apscheduler
-            from apscheduler.schedulers.blocking import BlockingScheduler
-            scheduler = BlockingScheduler()
-
             for cron_job in cron_jobs:
                 [hr, mn] = cron_job[0].split(':')
                 if cron_job[2] is None:
-                    scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn)
+                    self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn)
                 else:
-                    scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
+                    self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
 
             for monitor_time in monitor_time_list:
                 [hr, mn] = monitor_time.split(':')
-                scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
+                self.scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
 
             # 盘中执行需要补齐
             if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
@@ -522,13 +525,14 @@ class XtSubscriber:
 
             # 启动定时器
             try:
-                scheduler.start()
+                self.scheduler.start()
             except KeyboardInterrupt:
                 print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
             finally:
                 self.delegate.shutdown()
         else:
             # 旧版 schedule
+            import schedule
             for cron_job in cron_jobs:
                 if cron_job[2] is None:
                     schedule.every().day.at(cron_job[0]).do(cron_job[1])
