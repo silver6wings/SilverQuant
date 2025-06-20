@@ -63,7 +63,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 > 下载对应的券商版 QMT（需要提前找券商客户经理开通账户的 QMT 权限）
 > 
-> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以[GX券商](https://miniqmt.com/)为例：
+> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以[某券商](https://miniqmt.com/)为例：
 > 
 > WinRAR下载
 > 
@@ -206,6 +206,11 @@ Sell Conf 卖点相关的参数
 > * `held_days.json` 里记录的是持仓天数
 > * `max_price.json` 里记录的是历史最高价格
 
+## 设计理念
+
+以下为架构示意图，帮助二次开发的朋友们更好地理解和快速上手
+
+![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/architecture.png)
 
 ---
 
@@ -335,12 +340,6 @@ Upping Blocker: (需要历史数据) 双涨趋势阻断器
 日内均价和MACD同时上升时，不执行后续的卖出策略（注意GroupSeller的继承顺序）
 ```
 
-## 架构示意
-
-以下为示意图，帮助二次开发的朋友们更好地了解和快速上手
-
-![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/architecture.png)
-
 ## 常见问题 Q & A
 
 About QMT
@@ -418,7 +417,3 @@ About mytt
 这里有卧虎藏龙的技术支持群讨论各种问题，欢迎各路英雄好汉
 
 PS: 目前暂未建立任何付费分享渠道，请明辨真假，谨防冒牌货
-
-pss: 如果有土豪榜一大哥执意想要投喂，那这里先谢过各位义父
-
-![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/recipt.jpg)

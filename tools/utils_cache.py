@@ -458,17 +458,27 @@ def get_market_value_limited_codes(code_prefixes: Set[str], min_value: int, max_
     return [symbol_to_code(symbol) for symbol in list(df['代码'].values)]
 
 
+# 获取当日可用的股票代码
+def get_available_stock_codes() -> list[str]:
+    df = ak.stock_info_a_code_name()
+    codes = [symbol_to_code(symbol) for symbol in df['code'].values]
+    return list(set(codes))
+
+
 # 根据两位数前缀获取股票列表
 def get_prefixes_stock_codes(prefixes: Set[str]) -> List[str]:
     """
     prefixes: 六位数的两位数前缀
     """
     df = ak.stock_info_a_code_name()
-    return [
-        symbol_to_code(symbol)
-        for symbol in df['code'].values
-        if symbol[:2] in prefixes
-    ]
+    return [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
+
+
+def get_none_st_codes() -> list[str]:
+    df = ak.stock_info_a_code_name()
+    df = df[~df['name'].str.contains('ST')]  # 筛选name列中不包含"ST"的行
+    codes = [symbol_to_code(symbol) for symbol in df['code'].values]
+    return list(set(codes))
 
 
 # 获取流通市值，单位（元）
