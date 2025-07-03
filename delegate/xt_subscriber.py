@@ -160,31 +160,31 @@ class XtSubscriber:
             if len(self.code_list) > 1 and xtdata.get_client():
                 print('尝试重新订阅行情数据')
                 time.sleep(1)
-                self.unsubscribe_tick(notice=False)
-                self.subscribe_tick(notice=False)
+                self.unsubscribe_tick(pause=True)
+                self.subscribe_tick(resume=True)
 
     # -----------------------
     # 订阅tick相关
     # -----------------------
-    def subscribe_tick(self, notice=True):
+    def subscribe_tick(self, resume: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                               f'{"启动" if notice else "恢复"} {len(self.code_list) - 1}支')
+                                               f'{"恢复" if resume else "启动"} {len(self.code_list) - 1}支')
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
         xtdata.enable_hello = False
         print('[启动行情订阅]', end='')
 
-    def unsubscribe_tick(self, notice=True):
+    def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
         if 'sub_seq' in self.cache_limits:
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                                   f'{"关闭" if notice else "暂停"}')
+                                                   f'{"暂停" if pause else "关闭"}')
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
             print('\n[关闭行情订阅]')
 
@@ -476,7 +476,7 @@ class XtSubscriber:
         cron_jobs = [
             ['08:00', prev_check_open_day, None],
             ['09:15', self.subscribe_tick, None],
-            ['11:30', self.unsubscribe_tick, (False,)],
+            ['11:30', self.unsubscribe_tick, (True,)],
             ['13:00', self.subscribe_tick, (True,)],
             ['15:00', self.unsubscribe_tick, None],
             ['15:01', self.daily_summary, None],
