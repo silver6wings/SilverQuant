@@ -40,15 +40,27 @@ class GmCallback:
 
     @staticmethod
     def register_callback():
-        file_name = str('delegate.gm_callback.py').split('\\')[-1]
-        # print(file_name)
-        status = start(filename=file_name)
+        # 直接使用当前模块进行注册，不使用filename参数
+        try:
+            # file_name = 'delegate.gm_callback.py'
+            # status = start(filename=file_name)
 
-        if status == 0:
-            print(f'[掘金]:订阅回调成功')
-        else:
-            print(f'[掘金]:订阅回调失败')
-            # stop()
+            status = start(filename='__main__')
+            if status == 0:
+                print(f'[掘金]:使用__main__订阅回调成功')
+            else:
+                print(f'[掘金]:使用__main__订阅回调失败，状态码：{status}')
+        except Exception as e1:
+            print(f'[掘金]:使用__main__订阅回调异常：{e1}')
+            try:
+                # 如果start()不带参数失败，尝试使用空参数
+                status = start()
+                if status == 0:
+                    print(f'[掘金]:订阅回调成功')
+                else:
+                    print(f'[掘金]:订阅回调失败，状态码：{status}')
+            except Exception as e2:
+                print(f'[掘金]:使用空参数订阅回调也失败：{e2}')
 
     @staticmethod
     def unregister_callback():
