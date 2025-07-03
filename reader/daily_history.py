@@ -2,7 +2,6 @@ import os
 import datetime
 
 import pandas as pd
-import akshare as ak
 
 from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prev_trading_date
@@ -56,6 +55,7 @@ class DailyHistory:
         path = f'{self.root_path}/_code_list.csv'
 
         if force_download:
+            import akshare as ak
             df = ak.stock_info_a_code_name()
             df.to_csv(path, index=False)
 
@@ -65,7 +65,10 @@ class DailyHistory:
         else:
             return []
 
-    def load_history_from_disk_to_memory(self, data_source: DataSource = DataSource.TUSHARE) -> None:
+    def load_history_from_disk_to_memory(
+        self,
+        data_source: DataSource = DataSource.TUSHARE,
+    ) -> None:
         code_list = self.get_code_list()
         if len(code_list) == 0:
             self.download_all_to_disk()
@@ -79,7 +82,7 @@ class DailyHistory:
             if not os.path.exists(path):
                 missing_codes.append(code)
 
-        print(f'Downloading {len(missing_codes)} codes...', end='')
+        print(f'Downloading {len(missing_codes)} codes...')
         self._download_codes(missing_codes, self.init_day_count, data_source)
 
         print(f'Loading {len(code_list)} codes...', end='')
@@ -91,7 +94,7 @@ class DailyHistory:
                 print('.', end='')
             path = f'{self.root_path}/{code}.csv'
             try:
-                df = pd.read_csv(path, dtype={'datetime': str})
+                df = pd.read_csv(path, dtype={'datetime': int})
                 self.cache_history[code] = df
             except:
                 error_count += 1
@@ -126,14 +129,15 @@ class DailyHistory:
                     df.to_csv(f'{self.root_path}/{code}.csv', index=False)
                     downloaded_count += 1
             print(f'[{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
+        # 有可能是当天新股没有数据，下载失败也正常
         print(f'Download finished with {len(download_failure)} fails: {download_failure}')
 
-    def download_all_to_disk(self, data_source: DataSource = DataSource.TUSHARE) -> None:
-        code_list = self.get_code_list(force_download=True)
+    def download_all_to_disk(self, data_source: DataSource = DataSource.TUSHARE, renew_code_list: bool = True) -> None:
+        code_list = self.get_code_list(force_download=renew_code_list)
         print(f'Downloading all {len(code_list)} codes data of {self.init_day_count} days...')
         self._download_codes(code_list, self.init_day_count, data_source)
 
-    def download_gap_to_disk(self, data_source: DataSource = DataSource.TUSHARE) -> None:
+    def _download_gap_to_disk(self, data_source: DataSource = DataSource.TUSHARE) -> None:
         prev_code_list = self.get_code_list()
         curr_code_list = self.get_code_list(force_download=True)
         gap_codes = []
@@ -147,7 +151,7 @@ class DailyHistory:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
 
-        self.download_gap_to_disk()  # 先把之前的历史更新上，可能会有长度不够的问题
+        self._download_gap_to_disk()  # 先把之前的历史更新上，可能会有长度不够的问题
 
         code_list = self.get_code_list()
 
@@ -169,9 +173,10 @@ class DailyHistory:
                 )
 
                 # 填补缺失的日期
+                target_date_int = int(target_date)
                 for code in dfs:
                     df = dfs[code]
-                    if len(df) == 1 and (not (self[code]['datetime'] == target_date).any()):
+                    if len(df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
                         updated_codes.add(code)
                         updated_count += 1
                         if self.cache_history[code] is None or len(self.cache_history[code]) == 0:

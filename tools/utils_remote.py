@@ -161,6 +161,7 @@ def ts_to_standard(df: pd.DataFrame) -> pd.DataFrame:
         'vol': 'volume',
         'trade_date': 'datetime',
     })
+    df['datetime'] = df['datetime'].astype(int)
     df['volume'] = df['volume'].astype(int)
     df['amount'] = df['amount'] * 1000
     df['amount'] = df['amount'].round(2)
@@ -228,7 +229,6 @@ def get_ts_daily_histories(
         for code in codes:
             temp_df = df[df['ts_code'] == code]
             temp_df = ts_to_standard(temp_df)
-            temp_df['datetime'] = temp_df['datetime'].astype(str)
 
             if columns is None:
                 ans[code] = temp_df
