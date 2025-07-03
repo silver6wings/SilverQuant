@@ -1,7 +1,5 @@
-import time
 import math
 import logging
-import schedule
 
 from credentials import *
 
