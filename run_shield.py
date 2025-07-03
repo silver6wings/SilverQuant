@@ -10,8 +10,8 @@ from tools.utils_ding import DingMessager
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhiteIndexes as Pool
+from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ShieldGroupSeller as Seller
 
 

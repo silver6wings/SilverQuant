@@ -1,7 +1,5 @@
-import time
 import math
 import logging
-import schedule
 
 from credentials import *
 
@@ -13,8 +11,8 @@ from tools.utils_remote import get_wencai_codes
 from delegate.xt_delegate import xt_get_ticks
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhiteIndexes as Pool
+from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ClassicGroupSeller as Seller
 
 from selector.select_wencai import get_prompt

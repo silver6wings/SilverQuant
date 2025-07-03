@@ -12,8 +12,8 @@ from tools.utils_ding import DingMessager
 from delegate.xt_delegate import xt_get_ticks
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolBlackEmpty as Pool
+from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import LTT2GroupSeller as Seller
 
 from tools.utils_remote import pull_stock_codes

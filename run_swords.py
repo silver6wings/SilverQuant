@@ -11,8 +11,8 @@ from tools.utils_ding import DingMessager
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhiteCustomSymbol as Pool
+from trader.buyer import BaseBuyer as Buyer
 
 
 STRATEGY_NAME = '进攻监控'
