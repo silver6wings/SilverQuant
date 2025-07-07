@@ -83,7 +83,7 @@ class BaseSeller:
                     max_price=max_prices[code] if code in max_prices else None,
                     history=cache_history[code] if code in cache_history else None,
                     ticks=today_ticks[code] if code in today_ticks else None,
-                    extra=extra_datas[code] if code in today_ticks else None,
+                    extra=extra_datas[code] if code in extra_datas else None,
                 )
 
     def check_sell(
