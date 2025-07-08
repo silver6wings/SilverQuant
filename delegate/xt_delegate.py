@@ -170,7 +170,7 @@ class XtDelegate(BaseDelegate):
         else:
             raise Exception('xt_trader为空')
 
-    def check_orders(self, cancelable_only = False) -> List[XtOrder]:
+    def check_orders(self, cancelable_only: bool = False) -> List[XtOrder]:
         if self.xt_trader is not None:
             orders = self.xt_trader.query_stock_orders(self.account, cancelable_only)
             if cancelable_only:
@@ -294,18 +294,18 @@ class XtDelegate(BaseDelegate):
     # ORDER_PART_CANCEL = 53
 
     def order_cancel_all(self):
-        orders = self.check_orders(cancelable_only = True)
+        orders = self.check_orders(cancelable_only=True)
         for order in orders:
             self.order_cancel_async(order.order_id)
 
     def order_cancel_buy(self, code: str):
-        orders = self.check_orders(cancelable_only = True)
+        orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_BUY:
                 self.order_cancel_async(order.order_id)
 
     def order_cancel_sell(self, code: str):
-        orders = self.check_orders(cancelable_only = True)
+        orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_SELL:
                 self.order_cancel_async(order.order_id)
@@ -321,6 +321,7 @@ class XtDelegate(BaseDelegate):
             return self.xt_trader.query_new_purchase_limit(self.account)
         else:
             raise Exception('xt_trader为空')
+
 
 def is_position_holding(position: XtPosition) -> bool:
     return position.volume > 0

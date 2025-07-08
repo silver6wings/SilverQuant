@@ -88,18 +88,21 @@ def load_stock_code_and_names(retention_day: int = 1):
             cache_available = True
 
     if not cache_available:
-        df = ak.stock_info_a_code_name()
-        df = df.rename(columns={'code': '代码', 'name': '名称'})
+        try:
+            df = ak.stock_info_a_code_name()
+            df = df.rename(columns={'code': '代码', 'name': '名称'})
 
-        if len(df) == 0:
-            df = ak.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
-            df['代码'] = df['代码'].str[2:]
+            if len(df) == 0:
+                df = ak.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
+                df['代码'] = df['代码'].str[2:]
 
-        df = df[['代码', '名称']]
-        df = df.sort_values(by='代码')
-        df['日期'] = datetime.datetime.today().strftime('%Y-%m-%d')
+            df = df[['代码', '名称']]
+            df = df.sort_values(by='代码')
+            df['日期'] = datetime.datetime.today().strftime('%Y-%m-%d')
 
-        df.to_csv(CODE_NAME_CACHE_PATH)
+            df.to_csv(CODE_NAME_CACHE_PATH)
+        except Exception as e:
+            print('Download remote code and names failed! ', e)
 
     return df
 
@@ -139,8 +142,8 @@ def delete_file(path: str) -> None:
 
         if os.path.exists(path):
             os.unlink(path)
-    except:
-        print(f'delete {path} failed!')
+    except Exception as e:
+        print(f'delete {path} failed! {str(e)}')
 
 
 # 读取pickle缓存
@@ -215,7 +218,8 @@ def all_held_inc(held_operation_lock: threading.Lock, path: str) -> bool:
                 return True
             else:
                 return False
-        except:
+        except Exception as e:
+            print('held days +1 failed! ', e)
             return False
 
 
@@ -476,7 +480,8 @@ def get_prefixes_stock_codes(prefixes: Set[str]) -> List[str]:
 
 def get_none_st_codes() -> list[str]:
     df = ak.stock_info_a_code_name()
-    df = df[~df['name'].str.contains('ST')]  # 筛选name列中不包含"ST"的行
+    df = df[~df['name'].str.contains('ST')]
+    df = df[~df['name'].str.contains('退市')]
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
 
