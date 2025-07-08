@@ -61,7 +61,6 @@ class XtSubscriber:
         tick_memory_data_frame: bool = False,
         open_today_deal_report: bool = False,
         open_today_hold_report: bool = False,
-
     ):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
@@ -347,86 +346,85 @@ class XtSubscriber:
         if not check_is_open_day(curr_date):
             return
 
-        self.today_deal_report(today=curr_date)
-        self.today_hold_report(today=curr_date)
-        self.check_asset(today=curr_date)
+        if self.open_today_deal_report:
+            self.today_deal_report(today=curr_date)
+
+        if self.delegate is not None:
+            if self.open_today_hold_report:
+                positions = self.delegate.check_positions()
+                self.today_hold_report(today=curr_date, positions=positions)
+
+            asset = self.delegate.check_asset()
+            self.check_asset(today=curr_date, asset=asset)
 
     def today_deal_report(self, today):
-        if self.open_today_deal_report:
-            if not os.path.exists(self.path_deal):
-                return
-
-            df = pd.read_csv(self.path_deal, encoding='gbk')
-            if '日期' in df.columns:
-                df = df[df['日期'] == today]
-
-            if len(df) > 0:
-                title = f'[{self.account_id}]{self.strategy_name} 委托统计'
-                text = f'{title}\n\n[{today}] 交易{len(df)}单'
-                for index, row in df.iterrows():
-                    # ['日期', '时间', '代码', '名称', '类型', '注释', '成交价', '成交量']
-                    text += '\n\n> '
-                    text += f'{row["时间"]} {row["注释"]} {code_to_symbol(row["代码"])} '
-                    text += '\n>\n> '
-                    text += f'{row["名称"]} {row["成交量"]}股 {row["成交价"]}元 '
-
-                if self.ding_messager is not None:
-                    self.ding_messager.send_markdown(title, text)
-
-    def today_hold_report(self, today):
-        if self.delegate is None:
+        if not os.path.exists(self.path_deal):
+            print('Missing deal record file!')
             return
 
-        if self.open_today_hold_report:
-            positions = self.delegate.check_positions()
-            text = ''
-            i = 0
-            for position in positions:
-                if position.volume > 0:
-                    code = position.stock_code
-                    quotes = xtdata.get_full_tick([code])
-                    curr_price = None
-                    if (code in quotes) and ('lastPrice' in quotes[code]):
-                        curr_price = quotes[code]['lastPrice']
+        df = pd.read_csv(self.path_deal, encoding='gbk')
+        if '日期' in df.columns:
+            df = df[df['日期'] == today]
 
-                    open_price = position.open_price
-                    if open_price == 0.0 or curr_price is None:
-                        continue
+        title = f'[{self.account_id}]{self.strategy_name} 委托统计'
+        text = f'{title}\n\n[{today}] 交易{len(df)}单'
 
-                    vol = position.volume
+        if len(df) > 0:
+            for index, row in df.iterrows():
+                # ['日期', '时间', '代码', '名称', '类型', '注释', '成交价', '成交量']
+                text += '\n\n> '
+                text += f'{row["时间"]} {row["注释"]} {code_to_symbol(row["代码"])} '
+                text += '\n>\n> '
+                text += f'{row["名称"]} {row["成交量"]}股 {row["成交价"]}元 '
 
-                    i += 1
-                    text += '\n\n>'
-                    text += f'' \
-                            f'{code_to_symbol(code)} ' \
-                            f'{self.stock_names.get_name(code)} ' \
-                            f'{curr_price * vol:.2f}元'
-                    text += '\n>\n>'
+        if self.ding_messager is not None:
+            self.ding_messager.send_markdown(title, text)
 
-                    total_change = colour_text(
-                        f"{(curr_price - open_price) * vol:.2f}",
-                        curr_price > open_price,
-                        curr_price < open_price,
-                    )
-                    ratio_change = colour_text(
-                        f'{(curr_price / open_price - 1) * 100:.2f}%',
-                        curr_price > open_price,
-                        curr_price < open_price,
-                    )
+    def today_hold_report(self, today, positions):
+        text = ''
+        i = 0
+        for position in positions:
+            if position.volume > 0:
+                code = position.stock_code
+                quotes = xtdata.get_full_tick([code])
+                curr_price = None
+                if (code in quotes) and ('lastPrice' in quotes[code]):
+                    curr_price = quotes[code]['lastPrice']
 
-                    text += f'盈亏比:{ratio_change}</font> 盈亏额:{total_change}</font>'
+                open_price = position.open_price
+                if open_price == 0.0 or curr_price is None:
+                    continue
 
-            title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
-            text = f'{title}\n\n[{today}] 持仓{i}支\n{text}'
+                vol = position.volume
 
-            if self.ding_messager is not None:
-                self.ding_messager.send_markdown(title, text)
+                i += 1
+                text += '\n\n>'
+                text += f'' \
+                        f'{code_to_symbol(code)} ' \
+                        f'{self.stock_names.get_name(code)} ' \
+                        f'{curr_price * vol:.2f}元'
+                text += '\n>\n>'
 
-    def check_asset(self, today):
-        if self.delegate is None:
-            return
+                total_change = colour_text(
+                    f"{(curr_price - open_price) * vol:.2f}",
+                    curr_price > open_price,
+                    curr_price < open_price,
+                )
+                ratio_change = colour_text(
+                    f'{(curr_price / open_price - 1) * 100:.2f}%',
+                    curr_price > open_price,
+                    curr_price < open_price,
+                )
 
-        asset = self.delegate.check_asset()
+                text += f'盈亏比:{ratio_change}</font> 盈亏额:{total_change}</font>'
+
+        title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
+        text = f'{title}\n\n[{today}] 持仓{i}支\n{text}'
+
+        if self.ding_messager is not None:
+            self.ding_messager.send_markdown(title, text)
+
+    def check_asset(self, today, asset):
         title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
         text = title
 
@@ -525,9 +523,12 @@ class XtSubscriber:
 
             # 启动定时器
             try:
+                print('策略定时器任务已经启动！')
                 self.scheduler.start()
             except KeyboardInterrupt:
                 print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+            except Exception as e:
+                print('策略定时器出错：', e)
             finally:
                 self.delegate.shutdown()
         else:
