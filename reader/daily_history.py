@@ -51,17 +51,24 @@ class DailyHistory:
         print(f'Find {i}/{len(codes)} codes returned.')
         return ans
 
-    def get_code_list(self, force_download: bool = False) -> list[str]:
+    def get_code_list(self, force_download: bool = False, prefixes: set[str] = None) -> list[str]:
         path = f'{self.root_path}/_code_list.csv'
 
         if force_download:
             import akshare as ak
-            df = ak.stock_info_a_code_name()
-            df.to_csv(path, index=False)
+            try:
+                df = ak.stock_info_a_code_name()
+                df.to_csv(path, index=False)
+            except Exception as e:
+                print('Download code list failed! ', e)
 
         if os.path.exists(path):
             df = pd.read_csv(path, dtype={'code': str}, index_col=False)
-            return [symbol_to_code(symbol) for symbol in df['code'].values]
+            if prefixes is None:
+                return [symbol_to_code(symbol) for symbol in df['code'].values]
+            else:
+                return [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
+
         else:
             return []
 
@@ -96,7 +103,8 @@ class DailyHistory:
             try:
                 df = pd.read_csv(path, dtype={'datetime': int})
                 self.cache_history[code] = df
-            except:
+            except Exception as e:
+                print(code, e)
                 error_count += 1
         print(f'\nLoading finished with {error_count}/{i} errors')
 
@@ -147,6 +155,60 @@ class DailyHistory:
         print(f'Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
         self._download_codes(gap_codes, self.init_day_count, data_source)
 
+    def _download_date(self, target_date: str, code_list: list[str]) -> set[str]:
+        target_date_int = int(target_date)
+        print(f'Updating {target_date} ', end='')
+
+        loss_list = []
+        for code in code_list:
+            if not (self[code]['datetime'] == target_date_int).any():
+                loss_list.append(code)
+
+        updated_codes = set()
+        updated_count = 0
+        group_size = 1000
+        for i in range(0, len(loss_list), group_size):
+            group_codes = [sub_code for sub_code in loss_list[i:i + group_size]]
+
+            dfs = get_ts_daily_histories(
+                codes=group_codes,
+                start_date=target_date,
+                end_date=target_date,
+                columns=self.default_columns,
+            )
+
+            # 填补缺失的日期
+            for code in dfs:
+                df = dfs[code]
+                if len(df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
+                    updated_codes.add(code)
+                    updated_count += 1
+                    if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
+                        self.cache_history[code] = df  # concat len = 0 的 df 会报 warning
+                    else:
+                        self.cache_history[code] = pd.concat([self.cache_history[code], df], ignore_index=True)
+            print('.', end='')
+        print(f' {updated_count} Updated!')
+        return updated_codes
+
+    def download_single_daily(self, target_date: str) -> None:
+        if len(self.cache_history) == 0:
+            self.load_history_from_disk_to_memory()
+
+        # self._download_gap_to_disk()  # 平时手动操作补单日数据需要，这里就先注释掉
+
+        code_list = self.get_code_list()
+        updated_codes = self._download_date(target_date, code_list)
+        print('Sort and Save all history data ', end='')
+        i = 0
+        for code in updated_codes:
+            i += 1
+            if i % 1000 == 0:
+                print('.', end='')
+            self.cache_history[code] = self[code].sort_values(by='datetime')
+            self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
+        print(f'\nFinished with {i} files updated')
+
     def download_recent_daily(self, days: int) -> None:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
@@ -156,39 +218,15 @@ class DailyHistory:
         code_list = self.get_code_list()
 
         now = datetime.datetime.now()
-        updated_codes = set()
+        all_updated_codes = set()
         for forward_day in range(days, 0, -1):
             target_date = get_prev_trading_date(now, forward_day)
-            print(f'Updating {target_date}', end='')
-            updated_count = 0
-            group_size = 1000
-            for i in range(0, len(code_list), group_size):
-                group_codes = [sub_code for sub_code in code_list[i:i + group_size]]
-
-                dfs = get_ts_daily_histories(
-                    codes=group_codes,
-                    start_date=target_date,
-                    end_date=target_date,
-                    columns=self.default_columns,
-                )
-
-                # 填补缺失的日期
-                target_date_int = int(target_date)
-                for code in dfs:
-                    df = dfs[code]
-                    if len(df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
-                        updated_codes.add(code)
-                        updated_count += 1
-                        if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
-                            self.cache_history[code] = df  # concat len = 0 的 df 会报 warning
-                        else:
-                            self.cache_history[code] = pd.concat([self.cache_history[code], df], ignore_index=True)
-                print('.', end='')
-            print(f'{updated_count} Updated!')
+            sub_updated_codes = self._download_date(target_date, code_list)
+            all_updated_codes.update(sub_updated_codes)
 
         print('Sort and Save all history data ', end='')
         i = 0
-        for code in updated_codes:
+        for code in all_updated_codes:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
