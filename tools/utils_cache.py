@@ -481,7 +481,8 @@ def get_prefixes_stock_codes(prefixes: Set[str]) -> List[str]:
 def get_none_st_codes() -> list[str]:
     df = ak.stock_info_a_code_name()
     df = df[~df['name'].str.contains('ST')]
-    df = df[~df['name'].str.contains('退市')]
+    df = df[~df['name'].str.endswith('退')]
+    df = df[~df['name'].str.startswith('退市')]
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
 
