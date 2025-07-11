@@ -187,6 +187,20 @@ class XtSubscriber:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
             print('\n[关闭行情订阅]')
 
+    def resubscribe_tick(self, notice: bool = False):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return
+
+        if 'sub_seq' in self.cache_limits:
+            xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
+        self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
+        xtdata.enable_hello = False
+
+        if self.ding_messager is not None and notice:
+            self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                               f'{"重启" {len(self.code_list) - 1}支')
+        print('\n[重启行情订阅]', end='')
+    
     def update_code_list(self, code_list: list[str]):
         # 加上证指数防止没数据不打点
         self.code_list = ['000001.SH'] + code_list
@@ -510,11 +524,14 @@ class XtSubscriber:
                     self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn)
                 else:
                     self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
-
+            
+            #尝试重新订阅tick数据，减少30分时无数据返回机率
+            self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30) 
+            
             for monitor_time in monitor_time_list:
                 [hr, mn] = monitor_time.split(':')
                 self.scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
-
+    
             # 盘中执行需要补齐
             if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
                 self.before_trade_day_wrapper()
