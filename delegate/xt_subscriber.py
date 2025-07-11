@@ -198,7 +198,7 @@ class XtSubscriber:
 
         if self.ding_messager is not None and notice:
             self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                               f'{"重启" {len(self.code_list) - 1}支')
+                                               f'重启 {len(self.code_list) - 1}支')
         print('\n[重启行情订阅]', end='')
     
     def update_code_list(self, code_list: list[str]):
@@ -524,14 +524,14 @@ class XtSubscriber:
                     self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn)
                 else:
                     self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
-            
-            #尝试重新订阅tick数据，减少30分时无数据返回机率
+
+            # 尝试重新订阅 tick 数据，减少30分时无数据返回机率
             self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30) 
-            
+
             for monitor_time in monitor_time_list:
                 [hr, mn] = monitor_time.split(':')
                 self.scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
-    
+
             # 盘中执行需要补齐
             if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
                 self.before_trade_day_wrapper()
