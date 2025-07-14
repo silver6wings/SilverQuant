@@ -159,8 +159,7 @@ class XtSubscriber:
             if len(self.code_list) > 1 and xtdata.get_client():
                 print('尝试重新订阅行情数据')
                 time.sleep(1)
-                self.unsubscribe_tick(pause=True)
-                self.subscribe_tick(resume=True)
+                self.resubscribe_tick(notice=True)
 
     # -----------------------
     # 订阅tick相关
