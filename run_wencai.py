@@ -21,8 +21,8 @@ select_prompt = get_prompt()
 
 STRATEGY_NAME = '问财选股'
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
-IS_PROD = False
-IS_DEBUG = True
+IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
+IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
 
 PATH_BASE = CACHE_BASE_PATH
 

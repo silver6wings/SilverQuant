@@ -131,9 +131,9 @@ class XtSubscriber:
                 print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
 
                 if self.execute_strategy(
-                    curr_date,
-                    curr_time,
-                    curr_seconds,
+                    curr_date,      # str(%Y-%m-%d)
+                    curr_time,      # str(%H:%M)
+                    curr_seconds,   # str(%S)
                     self.cache_quotes,
                 ):
                     with self.lock_quotes_update:
