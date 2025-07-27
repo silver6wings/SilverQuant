@@ -54,7 +54,7 @@ class StockPool:
                 print(f'{i}.', end='')
             if code in cache_history:
                 df = selector(cache_history[code], code, None)  # 预筛公式默认不需要使用quote所以传None
-                if not df['PASS'].values[-1]:
+                if (len(df) > 0) and (not df['PASS'].values[-1]):
                     remove_list.append(code)
             else:
                 remove_list.append(code)

@@ -35,9 +35,9 @@ cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 cache_history: Dict[str, pd.DataFrame] = {}     # 记录历史日线行情的信息 { code: DataFrame }
 
 
-def debug(*args):
+def debug(*args, **kwargs):
     if IS_DEBUG:
-        print(*args)
+        print(*args, **kwargs)
 
 
 class PoolConf:

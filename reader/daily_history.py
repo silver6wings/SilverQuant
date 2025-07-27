@@ -29,6 +29,7 @@ class DailyHistory:
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
     def __init__(self, root_path: str = './_cache/_daily', init_day_count: int = default_init_day_count):
+        os.makedirs(root_path, exist_ok=True)
         self.root_path = root_path
         self.init_day_count = init_day_count
         self.cache_history: dict[str, pd.DataFrame] = {}

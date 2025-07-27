@@ -1,5 +1,8 @@
 """
 https://www.iwencai.com/
+注意：
+若直接执行本文件报错未找到selector.select_prompts
+请设置项目 Working Directory 到根目录执行即可
 """
 import datetime
 import pywencai
