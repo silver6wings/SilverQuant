@@ -1,7 +1,3 @@
-import json
-import os
-import time
-from ctypes import *
 
 class FileLock:
     def __init__(this, path, auto_lock = False):
@@ -12,6 +8,7 @@ class FileLock:
         return
 
     def is_lock(this):
+        import os
         if os.path.exists(this.path):
             try:
                 os.remove(this.path)
@@ -37,6 +34,7 @@ class FileLock:
         return True
 
     def clean(this):
+        import os
         if not os.path.exists(this.path):
             return True
         try:
@@ -48,13 +46,16 @@ class FileLock:
         return False
 
 class Extender:
+    from ctypes import c_float, c_short
     value_type = c_float
     rank_type = c_short
 
     def __init__(self, base_dir):
+        import os
         self.base_dir = os.path.join(base_dir, 'EP')
 
     def read_config(self):
+        import json, os
         data = None
         with open(os.path.join(self.file, 'config'), 'r', encoding='utf-8') as f:
             data = json.loads(f.read())
@@ -68,6 +69,7 @@ class Extender:
             self.timedatelist = data['tradedatelist']
 
     def read_data(self, data, time_indexs, stock_length):
+        from ctypes import c_float, c_short, sizeof, cast, POINTER
         res = {}
         num = (sizeof(self.value_type) + sizeof(self.rank_type)) * stock_length
         for time_index in time_indexs:
@@ -81,6 +83,7 @@ class Extender:
         return res
 
     def format_time(self, times):
+        import time
         if type(times) == str:
             return int(time.mktime(time.strptime(times, '%Y%m%d'))) * 1000
         elif type(times) == int:
@@ -92,6 +95,7 @@ class Extender:
                 return times
 
     def show_extend_data(self, file, times):
+        import time, os
         self.file = os.path.join(self.base_dir, file + '_Xdat')
         if not os.path.isdir(self.file):
             return "No such file"
@@ -125,9 +129,10 @@ class Extender:
         res = self.read_data(data, time_index, stock_length)
         return self.stocklist, res
 
-from . import xtdata as xd
 
 def show_extend_data(file, times):
+    import os
+    from . import xtdata as xd
     exd = Extender(os.path.join(xd.init_data_dir(), '..', 'datadir'))
 
     return exd.show_extend_data(file, times)

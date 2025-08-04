@@ -1,14 +1,9 @@
 #coding:utf-8
 
-import datetime as dt
-import threading
-import time
-import traceback
+import datetime as _DT_
 
 from xtquant import xtdata
-from xtquant import xtbson as bson
-
-_request_id = ''
+from xtquant import xtbson as _BSON_
 
 def datetime_to_timetag(timelabel, format = ''):
     '''
@@ -18,7 +13,7 @@ def datetime_to_timetag(timelabel, format = ''):
     '''
     if not format:
         format = '%Y%m%d' if len(timelabel) == 8 else '%Y%m%d%H%M%S'
-    return dt.datetime.strptime(timelabel, format).timestamp() * 1000
+    return _DT_.datetime.strptime(timelabel, format).timestamp() * 1000
 
 def timetag_to_datetime(timetag, format = ''):
     '''
@@ -28,7 +23,18 @@ def timetag_to_datetime(timetag, format = ''):
     '''
     if not format:
         format = '%Y%m%d' if timetag % 86400000 == 57600000 else '%Y%m%d%H%M%S'
-    return dt.datetime.fromtimestamp(timetag / 1000).strftime(format)
+    return _DT_.datetime.fromtimestamp(timetag / 1000).strftime(format)
+
+def fetch_ContextInfo():
+    import sys
+    frame = sys._getframe()
+    while (frame):
+        loc = list(frame.f_locals.values())
+        for val in loc:
+            if type(val).__name__ == "ContextInfo":
+                return val
+        frame = frame.f_back
+    return None
 
 def subscribe_quote(stock_code, period, dividend_type, count = 0, result_type = '', callback = None):
     return xtdata.subscribe_quote(stock_code, period, '', '', count, callback)
@@ -220,13 +226,19 @@ def get_raw_financial_data(field_list, stock_list, start_date, end_date, report_
 
         for field in field_list:
             fs = field.split('.')
-            table_data = stock_data[fs[0]]
+            table_data = stock_data.get(fs[0])
+
+            if not table_data:
+                continue
 
             ans = {}
             for row_data in table_data:
+                if row_data.get(report_type, None) == None:
+                    continue
                 date = time.strftime('%Y%m%d', time.localtime(row_data[report_type] / 1000))
-                if start_date <= date <= end_date:
-                    ans[int(row_data[report_type])] = row_data[fs[1]]
+                if start_date == '' or start_date <= date:
+                    if end_date == '' or date <= end_date:
+                        ans[int(row_data[report_type])] = row_data[fs[1]]
             res[stock][field] = ans
     return res
 
@@ -258,9 +270,16 @@ def download_sector_data():
 
 download_sector_weight = download_sector_data #compat
 
+def get_his_st_data(stock_code):
+    return xtdata.get_his_st_data(stock_code)
+
+
 def _passorder_impl(
-    optype, ordertype, accountid, ordercode
-    , prtype, modelprice, volume, ordertime, requestid
+    optype, ordertype, accountid
+    , ordercode, prtype, modelprice, volume
+    , strategyName, quickTrade, userOrderId
+    , barpos, bartime, func, algoName
+    , requestid
 ):
     data = {}
 
@@ -271,18 +290,39 @@ def _passorder_impl(
     data['prtype'] = prtype
     data['modelprice'] = modelprice
     data['volume'] = volume
-    data['ordertime'] = ordertime
+    data['strategyname'] = strategyName
+    data['remark'] = userOrderId
+    data['quicktrade'] = quickTrade
+    data['func'] = func
+    data['algoname'] = algoName
+    data['barpos'] = barpos
+    data['bartime'] = bartime
 
     client = xtdata.get_client()
-    client.callFormula(requestid, 'passorder', bson.BSON.encode(data))
+    client.callFormula(requestid, 'passorder', _BSON_.BSON.encode(data))
     return
 
-def passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume, C):
-    return C.passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume)
+
+def passorder(
+    opType, orderType, accountid
+    , orderCode, prType, modelprice, volume
+    , strategyName, quickTrade, userOrderId
+    , C
+):
+    return C.passorder(
+        opType, orderType, accountid
+        , orderCode, prType, modelprice, volume
+        , strategyName, quickTrade, userOrderId
+    )
+
 
 def get_trade_detail_data(accountid, accounttype, datatype, strategyname = ''):
-
     data = {}
+
+    C = fetch_ContextInfo()
+    if C is None:
+        raise Exception("contextinfo could not be found in the stack")
+    request_id = C.request_id
 
     data['accountid'] = accountid
     data['accounttype'] = accounttype
@@ -290,8 +330,8 @@ def get_trade_detail_data(accountid, accounttype, datatype, strategyname = ''):
     data['strategyname'] = strategyname
 
     client = xtdata.get_client()
-    result_bson = client.callFormula(_request_id, 'gettradedetail', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.callFormula(request_id, 'gettradedetail', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
 
     class DetailData(object):
         def __init__(self, _obj):
@@ -299,6 +339,9 @@ def get_trade_detail_data(accountid, accounttype, datatype, strategyname = ''):
                 self.__dict__.update(_obj)
 
     out = []
+    if not result:
+        return out
+
     for item in result.get('result'):
         out.append(DetailData(item))
     return out
@@ -310,7 +353,7 @@ def register_external_resp_callback(reqid, callback):
 
     def on_callback(type, data, error):
         try:
-            result = bson.BSON.decode(data)
+            result = _BSON_.BSON.decode(data)
             callback(type, result, error)
             return True
         except:
@@ -325,7 +368,7 @@ def _set_auto_trade_callback_impl(enable, requestid):
     data['enable'] = enable
 
     client = xtdata.get_client()
-    client.callFormula(requestid, 'setautotradecallback', bson.BSON.encode(data))
+    client.callFormula(requestid, 'setautotradecallback', _BSON_.BSON.encode(data))
     return
 
 def set_auto_trade_callback(C,enable):
@@ -336,7 +379,7 @@ def set_account(accountid, requestid):
     data['accountid'] = accountid
 
     client = xtdata.get_client()
-    client.callFormula(requestid, 'setaccount', bson.BSON.encode(data))
+    client.callFormula(requestid, 'setaccount', _BSON_.BSON.encode(data))
     return
 
 def _get_callback_cache_impl(type, requestid):
@@ -345,8 +388,8 @@ def _get_callback_cache_impl(type, requestid):
     data['type'] = type
 
     client = xtdata.get_client()
-    result_bson = client.callFormula(requestid, 'getcallbackcache', bson.BSON.encode(data))
-    return bson.BSON.decode(result_bson)
+    result_bson = client.callFormula(requestid, 'getcallbackcache', _BSON_.BSON.encode(data))
+    return _BSON_.BSON.decode(result_bson)
 
 def get_account_callback_cache(data, C):
     data = C.get_callback_cache("account").get('')
@@ -382,8 +425,8 @@ def get_opt_iv(opt_code, requestid):
     data['code'] = opt_code
 
     client = xtdata.get_client()
-    result_bson = client.callFormula(requestid, 'getoptiv', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.callFormula(requestid, 'getoptiv', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
 
     out = result.get('result', 0)
     return out
@@ -399,8 +442,8 @@ def calc_bsm_price(optionType,strikePrice, targetPrice, riskFree, sigma, days, d
     data['dividend'] = dividend
 
     client = xtdata.get_client()
-    result_bson = client.callFormula(requestid, 'calcbsmprice', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.callFormula(requestid, 'calcbsmprice', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
 
     out = result.get('result', 0)
     return out
@@ -416,9 +459,79 @@ def calc_bsm_iv(optionType, strikePrice, targetPrice, optionPrice, riskFree, day
     data['dividend'] = dividend
 
     client = xtdata.get_client()
-    result_bson = client.callFormula(requestid, 'calcbsmiv', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.callFormula(requestid, 'calcbsmiv', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
 
     out = result.get('result', 0)
     return out
 
+def get_ipo_info(start_time, end_time):
+    return xtdata.get_ipo_info(start_time, end_time)
+
+def get_backtest_index(requestid, path):
+    import os
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok = True)
+
+    data = {'savePath': path}
+    client = xtdata.get_client()
+    bresult = client.callFormula(requestid, 'backtestresult', _BSON_.BSON.encode(data))
+    return _BSON_.BSON.decode(bresult)
+
+def get_group_result(requestid, path, fields):
+    import os
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok = True)
+
+    data = {'savePath': path, 'fields': fields}
+    client = xtdata.get_client()
+    bresult = client.callFormula(requestid, 'groupresult', _BSON_.BSON.encode(data))
+    return _BSON_.BSON.decode(bresult)
+
+def subscribe_formula(formula_name, stock_code, period, start_time = "", end_time = "", count=-1, dividend_type = "none", extend_params = {}, callback = None):
+    return xtdata.subscribe_formula(formula_name, stock_code, period, start_time, end_time, count, dividend_type, extend_params, callback)
+
+def call_formula_batch(formula_names, stock_codes, period, start_time = "", end_time = "", count=-1, dividend_type = "none", extend_params = []):
+    import copy
+    params = []
+    for name in formula_names:
+        for stock in stock_codes:
+            param = {
+                'formulaname': name, 'stockcode': stock, 'period': period
+                , 'starttime': start_time, 'endtime': end_time, 'count': count
+                , 'dividendtype': dividend_type, 'extendparam': {}
+                , 'create': True, 'datademand': 0
+            }
+
+            if extend_params:
+                for extend in extend_params:
+                    param['extendparam'] = extend
+                    params.append(copy.deepcopy(param))
+            else:
+                params.append(param)
+
+    client = xtdata.get_client()
+    result = client.commonControl(
+        'callformulabatch'
+        , _BSON_.BSON.encode(
+            {"params": params}
+        )
+    )
+    result = _BSON_.BSON.decode(result)
+    return result.get("result", {})
+
+def is_suspended_stock(stock_code, period, timetag):
+    client = xtdata.get_client()
+
+    result = client.commonControl(
+        'issuspendedstock'
+        , _BSON_.BSON.encode({
+            "stockcode": stock_code
+            , "period": period
+            , "timetag": timetag
+        })
+    )
+    result = _BSON_.BSON.decode(result)
+    return result.get('result', True)
