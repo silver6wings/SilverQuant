@@ -3,7 +3,7 @@ from typing import Set, Callable
 
 from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prefixes_stock_codes, get_index_constituent_codes
-from tools.utils_remote import get_wencai_codes
+from tools.utils_remote import get_wencai_codes, get_tdx_zxg_code
 
 from trader.pools_indicator import get_macd_index_indicator, get_ma_index_indicator
 from trader.pools_section import get_dfcf_industry_stock_codes, get_dfcf_industry_sections, \
@@ -16,6 +16,7 @@ class StockPool:
         self.strategy_name = strategy_name
         self.ding_messager = ding_messager
 
+        self.pool_parameters = parameters
         self.cache_blacklist: Set[str] = set()
         self.cache_whitelist: Set[str] = set()
 
@@ -132,6 +133,18 @@ class StocksPoolWhiteCustomSymbol(StocksPoolBlackWencai):
                     code = symbol_to_code(line)
                     codes.append(code)
             self.cache_whitelist.update(codes)
+
+
+class StocksPoolWhiteCustomTdx(StocksPoolBlackWencai):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+        super().__init__(account_id, strategy_name, parameters, ding_messager)
+        # 自选股文件默认路径示例： r'C:\new_tdx\T0002\blocknew\ZXG.blk'
+        self.tdx_codes_filepath = parameters.tdx_codes_filepath
+
+    def refresh_white(self):
+        super().refresh_white()
+        codes = get_tdx_zxg_code(self.tdx_codes_filepath)
+        self.cache_whitelist.update(codes)
 
 
 # -----------------------

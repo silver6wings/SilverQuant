@@ -1,15 +1,36 @@
+import csv
 import datetime
-
 import requests
 import pandas as pd
 from typing import Optional
 
-from tools.utils_basic import is_stock, code_to_symbol
+from tools.utils_basic import is_stock, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
+
+
+DEFAULT_ZXG_FILE = r'C:\new_tdx\T0002\blocknew\ZXG.blk'     # 自选股文件
 
 
 class DataSource:
     AKSHARE = 0
     TUSHARE = 1
+
+
+def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_ZXG_FILE):
+    # 打开或创建CSV文件并指定写入模式, newline=''则不生成空行
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        for item in data:
+            writer.writerow([code_to_tdxsymbol(item)])
+    print(f"已成功将数据写入{filename}文件！")
+
+
+def get_tdx_zxg_code(filename: str = DEFAULT_ZXG_FILE) -> list[str]:
+    ret_list = []
+    with open(filename) as f:
+        f_reader = csv.reader(f)
+        for row in f_reader:
+            ret_list.append(tdxsymbol_to_code(''.join(row)))
+    return ret_list
 
 
 def get_wencai_codes(queries: list[str]) -> list[str]:

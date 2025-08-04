@@ -71,8 +71,51 @@ def code_to_symbol(code: str) -> str:
 
 
 # ==========
+# 通达信系列代码
+# ==========
+
+
+def code_to_tdxsymbol(code: str) -> str:
+    [symbol, exchange] = code.split('.')
+    if exchange == 'SZ':
+        return '0' + symbol
+    elif exchange == 'SH':
+        return '1' + symbol
+    elif exchange == 'BJ':
+        return '2' + symbol
+    return code         # 这里先不变，不报错
+
+
+def tdxsymbol_to_code(tdxsymbol: str) -> str:
+    if tdxsymbol[0] == '0':
+        return tdxsymbol[1:7] + '.SZ'
+    elif tdxsymbol[0] == '1':
+        return tdxsymbol[1:7] + '.SH'
+    elif tdxsymbol[0] == '2':
+        return tdxsymbol[1:7] + '.BJ'
+    return tdxsymbol    # 这里先不变，不报错
+
+
+def symbol_to_tdxsymbol(code: str) -> str:
+    """ 转换代码函数 """
+    # 深证为0，沪市为1，北交所为2
+    code = ''.join(c for c in code if c.isdigit())  # 只取股票代码中数字代码部分
+    # A股，股票代码转换，如：1601068，2300250
+    if len(code) == 6:
+        if code[0] == "6" or code[0] == "9":  # 上证股票
+            return "1" + code
+        if code[0] == "0" or code[0] == "3" or code[0] == "2":  # 深证股票
+            return "0" + code
+        if code[0] == "4" or code[0] == "8":  # 北证股票
+            return "2" + code
+    return code
+
+
+# ==========
 # 掘金系列代码
 # ==========
+
+
 def symbol_to_gmsymbol(symbol: str | int) -> str:
     symbol = str(symbol) if type(symbol) == int else symbol
 
