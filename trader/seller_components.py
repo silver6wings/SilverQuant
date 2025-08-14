@@ -226,7 +226,7 @@ class MASeller(BaseSeller):
                 ma_value = ma_values[-1]
 
                 if curr_price <= ma_value - 0.01:
-                    self.order_sell(code, quote, sell_volume, f'破{self.ma_above}日均线{ma_value:.2f}')
+                    self.order_sell(code, quote, sell_volume, f'破{self.ma_above}日均{ma_value:.2f}')
                     return True
         return False
 

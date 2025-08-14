@@ -340,10 +340,10 @@ def record_deal(
 # 获取总仓位价格增幅
 def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float) -> Optional[float]:
     if os.path.exists(path_assets):
-        df = pd.read_csv(path_assets)
-        prev_asset = df.tail(1)['asset'].values[0]
-        df.loc[len(df)] = [curr_date, curr_asset]
-        df.to_csv(path_assets, index=False)
+        df = pd.read_csv(path_assets)               # 读取
+        prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
+        df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
+        df.to_csv(path_assets, index=False)         # 存储
         return curr_asset - prev_asset
     else:
         df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
@@ -469,20 +469,28 @@ def get_available_stock_codes() -> list[str]:
     return list(set(codes))
 
 
+def _filter_none_st_out(df: pd.DataFrame) -> pd.DataFrame:
+    df = df[~df['name'].str.contains('ST')]
+    df = df[~df['name'].str.endswith('退')]
+    df = df[~df['name'].str.startswith('退市')]
+    return df
+
+
 # 根据两位数前缀获取股票列表
-def get_prefixes_stock_codes(prefixes: Set[str]) -> List[str]:
+def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[str]:
     """
     prefixes: 六位数的两位数前缀
     """
     df = ak.stock_info_a_code_name()
-    return [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
+    if none_st:
+        df = _filter_none_st_out(df)
+    codes = [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
+    return list(set(codes))
 
 
 def get_none_st_codes() -> list[str]:
     df = ak.stock_info_a_code_name()
-    df = df[~df['name'].str.contains('ST')]
-    df = df[~df['name'].str.endswith('退')]
-    df = df[~df['name'].str.startswith('退市')]
+    df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
 

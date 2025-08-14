@@ -33,7 +33,7 @@ class StockPool:
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name}:更新{len(self.get_code_list())}支\n'
+                f'[{self.account_id}]{self.strategy_name}:刷新{len(self.get_code_list())}支\n'
                 f'白名单: {len(self.cache_whitelist)} '
                 f'黑名单: {len(self.cache_blacklist)}')
 
@@ -211,11 +211,15 @@ class StocksPoolWhitePrefixes(StocksPoolBlackWencai):
     def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
+        if hasattr(parameters, 'white_none_st'):
+            self.white_none_st = parameters.white_none_st
+        else:
+            self.white_none_st = False
 
     def refresh_white(self):
         super().refresh_white()
 
-        t_white_codes = get_prefixes_stock_codes(self.white_prefixes)
+        t_white_codes = get_prefixes_stock_codes(self.white_prefixes, self.white_none_st)
         self.cache_whitelist.update(t_white_codes)
 
 

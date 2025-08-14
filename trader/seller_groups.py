@@ -60,6 +60,16 @@ class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller):
         self.group_check_sell(code, quote, curr_date, curr_time, position, held_day, max_price, history, ticks, extra)
 
 
+# 问财卖出
+class WencaiGroupSeller(GroupSellers, HardSeller, FallSeller, ReturnSeller, SwitchSeller):
+    def __init__(self, strategy_name, delegate, parameters):
+        super().__init__()
+        self.group_init(strategy_name, delegate, parameters)
+
+    def check_sell(self, code, quote, curr_date, curr_time, position, held_day, max_price, history, ticks, extra):
+        self.group_check_sell(code, quote, curr_date, curr_time, position, held_day, max_price, history, ticks, extra)
+
+
 # Deepseek
 class DeepseekGroupSeller(GroupSellers, HardSeller, SwitchSeller, FallSeller):
     def __init__(self, strategy_name, delegate, parameters):
