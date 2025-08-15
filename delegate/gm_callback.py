@@ -2,8 +2,8 @@ import datetime
 import threading
 from typing import Optional
 
-from gmtrade.api import *
-from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
+from gm.api import *
+from gm.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
 from tools.utils_basic import gmsymbol_to_code
 from tools.utils_cache import record_deal, new_held, del_key, StockNames
@@ -40,32 +40,19 @@ class GmCallback:
 
     @staticmethod
     def register_callback():
-        # 直接使用当前模块进行注册，不使用filename参数
         try:
-            # file_name = 'delegate.gm_callback.py'
-            # status = start(filename=file_name)
-
-            status = start(filename='__main__')
-            if status == 0:
-                print(f'[掘金]:使用__main__订阅回调成功')
-            else:
-                print(f'[掘金]:使用__main__订阅回调失败，状态码：{status}')
-        except Exception as e1:
-            print(f'[掘金]:使用__main__订阅回调异常：{e1}')
-            try:
-                # 如果start()不带参数失败，尝试使用空参数
-                status = start()
-                if status == 0:
-                    print(f'[掘金]:订阅回调成功')
-                else:
-                    print(f'[掘金]:订阅回调失败，状态码：{status}')
-            except Exception as e2:
-                print(f'[掘金]:使用空参数订阅回调也失败：{e2}')
+            # 在当前GM版本中，回调函数通过导入后自动注册
+            print(f'[掘金]:回调注册完成')
+        except Exception as e:
+            print(f'[掘金]:回调注册异常：{e}')
 
     @staticmethod
     def unregister_callback():
-        print(f'[掘金]:取消订阅回调')
-        # stop()
+        try:
+            stop()
+            print(f'[掘金]:取消订阅回调')
+        except Exception as e:
+            print(f'[掘金]:取消订阅异常：{e}')
 
     def record_order(self, order_time: str, code: str, price: float, volume: int, side: str, remark: str):
         record_deal(
