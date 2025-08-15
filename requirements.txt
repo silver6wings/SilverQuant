@@ -1,6 +1,6 @@
 APScheduler>=3.11.0
 akshare>=1.16.0
-gmtrade>=3.0.6
+gm>=3.0.6
 numpy==2.2.4
 pandas==2.2.3
 pywencai>=0.12.3

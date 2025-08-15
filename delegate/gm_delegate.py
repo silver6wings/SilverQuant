@@ -3,8 +3,8 @@ https://sim.myquant.cn/sim/help/Python.html
 """
 from typing import List
 
-from gmtrade.api import *
-from gmtrade.pb.account_pb2 import Cash, Position, Order
+from gm.api import *
+from gm.pb.account_pb2 import Cash, Position, Order
 
 from delegate.base_delegate import BaseDelegate
 from delegate.gm_callback import GmCallback
@@ -55,11 +55,9 @@ class GmDelegate(BaseDelegate):
         self.account_id = '**' + str(account_id)[-4:]
         self.ding_messager = ding_messager
 
-        set_endpoint(GM_SERVER_HOST)
+        set_serv_addr(GM_SERVER_HOST)
         set_token(GM_CLIENT_TOKEN)
-
-        self.account = account(account_id=GM_ACCOUNT_ID, account_alias='')
-        login(self.account)
+        set_account_id(GM_ACCOUNT_ID)
 
         if callback is not None:
             self.callback = callback
@@ -69,15 +67,15 @@ class GmDelegate(BaseDelegate):
         self.callback.unregister_callback()
 
     def check_asset(self) -> GmAsset:
-        cash: Cash = get_cash(self.account)
+        cash: Cash = get_cash()
         return GmAsset(cash)
 
     def check_orders(self) -> List[GmOrder]:
-        orders = get_orders(self.account)
+        orders = get_orders()
         return [GmOrder(order) for order in orders]
 
     def check_positions(self) -> List[GmPosition]:
-        positions = get_positions(self.account)
+        positions = get_positions()
         return [GmPosition(position) for position in positions if position.volume > 0]
 
     def order_market_open(
