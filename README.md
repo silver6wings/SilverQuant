@@ -16,6 +16,11 @@ Github 因某些原因不便境内服务器部署，这里有：[国内镜像](h
 > 
 > 感谢 [@vipally](https://github.com/vipally) 提交的PR，优化部分MyTT公式和vscode配置
 
+# 已知问题
+
+* 持仓价从QMT直接获取，目前不会根据除权情况动态调整，可能会因为除权价格降低导致非正常止损卖出。
+* Daily History 模块目前尚未加入除权数据更新机制，定期删除`_cache/_daily`文件夹可以保持数据一致性
+
 ---
 
 # 项目简介
@@ -225,11 +230,14 @@ Sell Conf 卖点相关的参数
 由于 QMT 针对单个操作系统 instance 只能单开，所以每次尽可能只 run 一个策略，以防冲突。
 
 ```
-run_wencai.py
+run_wencai_qmt.py
 利用同花顺问财大模型选股买入，
 需自行定义prompt选股问句，在`selector/select_wencai.py`中定义
 可以用来快速建立原型，做模拟盘测试，预估大致收益，一般至少测试一个月
 如果需要复杂卖出策略，需要参考`run_remote.py`加入下载历史数据代码
+
+run_wencai_tdx.py
+使用问财和通达信的数据源，可以脱离QMT客户端运行模拟盘
 ```
 ```
 run_remote.py
@@ -395,11 +403,6 @@ About mytt
 ```
 
 ---
-
-# 已知问题
-
-* 持仓价从QMT直接获取，目前尚不清楚是否会根据除权情况动态调整
-* Daily history 模块目前尚未加入除权相关的数据更新机制，定期删除_daily文件夹可以保持数据一致性
 
 # 免责声明
 

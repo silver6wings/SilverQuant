@@ -1,8 +1,8 @@
-APScheduler>=3.11.0
-akshare>=1.16.0
-gmtrade>=3.0.6
 numpy==2.2.4
 pandas==2.2.3
+APScheduler>=3.11.0
+akshare>=1.16.0
+mootdx>=0.11.7
 pywencai>=0.12.3
 requests>=2.31.0
 schedule>=1.2.1

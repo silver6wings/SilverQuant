@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 from xtquant.xttype import XtPosition
 from tools.utils_basic import get_limit_up_price
-from tools.utils_remote import append_ak_quote_dict
+from tools.utils_remote import concat_ak_quote_dict
 from trader.seller import BaseSeller
 
 
@@ -220,7 +220,7 @@ class MASeller(BaseSeller):
 
                 curr_price = quote['lastPrice']
 
-                df = append_ak_quote_dict(history, quote, curr_date)
+                df = concat_ak_quote_dict(history, quote, curr_date)
 
                 ma_values = MA(df.close.tail(self.ma_above + 1), self.ma_above)
                 ma_value = ma_values[-1]
@@ -251,7 +251,7 @@ class CCISeller(BaseSeller):
             if (held_day > 0) and int(curr_time[-2:]) % 5 == 0:  # 每隔5分钟 CCI 卖出
                 sell_volume = position.can_use_volume
 
-                df = append_ak_quote_dict(history, quote, curr_date)
+                df = concat_ak_quote_dict(history, quote, curr_date)
 
                 df['CCI'] = CCI(df['close'], df['high'], df['low'], 14)
                 cci = df['CCI'].tail(2).values
@@ -285,7 +285,7 @@ class WRSeller(BaseSeller):
             if held_day > 0 and int(curr_time[-2:]) % 5 == 0:  # 每隔5分钟 WR 卖出
                 sell_volume = position.can_use_volume
 
-                df = append_ak_quote_dict(history, quote, curr_date)
+                df = concat_ak_quote_dict(history, quote, curr_date)
 
                 df['WR'] = WR(df['close'], df['high'], df['low'], 14)
                 wr = df['WR'].tail(2).values
@@ -406,7 +406,7 @@ class UppingBlocker(BaseSeller):
     ) -> bool:
         if history is not None:
             if held_day > 0:
-                df = append_ak_quote_dict(history, quote, curr_date)
+                df = concat_ak_quote_dict(history, quote, curr_date)
 
                 _, _, df['MACD'] = MACD(df['close'])
                 macd = df['MACD'].tail(2).values

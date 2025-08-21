@@ -1,6 +1,10 @@
 # 将本文件复制重命名为 credentials.py 生效
 
-CACHE_BASE_PATH = './_cache/staging_pwc'
+CACHE_PROD_PATH = './_cache/prod_pwc'   # 生产环境缓存目录
+CACHE_TEST_PATH = './_cache/test_pwc'   # 测试环境缓存目录
+
+# 本地通达信安装目录，用以mootdx数据加速以及访问通达信自选列表
+TDX_FOLDER = r'C:\new_tdx'
 
 # 具体账号信息请咨询对应券商客服经理
 QMT_ACCOUNT_ID = '55009728'

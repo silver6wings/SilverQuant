@@ -6,7 +6,7 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
-from tools.utils_remote import append_ak_quote_dict, DataSource
+from tools.utils_remote import concat_ak_quote_dict, DataSource
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
@@ -23,7 +23,7 @@ DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
 
-PATH_BASE = CACHE_BASE_PATH
+PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
@@ -153,7 +153,7 @@ def prepare_history() -> None:
 
 
 def check_stock(code: str, quote: Dict, curr_date: str) -> (bool, Dict):
-    df = append_ak_quote_dict(my_suber.cache_history[code], quote, curr_date)
+    df = concat_ak_quote_dict(my_suber.cache_history[code], quote, curr_date)
 
     result_df = select(df, code, quote)
     buy = result_df['PASS'].values[-1]

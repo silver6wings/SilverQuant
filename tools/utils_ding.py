@@ -1,3 +1,4 @@
+import abc
 import base64
 import hashlib
 import hmac
@@ -9,7 +10,25 @@ import urllib.parse
 import urllib.request
 
 
-class DingMessager(object):
+class BaseMessager:
+    @abc.abstractmethod
+    def send_message(self, data) -> dict:
+        return {}
+
+    @abc.abstractmethod
+    def send_text(self, text: str, output: str = '', alert: bool = False) -> bool:
+        return False
+
+    @abc.abstractmethod
+    def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
+        return False
+
+    @abc.abstractmethod
+    def send_markdown(self, title: str, text: str, output: str = '', alert: bool = False) -> bool:
+        return False
+
+
+class DingMessager(BaseMessager):
     def __init__(self, secret: str = None, url: str = None):
         """
         https://open.dingtalk.com/document/orgapp/custom-robots-send-group-messages
@@ -55,9 +74,9 @@ class DingMessager(object):
 
                 response = requests.post(url=self.webhook_url, data=send_data, headers=header)
                 return json.loads(response.text)
-        except:
+        except Exception as e:
             traceback.print_exc()
-            return {'errmsg': 'Exception!'}
+            return {'errmsg': str(e)}
 
     def send_text(self, text: str, output: str = '', alert: bool = False) -> bool:
         res = self.send_message(data={

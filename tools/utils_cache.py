@@ -110,14 +110,14 @@ def load_stock_code_and_names(retention_day: int = 1):
 def get_stock_codes_and_names() -> Dict[str, str]:
     ans = {}
 
-    with open('./_data/mktdt00.txt', 'r', errors='replace') as r:
+    with open('./_cache/_rawdata/mktdt00.txt', 'r', errors='replace') as r:
         lines = r.readlines()
         for line in lines:
             arr = line.split('|')
             if len(arr) > 2 and len(arr[1]) == 6:
                 ans[arr[1] + '.SH'] = arr[2]
 
-    with open('./_data/sjshq.txt', 'r', encoding='utf-8', errors='replace') as r:
+    with open('./_cache/_rawdata/sjshq.txt', 'r', encoding='utf-8', errors='replace') as r:
         lines = r.readlines()
         for line in lines:
             arr = json.loads(line)

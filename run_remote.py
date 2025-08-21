@@ -8,6 +8,7 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
+from tools.utils_remote import DataSource
 
 from delegate.xt_delegate import xt_get_ticks
 from delegate.xt_subscriber import XtSubscriber, update_position_held
@@ -18,6 +19,7 @@ from trader.seller_groups import LTT2GroupSeller as Seller
 
 from tools.utils_remote import pull_stock_codes
 
+data_source = DataSource.AKSHARE
 
 STRATEGY_NAME = '远程选股'
 SELECTION_ID = 'REMOTE'
@@ -25,7 +27,7 @@ DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
 
-PATH_BASE = CACHE_BASE_PATH
+PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
@@ -144,6 +146,7 @@ def prepare_history() -> None:
         end=end,
         adjust=PoolConf.price_adjust,
         columns=PoolConf.columns,
+        data_source=data_source
     )
 
 

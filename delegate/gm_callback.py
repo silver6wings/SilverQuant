@@ -7,7 +7,7 @@ from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
 from tools.utils_basic import gmsymbol_to_code
 from tools.utils_cache import record_deal, new_held, del_key, StockNames
-from tools.utils_ding import DingMessager
+from tools.utils_ding import BaseMessager
 
 
 class GmCallback:
@@ -15,7 +15,7 @@ class GmCallback:
         self,
         account_id: str,
         strategy_name: str,
-        ding_messager: DingMessager,
+        ding_messager: BaseMessager,
         disk_lock: threading.Lock,
         path_deal: str,
         path_held: str,

@@ -12,7 +12,7 @@ from delegate.gm_callback import GmCallback
 from credentials import GM_ACCOUNT_ID, GM_CLIENT_TOKEN
 
 from tools.utils_basic import code_to_gmsymbol, gmsymbol_to_code
-from tools.utils_ding import DingMessager
+from tools.utils_ding import BaseMessager
 
 
 GM_SERVER_HOST = 'api.myquant.cn:9000'
@@ -50,7 +50,7 @@ class GmPosition:
 
 
 class GmDelegate(BaseDelegate):
-    def __init__(self, account_id: str = None, callback: GmCallback = None, ding_messager: DingMessager = None):
+    def __init__(self, account_id: str = None, callback: GmCallback = None, ding_messager: BaseMessager = None):
         super().__init__()
         self.account_id = '**' + str(account_id)[-4:]
         self.ding_messager = ding_messager

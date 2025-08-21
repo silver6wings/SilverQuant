@@ -263,7 +263,7 @@ def get_limiting_up_rate(code_or_symbol: str) -> float:
 
 # 获取涨停价
 def get_limit_up_price(code_or_symbol: str, pre_close: float) -> float:
-    if pre_close == 0:
+    if pre_close is None or pre_close == 0:
         return 0
 
     limit_rate = get_limiting_up_rate(code_or_symbol)
@@ -284,7 +284,7 @@ def get_limiting_down_rate(code_or_symbol: str) -> float:
 
 # 获取跌停价
 def get_limit_down_price(code_or_symbol: str, pre_close: float) -> float:
-    if pre_close == 0:
+    if pre_close is None or pre_close == 0:
         return 0
 
     limit_rate = get_limiting_down_rate(code_or_symbol)

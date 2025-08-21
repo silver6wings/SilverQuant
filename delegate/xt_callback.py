@@ -9,7 +9,7 @@ from xtquant.xttrader import XtQuantTraderCallback
 from xtquant.xttype import XtOrder, XtTrade, XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
 
 from tools.utils_cache import record_deal, new_held, del_key, StockNames
-from tools.utils_ding import DingMessager
+from tools.utils_ding import BaseMessager
 
 
 class XtBaseCallback(XtQuantTraderCallback):
@@ -72,7 +72,7 @@ class XtCustomCallback(XtBaseCallback):
         self,
         account_id: str,
         strategy_name: str,
-        ding_messager: DingMessager,
+        ding_messager: BaseMessager,
         disk_lock: threading.Lock,
         path_deal: str,
         path_held: str,

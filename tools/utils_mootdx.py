@@ -1,66 +1,205 @@
+import pandas as pd
 import datetime
-from mootdx.quotes import Quotes
+
+from credentials import TDX_FOLDER
 
 
-mootdx_client = Quotes.factory(market='std')
+class MootdxClientInstance:
+    _instance = None
+    client = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(MootdxClientInstance, cls).__new__(cls)
+            cls.client = None  # Initialize data as None initially
+        return cls._instance
+
+    def __init__(self):
+        if self.client is None:
+            from mootdx.quotes import Quotes
+            self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
+            pd.set_option('future.no_silent_downcasting', True)
 
 
-def get_quotes(code_list: list[str]):
-    if code_list is None or len(code_list) == 0:
-        return {}
+def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
+    """
+    计算两个日期区间的交易日数（含首尾），及end到今天的交易日数（不含end）
 
-    symbol_list = [code.split('.')[0] for code in code_list]
+    参数：
+    csv_path: str - 交易日CSV文件路径（需包含trade_date列）
+    start_date_str: str - 起始日期（格式：20250101）
+    end_date_str: str - 结束日期（格式：20250101）
 
-    df = mootdx_client.quotes(symbol=symbol_list)
+    返回：
+    tuple - (start到end的交易日数, end到今天的交易日数)
+    """
+    # 1. 读取并预处理交易日数据（确保排序、去重）
+    df = pd.read_csv(csv_path)
+    df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.date  # 仅保留日期部分（避免时间干扰）
+    trade_dates = df["trade_date"].drop_duplicates().sort_values().reset_index(drop=True)
+    if trade_dates.empty:
+        return 0, 0  # 无交易日数据时返回0
 
-    result = {}
-    for _, row in df.iterrows():
-        # 构建股票代码（考虑market字段：0为深交所，1为上交所, 2为北交所）
-        market_suffix = '.SZ' if row['market'] == 0 else ('.SH' if row['market'] == 1 else '.BJ')
-        stock_code = f"{row['code']}{market_suffix}"
+    # 2. 工具函数：调整日期为目标方向的最近交易日
+    def adjust_date(target_date, direction):
+        """
+        direction: 'next'（start专用：取>=target的最近交易日）
+                  'prev'（end/今天专用：取<=target的最近交易日）
+        """
+        # 超出交易日范围时返回无效标记
+        if target_date < trade_dates.min():
+            return trade_dates.min() if direction == 'next' else None
+        if target_date > trade_dates.max():
+            return None if direction == 'next' else trade_dates.max()
 
-        time_str = row['servertime']    # 转换servertime为毫秒时间戳
-        date_str = datetime.datetime.today().strftime('%Y-%m-%d')
+        # 二分查找快速定位索引
+        if direction == 'next':
+            idx = trade_dates.searchsorted(target_date, side="left")
+            return trade_dates.iloc[idx]
+        else:
+            idx = trade_dates.searchsorted(target_date, side="right") - 1
+            return trade_dates.iloc[idx] if idx >= 0 else None
 
-        datetime_obj = datetime.datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M:%S.%f')
-        timestamp_ms = int(datetime_obj.timestamp() * 1000)
+    # 3. 解析输入日期（转为date类型，与trade_dates格式统一）
+    try:
+        start_date = datetime.datetime.strptime(start_date_str, "%Y%m%d").date()
+        end_date = datetime.datetime.strptime(end_date_str, "%Y%m%d").date()
+    except ValueError:
+        return 0, 0  # 日期格式错误返回0
 
-        ask_price = [row[f'ask{i + 1}'] for i in range(5)]
-        bid_price = [row[f'bid{i + 1}'] for i in range(5)]
-        ask_vol = [row[f'ask_vol{i + 1}'] for i in range(5)]
-        bid_vol = [row[f'bid_vol{i + 1}'] for i in range(5)]
+    # ---------------------- 4. 计算：start到end的交易日数（含首尾） ----------------------
+    adjusted_start = adjust_date(start_date, direction="next")  # start非交易日则取后一个
+    adjusted_end = adjust_date(end_date, direction="prev")      # end非交易日则取前一个
 
-        stock_data = {
-            'time': timestamp_ms,
-            'lastPrice': row['price'],
-            'open': row['open'],
-            'high': row['high'],
-            'low': row['low'],
-            'lastClose': row['last_close'],
-            'amount': row['amount'],
-            'volume': row['vol'],
-            'pvolume': row['vol'] * 100,  # 手转股
-            # 'stockStatus': 0,
-            # 'openInt': 0,
-            # 'transactionNum': 0,
-            # 'lastSettlementPrice': 0.0,
-            # 'settlementPrice': 0.0,
-            # 'pe': 0.0,
-            'askPrice': ask_price,
-            'bidPrice': bid_price,
-            'askVol': ask_vol,
-            'bidVol': bid_vol,
-            # 'volRatio': 0.0,
-            # 'speed1Min': 0.0,
-            # 'speed5Min': 0.0
-        }
-        result[stock_code] = stock_data
+    days_between = 0
+    if adjusted_start is not None and adjusted_end is not None and adjusted_start <= adjusted_end:
+        # 索引差 +1 = 含首尾的总天数（如16日索引0、17日1、18日2：2-0+1=3）
+        idx_start = trade_dates[trade_dates == adjusted_start].index[0]
+        idx_end = trade_dates[trade_dates == adjusted_end].index[0]
+        days_between = idx_end - idx_start + 1
 
-    return result
+    # ---------------------- 5. 计算：end到今天的交易日数（不含end） ----------------------
+    now = datetime.datetime.now()
+    curr_date = now.date()  # 今天的日期（仅日期部分）
+    adjusted_today = adjust_date(curr_date, direction="prev")  # 今天非交易日则取前一个
+
+    days_from_end_to_today = 0
+    if adjusted_end is not None and adjusted_today is not None and adjusted_end < adjusted_today:
+        # 索引差 = 不含end的天数（如18日索引2、19日3：3-2=1）
+        idx_adjusted_end = trade_dates[trade_dates == adjusted_end].index[0]
+        idx_today = trade_dates[trade_dates == adjusted_today].index[0]
+        days_from_end_to_today = idx_today - idx_adjusted_end
+
+    # 早上有当日的daily的K线之前要少向前推一天
+    if now.time() < datetime.time(9, 30):
+        days_from_end_to_today = max(0, days_from_end_to_today - 1)
+
+    return days_between, days_from_end_to_today
 
 
-if __name__ == '__main__':
-    import json
-    quotes = get_quotes(['000001.SZ', '600000.SH'])
-    for code in quotes:
-        print(json.dumps(quotes[code], indent=4))
+def make_qfq(data, xdxr, fq_type="01"):
+    """使用数据库数据进行复权"""
+
+    # 过滤其他，只留除权信息
+    xdxr = xdxr.query("category==1")
+    # data = data.assign(if_trade=1)
+
+    if len(xdxr) > 0:
+        # 有除权信息, 合并原数据 + 除权数据
+        # data = pd.concat([data, xdxr.loc[data.index[0]:data.index[-1], ['category']]], axis=1)
+        # data['if_trade'].fillna(value=0, inplace=True)
+
+        data = data.ffill()
+        # present       bonus       price       rationed
+        # songzhuangu   fenhong     peigujia    peigu
+        data = pd.concat(
+            [data, xdxr.loc[data.index[0]:data.index[-1], ["fenhong", "peigu", "peigujia", "songzhuangu"]]],
+            axis=1,
+        )
+    else:
+        # 没有除权信息
+        data = pd.concat([data, xdxr.loc[:, ["fenhong", "peigu", "peigujia", "songzhuangu"]]], axis=1)
+
+    # 清理数据
+    data = data.fillna(0)
+
+    if fq_type == "01":
+        data["preclose"] = (
+            (data["close"].shift(1) * 10 - data["fenhong"] + data["peigu"] * data["peigujia"]) /
+            (10 + data["peigu"] + data["songzhuangu"])
+        )
+        # 生成 adj 复权因子
+        data["adj"] = (data["preclose"].shift(-1) / data["close"]).fillna(1)[::-1].cumprod()
+    else:
+        # 生成 preclose todo 关键位置
+        data["preclose"] = (
+            (data["close"].shift(1) * 10 - data["fenhong"] + data["peigu"] * data["peigujia"]) /
+            (10 + data["peigu"] + data["songzhuangu"])
+        )
+        # 生成 adj 复权因子
+        data["adj"] = (data["close"] / data["preclose"].shift(-1)).cumprod().shift(1).fillna(1)
+
+    # 计算复权价格
+    for field in data.columns.values:
+        if field in ("open", "close", "high", "low", "preclose"):
+            data[field] = data[field] * data["adj"]
+
+    # 清理数据, 返回结果
+    return data.query("open != 0").drop(
+        [
+            "fenhong",
+            "peigu",
+            "peigujia",
+            "songzhuangu",
+        ],
+        axis=1,
+    )
+
+
+def make_hfq(bfq_data, xdxr_data):
+    """使用数据库数据进行复权"""
+    info = xdxr_data.query('category==1')
+    bfq_data = bfq_data.assign(if_trade=1)
+
+    if len(info) > 0:
+        # 合并数据
+        data = pd.concat([bfq_data, info.loc[bfq_data.index[0]:bfq_data.index[-1], ['category']]], axis=1)
+        data['if_trade'] = data['if_trade'].fillna(value=0)
+
+        data = data.ffill()
+        data = pd.concat([
+            data,
+            info.loc[bfq_data.index[0]:bfq_data.index[-1], ['fenhong', 'peigu', 'peigujia', 'songzhuangu']]
+        ], axis=1)
+    else:
+        data = pd.concat([bfq_data, info.loc[:, ['category', 'fenhong', 'peigu', 'peigujia', 'songzhuangu']]], axis=1)
+
+    data = data.fillna(0)
+
+    # 生成 preclose 关键位置
+    data['preclose'] = (data['close'].shift(1) * 10 - data['fenhong'] + data['peigu'] * data['peigujia']) / \
+                       (10 + data['peigu'] + data['songzhuangu'])
+    data['adj'] = (data['close'] / data['preclose'].shift(-1)).cumprod().shift(1).fillna(1)
+
+    # 计算复权价格
+    for field in data.columns.values:
+        if field in ('open', 'close', 'high', 'low', 'preclose'):
+            data[field] = data[field] * data['adj']
+
+    # data['open'] = data['open'] * data['adj']
+    # data['high'] = data['high'] * data['adj']
+    # data['low'] = data['low'] * data['adj']
+    # data['close'] = data['close'] * data['adj']
+    # data['preclose'] = data['preclose'] * data['adj']
+
+    # 不计算 交易量
+    # data['volume'] = data['volume'] / data['adj'] if 'volume' in data.columns else data['vol'] / data['adj']
+
+    try:
+        data['high_limit'] = data['high_limit'] * data['adj']
+        data['low_limit'] = data['high_limit'] * data['adj']
+    except Exception as e:
+        print('xdxr error! ', e)
+
+    return data.query('if_trade==1 and open != 0').drop(
+        ['fenhong', 'peigu', 'peigujia', 'songzhuangu', 'if_trade', 'category'], axis=1)
