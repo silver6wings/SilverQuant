@@ -374,7 +374,7 @@ class XtSubscriber(BaseSubscriber):
                 print(f'{len(self.cache_history)} histories loaded from {cache_path}')
                 if self.ding_messager is not None:
                     self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                                       f'加载历史{len(self.cache_history)}支')
+                                                       f'历史{len(self.cache_history)}支')
             else:
                 # 如果没缓存就刷新白名单
                 self.cache_history.clear()
@@ -384,7 +384,7 @@ class XtSubscriber(BaseSubscriber):
                 print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
                 if self.ding_messager is not None:
                     self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                                       f'下载历史{len(self.cache_history)}支')
+                                                       f'历史{len(self.cache_history)}支')
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)

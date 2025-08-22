@@ -44,7 +44,7 @@ class StockPool:
         self.cache_whitelist.clear()
 
     # 删除不符合模式和没有缓存的票池
-    def filter_white_list_by_selector(self, selector: Callable, cache_history: dict[str, pd.DataFrame]):
+    def filter_white_list_by_selector(self, filter_func: Callable, cache_history: dict[str, pd.DataFrame]):
         remove_list = []
         print('filtering...', end='')
 
@@ -54,8 +54,12 @@ class StockPool:
             if i % 200 == 0:
                 print(f'{i}.', end='')
             if code in cache_history:
-                df = selector(cache_history[code], code, None)  # 预筛公式默认不需要使用quote所以传None
-                if (len(df) > 0) and (not df['PASS'].values[-1]):
+                try:
+                    df = filter_func(cache_history[code], code, None)  # 预筛公式默认不需要使用quote所以传None
+                    if (len(df) > 0) and (not df['PASS'].values[-1]):
+                        remove_list.append(code)
+                except Exception as e:
+                    print(f'Drop {code} when filtering: ', e)
                     remove_list.append(code)
             else:
                 remove_list.append(code)

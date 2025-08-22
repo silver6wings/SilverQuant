@@ -61,9 +61,12 @@ def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> t
             return trade_dates.iloc[idx] if idx >= 0 else None
 
     # 3. 解析输入日期（转为date类型，与trade_dates格式统一）
+    now = datetime.datetime.now()
+    curr_date = now.date()  # 今天的日期（仅日期部分）
     try:
+        today_str = curr_date.strftime("%Y%m%d")
         start_date = datetime.datetime.strptime(start_date_str, "%Y%m%d").date()
-        end_date = datetime.datetime.strptime(end_date_str, "%Y%m%d").date()
+        end_date = datetime.datetime.strptime(min(end_date_str, today_str), "%Y%m%d").date()
     except ValueError:
         return 0, 0  # 日期格式错误返回0
 
@@ -79,8 +82,7 @@ def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> t
         days_between = idx_end - idx_start + 1
 
     # ---------------------- 5. 计算：end到今天的交易日数（不含end） ----------------------
-    now = datetime.datetime.now()
-    curr_date = now.date()  # 今天的日期（仅日期部分）
+
     adjusted_today = adjust_date(curr_date, direction="prev")  # 今天非交易日则取前一个
 
     days_from_end_to_today = 0
@@ -91,8 +93,10 @@ def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> t
         days_from_end_to_today = idx_today - idx_adjusted_end
 
     # 早上有当日的daily的K线之前要少向前推一天
-    if now.time() < datetime.time(9, 30):
-        days_from_end_to_today = max(0, days_from_end_to_today - 1)
+    if trade_dates.isin([curr_date]).any() and now.time() < datetime.time(9, 30):
+        if days_from_end_to_today > 0:
+            days_between += 1
+            days_from_end_to_today -= 1
 
     return days_between, days_from_end_to_today
 
@@ -131,7 +135,7 @@ def make_qfq(data, xdxr, fq_type="01"):
         # 生成 adj 复权因子
         data["adj"] = (data["preclose"].shift(-1) / data["close"]).fillna(1)[::-1].cumprod()
     else:
-        # 生成 preclose todo 关键位置
+        # 生成 preclose 关键位置
         data["preclose"] = (
             (data["close"].shift(1) * 10 - data["fenhong"] + data["peigu"] * data["peigujia"]) /
             (10 + data["peigu"] + data["songzhuangu"])

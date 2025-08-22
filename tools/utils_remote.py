@@ -362,11 +362,6 @@ def get_mootdx_daily_history(
             offset=offset,  # 总共N个K线
             start=start,    # 向前数跳过几行
         )
-        df = df.replace([np.inf, -np.inf], np.nan)
-        # 然后删除所有包含NaN的行
-
-        # print(df.dtypes)
-        # print(df)
     except Exception as e:
         print(f' mootdx get daily {code} error: ', e)
         return None
@@ -391,13 +386,14 @@ def get_mootdx_daily_history(
 
     if df is not None and len(df) > 0 and type(df) == pd.DataFrame and 'datetime' in df.columns:
         try:
-            df = df.replace([np.inf, -np.inf], np.nan).dropna()
+            df = df.replace([np.inf, -np.inf], np.nan).dropna()  # 然后删除所有包含 NaN 的行
             df['datetime'] = pd.to_datetime(df['datetime'])
             df['datetime'] = df['datetime'].dt.date.astype(str).str.replace('-', '').astype(int)
             df = pd.concat([df['datetime'], df.drop('datetime', axis=1)], axis=1)
 
             df = df.drop(columns='volume')
             df = df.rename(columns={'vol': 'volume'})
+            df['volume'] = df['volume'].astype(int)
             df = df.reset_index(drop=True)
             if columns is not None:
                 return df[columns]
