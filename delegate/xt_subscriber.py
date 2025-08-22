@@ -262,7 +262,7 @@ class XtSubscriber(BaseSubscriber):
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史
         if self.is_ticks_df:
-            tick_df_cols = ['time', 'price', 'volume', 'amount', 'high', 'low'] \
+            tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
                 + [f'askPrice{i}' for i in range(1, 6)] \
                 + [f'askVol{i}' for i in range(1, 6)] \
                 + [f'bidPrice{i}' for i in range(1, 6)] \
@@ -284,10 +284,10 @@ class XtSubscriber(BaseSubscriber):
                 self.today_ticks[code].append([
                     tick_time,                          # 成交时间，格式：%H:%M:%S
                     round(quote['lastPrice'], 3),       # 成交价格
-                    int(quote['volume']),               # 累计成交量（手）
-                    round(quote['amount'], 3),          # 累计成交额（元）
                     round(quote['high'], 3),            # 成交最高价
                     round(quote['low'], 3),             # 成交最最低价
+                    int(quote['volume']),               # 累计成交量（手）
+                    round(quote['amount'], 3),          # 累计成交额（元）
                     [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['askPrice']],  # 卖价
                     [int(v) if isinstance(v, (int, float)) else v for v in quote['askVol']],         # 卖量
                     [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
@@ -528,22 +528,26 @@ class XtSubscriber(BaseSubscriber):
             text += f'当日变动: {total_change}元({ratio_change})'
 
             if hasattr(self.delegate.xt_trader, 'query_bank_info'):
-                cashchange = 0.0
+                cash_change = 0.0
                 today_xt = today.replace('-', '')
-                bankinfos = self.delegate.xt_trader.query_bank_info(self.delegate.account) #银行信息查询
-                for bank in bankinfos:
+                bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account) # 银行信息查询
+                for bank in bank_info:
                     if bank.success:
-                        transfers = self.delegate.xt_trader.query_bank_transfer_stream(self.delegate.account, today_xt, today_xt, bank.bank_no, bank.bank_account) #银行卡流水记录查询
+                        # 银行卡流水记录查询
+                        transfers = self.delegate.xt_trader.query_bank_transfer_stream(
+                            self.delegate.account, today_xt, today_xt, bank.bank_no, bank.bank_account)
                         total_change = sum(
-                            -t.balance if t.transfer_direction == '2' else t.balance
+                            -t.balance
+                            if t.transfer_direction == '2' else t.balance
                             for t in transfers if t.success
                         )
-                        cashchange += total_change
-                if cashchange != 0.0:
+                        cash_change += total_change
+
+                if abs(cash_change) > 0.0001:
                     cash_change = colour_text(
-                        f'{"+" if cashchange > 0 else ""}{round(cashchange, 2)}',
-                        cashchange > 0,
-                        cashchange < 0,
+                        f'{"+" if cash_change > 0 else ""}{round(cash_change, 2)}',
+                        cash_change > 0,
+                        cash_change < 0,
                     )
                     text += '\n>\n> '
                     text += f'银证转账: {cash_change}元'

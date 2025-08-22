@@ -152,10 +152,10 @@ def qmt_quote_to_tick(quote: dict):
     ans = {
         'time': datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S'),
         'price': quote['lastPrice'],
-        'volume': quote['volume'],
-        'amount': quote['amount'],
         'high': quote['high'],
         'low': quote['low'],
+        'volume': quote['volume'],
+        'amount': quote['amount'],
     }
 
     ap = _adjust_list(quote['askPrice'], 5)
