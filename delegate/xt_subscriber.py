@@ -525,6 +525,27 @@ class XtSubscriber(BaseSubscriber):
             )
             text += f'当日变动: {total_change}元({ratio_change})'
 
+            if hasattr(self.delegate.xt_trader, 'query_bank_info'):
+                cashchange = 0.0
+                today_xt = today.replace('-', '')
+                bankinfos = self.delegate.xt_trader.query_bank_info(self.delegate.account) #银行信息查询
+                for bank in bankinfos:
+                    if bank.success:
+                        transfers = self.delegate.xt_trader.query_bank_transfer_stream(self.delegate.account, today_xt, today_xt, bank.bank_no, bank.bank_account) #银行卡流水记录查询
+                        total_change = sum(
+                            -t.balance if t.transfer_direction == '2' else t.balance
+                            for t in transfers if t.success
+                        )
+                        cashchange += total_change
+                if cashchange != 0.0:
+                    cash_change = colour_text(
+                        f'{"+" if cashchange > 0 else ""}{round(cashchange, 2)}',
+                        cashchange > 0,
+                        cashchange < 0,
+                    )
+                    text += '\n>\n> '
+                    text += f'银证转账: {cash_change}元'
+
         text += '\n>\n> '
         text += f'持仓市值: {round(asset.market_value, 2)}元'
 
