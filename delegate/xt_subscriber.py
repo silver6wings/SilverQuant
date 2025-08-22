@@ -262,7 +262,7 @@ class XtSubscriber(BaseSubscriber):
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史
         if self.is_ticks_df:
-            tick_df_cols = ['time', 'price', 'volume', 'amount'] \
+            tick_df_cols = ['time', 'price', 'volume', 'amount', 'high', 'low'] \
                 + [f'askPrice{i}' for i in range(1, 6)] \
                 + [f'askVol{i}' for i in range(1, 6)] \
                 + [f'bidPrice{i}' for i in range(1, 6)] \
@@ -286,6 +286,8 @@ class XtSubscriber(BaseSubscriber):
                     round(quote['lastPrice'], 3),       # 成交价格
                     int(quote['volume']),               # 累计成交量（手）
                     round(quote['amount'], 3),          # 累计成交额（元）
+                    round(quote['high'], 3),            # 成交最高价
+                    round(quote['low'], 3),             # 成交最最低价
                     [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['askPrice']],  # 卖价
                     [int(v) if isinstance(v, (int, float)) else v for v in quote['askVol']],         # 卖量
                     [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
