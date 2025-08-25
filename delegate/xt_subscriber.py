@@ -223,20 +223,20 @@ class XtSubscriber(BaseSubscriber):
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                f'{"恢复" if resume else "启动"} {len(self.code_list) - 1}支')
+        print('[启动行情订阅]', end='')
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
         xtdata.enable_hello = False
-        print('[启动行情订阅]', end='')
 
     def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
         if 'sub_seq' in self.cache_limits:
+            xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
             print('\n[关闭行情订阅]')
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                    f'{"暂停" if pause else "关闭"}')
-            xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
 
     def resubscribe_tick(self, notice: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
