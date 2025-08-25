@@ -20,12 +20,22 @@ def connect(ip = '', port = None, remember_if_success = True):
 
     from . import xtconn
 
+    start_port = 0
+    end_port = 65535
+
+    if isinstance(port, tuple):
+        start_port = port[0]
+        end_port = port[1]
+
+    if start_port > end_port:
+        start_port, end_port = end_port, start_port
+
     if not ip:
         ip = 'localhost'
 
     if port:
         server_list = [f'{ip}:{port}']
-        __client = xtconn.connect_any(server_list)
+        __client = xtconn.connect_any(server_list, start_port, end_port)
     else:
         server_list = xtconn.scan_available_server_addr()
 
@@ -33,7 +43,7 @@ def connect(ip = '', port = None, remember_if_success = True):
         if not default_addr in server_list:
             server_list.append(default_addr)
 
-        __client = xtconn.connect_any(server_list)
+        __client = xtconn.connect_any(server_list, start_port, end_port)
 
     if not __client or not __client.is_connected():
         raise Exception("无法连接xtquant服务，请检查QMT-投研版或QMT-极简版是否开启")
@@ -324,3 +334,51 @@ def push_xtview_data(data_type, time, datas):
     )
     return
 
+
+class UIPanel:
+    code = ''
+    period = '1d'
+    figures = []
+    startX = -1
+    startY = -1
+    width = -1
+    height = -1
+
+    def __init__(self, code, period = '1d', figures = [], startX = -1, startY = -1, width = -1, height = -1):
+        self.code = code
+        self.period = period
+        self.figures = figures
+        self.startX = startX
+        self.startY = startY
+        self.width = width
+        self.height = height
+
+
+def apply_ui_panel_control(info: list):
+    '''
+    控制主图界面展示
+    用法：
+    apply_ui_panel_control(info:list[UIPanel])
+
+    参数：
+    info,list[UIPanel]类型,每个UIPanel为一个行情页面,code为必填项
+    code:str,代码市场,为必填项
+    period:str,周期,'tick','1m','5m','1d'等
+    figures:list,内部存放附图指标名称
+    startX: int, 距屏幕左上角横坐标的位置
+    startY: int, 距屏幕左上角纵坐标的位置
+    width: int, 宽度
+    height: int, 高度
+
+    示例：
+    from xtquant import xtview
+    x=xtview.UIPanel('600000.SH','1d', figures=[{'ma': {'n1': 5}}])
+    y=xtview.UIPanel(code='600030.SH',period='1m',startX=-1,startY=-1, width=-1, height=-1)
+    xtview.apply_ui_panel_control([x,y])
+    '''
+    data = []
+    for i in info:
+        data.append(i.__dict__)
+
+    result = _BSON_call_common(get_client().commonControl, 'applyuipanelcontrol', {'data': data})
+    return

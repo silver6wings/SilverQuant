@@ -89,6 +89,12 @@ xtdata是xtquant库中提供行情相关数据的模块，本模块旨在提供�
   - `get_stock_list_in_sector` 增加`real_timetag`参数
 - 2024-09-06
   - 增加`subscribe_quote2`，与第一版相比，多一个除权参数
+- 2024-10-11
+  - `data_dir`变量作用改为设置用户自定义数据路径
+  - `get_data_dir`函数来返回数据路径
+- 2024-10-16
+  - 删除`get_trading_time`函数
+  - 增加`get_trading_period`，`get_kline_trading_period`，`get_all_trading_periods`，`get_all_kline_trading_periods`函数获取交易时段
 
 ## 接口概述
 
@@ -759,6 +765,23 @@ get_full_kline(field_list = [], stock_list = [], period = '1m'
 - 返回
   - dict - {field: DataFrame}
 
+#### 获取本地数据路径
+
+```python
+get_data_dir()
+```
+
+- 释义
+  - 获取本地数据路径
+- 参数
+  - 无
+- 返回
+  - str
+- 备注
+  - 如果更改过`xtdata.data_dir`变量的值，优先返回变量设置的值
+  - 没有设置过，返回服务的数据路径
+  - 注意----设置`xtdata.data_dir`的值可以强制指定读取本地数据的位置，谨慎修改
+
 ### 财务数据接口
 
 #### 获取财务数据
@@ -1347,6 +1370,205 @@ download_index_weight()
 'turnoverRate5'     #5日换手
 'turnoverRate10'    #10日换手
 ```
+
+#### hfiopv - 高频IOPV
+
+```python
+高频IOPV数据指标， 100ms推送频率
+普通指标:
+'time'                              #时间戳
+'dIOPV'                             #动态IOPV
+'dUpperLimitIOPV'                   #涨停IOPV
+'dLowerLimitIOPV'                   #跌停IOPV
+'dSidecarIOPV'                      #停牌IOPV
+'dUpperLimitMarketValue'            #涨停成分股市值
+'dLowerLimitMarketValue'            #跌停成分股市值
+'dSidecarMarketValue'               #停牌成分股市值
+'dUpperLimitMarketValue_local'      #本市场涨停成分股市值
+'dLowerLimitMarketValue_local'      #本市场跌停成分股市值
+'dSidecarMarketValue_local'         #本市场停牌成分股市值
+'dUpperLimitMarketValue_SH'         #上海市场涨停成分股市值
+'dLowerLimitMarketValue_SH'         #上海市场跌停成分股市值
+'dSidecarMarketValue_SH'            #上海市场停牌成分股市值
+'dUpperLimitMarketValue_SZ'         #深圳市场涨停成分股市值
+'dLowerLimitMarketValue_SZ'         #深圳市场跌停成分股市值
+'dSidecarMarketValue_SZ'            #深圳市场停牌成分股市值
+'dIndexDeviation'                   #指数偏差
+    
+五档指标:
+'purchaseIOPVs'                     #申购动态IOPV
+'redemptionIOPVs'                   #赎回动态IOPV
+'lxPurchaseIOPV'                    #申购IOPV
+'lxRedemptionIOPV'                  #赎回IOPV
+'lxPremiumNoRisk'                   #溢价无风险
+'lxDiscountNoRisk'                  #折价无风险
+'purchaseMarketValue'               #申购市值
+'redemptionMarketValue'             #赎回市值
+'purchaseMarketValue_local'         #本市场申购市值
+'redemptionMarketValue_local'       #本市场赎回市值
+'premiumProfits'                    #五档预估溢价
+'discountProfits'                   #五档预估折价
+'premiumCapacitys'                  #溢价容量
+'discountCapacitys'                 #折价容量
+```
+
+#### fullspeedorderbook -  全速盘口
+
+```python
+'time'                    #时间戳
+'price'                   #最新成交价
+'bidPrice'                #多档委买价列表 [1 - 20]档
+'bidVolume'               #多档委买量列表 [1 - 20]档
+'askPrice'                #多档委卖价列表 [1 - 20]档
+'askVolume'               #多档委卖量列表 [1 - 20]档
+```
+
+#### l2transactioncount - level2逐笔成交统计
+
+```python
+'time'                                      #时间戳
+'bidNumber'                                 #主买单总单数
+'offNumber'                                 #主卖单总单数
+'ddx'                                       #大单动向
+'ddy'                                       #涨跌动因
+'ddz'                                       #大单差分
+'netOrder'                                  #净挂单量
+'netWithdraw'                               #净撤单量
+'withdrawBid'                               #总撤买量
+'withdrawOff'                               #总撤卖量
+'bidNumberDx'                               #主买单总单数增量
+'offNumberDx'                               #主卖单总单数增量
+'transactionNumber'                         #成交笔数增量
+
+'bidMostAmount'                             #主买特大单成交额
+'bidBigAmount'                              #主买大单成交额
+'bidMediumAmount'                           #主买中单成交额
+'bidSmallAmount'                            #主买小单成交额
+'bidTotalAmount'                            #主买累计成交额
+
+'offMostAmount'                             #主卖特大单成交额
+'offBigAmount'                              #主卖大单成交额
+'offMediumAmount'                           #主卖中单成交额
+'offSmallAmount'                            #主卖小单成交额
+'offTotalAmount'                            #主卖累计成交额
+
+'unactiveBidMostAmount'                     #被动买特大单成交额
+'unactiveBidBigAmount'                      #被动买大单成交额
+'unactiveBidMediumAmount'                   #被动买中单成交额
+'unactiveBidSmallAmount'                    #被动买小单成交额
+'unactiveBidTotalAmount'                    #被动买累计成交额
+
+'unactiveOffMostAmount'                     #被动卖特大单成交额
+'unactiveOffBigAmount'                      #被动卖大单成交额
+'unactiveOffMediumAmount'                   #被动卖中单成交额
+'unactiveOffSmallAmount'                    #被动卖小单成交额
+'unactiveOffTotalAmount'                    #被动卖累计成交额
+
+'netInflowMostAmount'                       #净流入超大单成交额
+'netInflowBigAmount'                        #净流入大单成交额
+'netInflowMediumAmount'                     #净流入中单成交额
+'netInflowSmallAmount'                      #净流入小单成交额
+
+'bidMostVolume'                             #主买特大单成交量
+'bidBigVolume'                              #主买大单成交量
+'bidMediumVolume'                           #主买中单成交量
+'bidSmallVolume'                            #主买小单成交量
+'bidTotalVolume'                            #主买累计成交量
+
+'offMostVolume'                             #主卖特大单成交量
+'offBigVolume'                              #主卖大单成交量
+'offMediumVolume'                           #主卖中单成交量
+'offSmallVolume'                            #主卖小单成交量
+'offTotalVolume'                            #主卖累计成交量
+
+'unactiveBidMostVolume'                     #被动买特大单成交量
+'unactiveBidBigVolume'                      #被动买大单成交量
+'unactiveBidMediumVolume'                   #被动买中单成交量
+'unactiveBidSmallVolume'                    #被动买小单成交量
+'unactiveBidTotalVolume'                    #被动买累计成交量
+
+'unactiveOffMostVolume'                     #被动卖特大单成交量
+'unactiveOffBigVolume'                      #被动卖大单成交量
+'unactiveOffMediumVolume'                   #被动卖中单成交量
+'unactiveOffSmallVolume'                    #被动卖小单成交量
+'unactiveOffTotalVolume'                    #被动卖累计成交量
+
+'netInflowMostVolume'                       #净流入超大单成交量
+'netInflowBigVolume'                        #净流入大单成交量
+'netInflowMediumVolume'                     #净流入中单成交量
+'netInflowSmallVolume'                      #净流入小单成交量
+
+'bidMostAmountDx'                           #主买特大单成交额增量
+'bidBigAmountDx'                            #主买大单成交额增量
+'bidMediumAmountDx'                         #主买中单成交额增量
+'bidSmallAmountDx'                          #主买小单成交额增量
+'bidTotalAmountDx'                          #主买累计成交额增量
+
+'offMostAmountDx'                           #主卖特大单成交额增量
+'offBigAmountDx'                            #主卖大单成交额增量
+'offMediumAmountDx'                         #主卖中单成交额增量
+'offSmallAmountDx'                          #主卖小单成交额增量
+'offTotalAmountDx'                          #主卖累计成交额增量
+
+'unactiveBidMostAmountDx'                   #被动买特大单成交额增量
+'unactiveBidBigAmountDx'                    #被动买大单成交额增量
+'unactiveBidMediumAmountDx'                 #被动买中单成交额增量
+'unactiveBidSmallAmountDx'                  #被动买小单成交额增量
+'unactiveBidTotalAmountDx'                  #被动买累计成交额增量
+
+'unactiveOffMostAmountDx'                   #被动卖特大单成交额增量
+'unactiveOffBigAmountDx'                    #被动卖大单成交额增量
+'unactiveOffMediumAmountDx'                 #被动卖中单成交额增量
+'unactiveOffSmallAmountDx'                  #被动卖小单成交额增量
+'unactiveOffTotalAmountDx'                  #被动卖累计成交额增量
+
+'netInflowMostAmountDx'                     #净流入超大单成交额增量
+'netInflowBigAmountDx'                      #净流入大单成交额增量
+'netInflowMediumAmountDx'                   #净流入中单成交额增量
+'netInflowSmallAmountDx'                    #净流入小单成交额增量
+
+'bidMostVolumeDx'                           #主买特大单成交量增量
+'bidBigVolumeDx'                            #主买大单成交量增量
+'bidMediumVolumeDx'                         #主买中单成交量增量
+'bidSmallVolumeDx'                          #主买小单成交量增量
+'bidTotalVolumeDx'                          #主买累计成交量增量
+
+'offMostVolumeDx'                           #主卖特大单成交量增量
+'offBigVolumeDx'                            #主卖大单成交量增量
+'offMediumVolumeDx'                         #主卖中单成交量增量
+'offSmallVolumeDx'                          #主卖小单成交量增量
+'offTotalVolumeDx'                          #主卖累计成交量增量
+
+'unactiveBidMostVolumeDx'                   #被动买特大单成交量增量
+'unactiveBidBigVolumeDx'                    #被动买大单成交量增量
+'unactiveBidMediumVolumeDx'                 #被动买中单成交量增量
+'unactiveBidSmallVolumeDx'                  #被动买小单成交量增量
+'unactiveBidTotalVolumeDx'                  #被动买累计成交量增量
+
+'unactiveOffMostVolumeDx'                   #被动卖特大单成交量增量
+'unactiveOffBigVolumeDx'                    #被动卖大单成交量增量
+'unactiveOffMediumVolumeDx'                 #被动卖中单成交量增量
+'unactiveOffSmallVolumeDx'                  #被动卖小单成交量增量
+'unactiveOffTotalVolumeDx'                  #被动卖累计成交量增量
+
+'netInflowMostVolumeDx'                     #净流入超大单成交量增量
+'netInflowBigVolumeDx'                      #净流入大单成交量增量
+'netInflowMediumVolumeDx'                   #净流入中单成交量增量
+'netInflowSmallVolumeDx'                    #净流入小单成交量增量
+```
+
+#### l2thousand - level2委买委卖千档盘口
+
+```python
+'timeTag'                    #时间戳
+'price'                      #最新成交价
+'bidPrice'                   #多档委买价(向量)
+'bidVolume'                  #多档委买量(向量)，单位是手
+'offPrice'                   #多档委卖价(向量)
+'offVolume'                  #多档委卖量(向量)，单位是手
+```
+
+
 
 ### 数据字典
 

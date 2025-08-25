@@ -27,7 +27,7 @@ def _get_tabular_feather_single_ori(
 
     file_path = os.path.join(xtdata.get_data_dir(), "EP", f"{table}_Xdat2", "data.fe")
     if not os.path.exists(file_path):
-        return
+        return None, None
 
     fe_table = fe.read_table(file_path)
 
@@ -199,6 +199,36 @@ def _parse_keys(fields):
 
     return [(tb, sd['show'], sd['fe']) for tb, sd in tmp.items()]
 
+def _datetime_to_timetag(timelabel, format=''):
+    '''
+    timelabel: str '20221231' '20221231235959'
+    format: str '%Y%m%d' '%Y%m%d%H%M%S'
+    return: int 1672502399000
+    '''
+    import datetime as dt
+    if not format:
+        format = '%Y%m%d' if len(timelabel) == 8 else '%Y%m%d%H%M%S'
+    try:
+        return dt.datetime.strptime(timelabel, format).timestamp() * 1000
+    except:
+        return 0
+
+def _datetime_to_timetag_end(timelabel, format=''):
+    '''
+    timelabel: str '20221231' '20221231235959'
+    format: str '%Y%m%d' '%Y%m%d%H%M%S'
+    return: int 1672502399000
+    '''
+    import datetime as dt
+    if not format:
+        format = '%Y%m%d' if len(timelabel) == 8 else '%Y%m%d%H%M%S'
+    try:
+        if len(timelabel) == 8:
+            return dt.datetime.strptime(timelabel, format).timestamp() * 1000 + 24*60*60*1000 - 1
+        elif len(timelabel) == 14:
+            return dt.datetime.strptime(timelabel, format).timestamp() * 1000 + 1000 - 1
+    except:
+        return 0
 
 def get_tabular_fe_data(
         codes: list,
@@ -229,22 +259,8 @@ def get_tabular_fe_data(
 
     table_fields = _parse_fields(fields)
 
-    def datetime_to_timetag(timelabel, format=''):
-        '''
-        timelabel: str '20221231' '20221231235959'
-        format: str '%Y%m%d' '%Y%m%d%H%M%S'
-        return: int 1672502399000
-        '''
-        import datetime as dt
-        if not format:
-            format = '%Y%m%d' if len(timelabel) == 8 else '%Y%m%d%H%M%S'
-        try:
-            return dt.datetime.strptime(timelabel, format).timestamp() * 1000
-        except:
-            return 0
-
-    start_timetag = datetime_to_timetag(start_time)
-    end_timetag = datetime_to_timetag(end_time)
+    start_timetag = _datetime_to_timetag(start_time)
+    end_timetag = _datetime_to_timetag_end(end_time)
 
     dfs = []
     ordered_fields = []
@@ -309,22 +325,8 @@ def get_tabular_fe_bson(
 
     table_fields = _parse_keys(fields)
 
-    def datetime_to_timetag(timelabel, format=''):
-        '''
-        timelabel: str '20221231' '20221231235959'
-        format: str '%Y%m%d' '%Y%m%d%H%M%S'
-        return: int 1672502399000
-        '''
-        import datetime as dt
-        if not format:
-            format = '%Y%m%d' if len(timelabel) == 8 else '%Y%m%d%H%M%S'
-        try:
-            return dt.datetime.strptime(timelabel, format).timestamp() * 1000
-        except:
-            return 0
-
-    start_timetag = datetime_to_timetag(start_time)
-    end_timetag = datetime_to_timetag(end_time)
+    start_timetag = _datetime_to_timetag(start_time)
+    end_timetag = _datetime_to_timetag_end(end_time)
 
     def _get_convert():
         import pyarrow as pa

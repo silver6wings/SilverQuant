@@ -328,12 +328,19 @@ function c_relate()
 end
 
 function c_std()
-    local cache = FormulaDataCacheDouble(cacheDoubleNum)
-    function std_func(value, N, timetag, __formula, type)
-        local ret = std(value, cache, N, timetag, __formula, type)
-        return ret
+    local container = FormulaCacheContainer()
+    function wrapper(X, N, timetag, formula)
+        return std(container, X, N, timetag, formula)
     end
-    return std_func
+    return wrapper
+end
+
+function c_stdp()
+    local container = FormulaCacheContainer()
+    function wrapper(X, N, timetag, formula)
+        return stdp(container, X, N, timetag, formula)
+    end
+    return wrapper
 end
 
 function c_var()
@@ -343,15 +350,6 @@ function c_var()
         return ret
     end
     return var_func
-end
-
-function c_stdp()
-    local cache = FormulaDataCacheDouble(cacheDoubleNum)
-    function stdp_func(value, N, timetag, __formula)
-        local ret = stdp(value, cache, N, timetag, __formula)
-        return ret
-    end
-    return stdp_func
 end
 
 function c_varp()

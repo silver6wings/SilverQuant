@@ -77,10 +77,10 @@ XtQuant目前提供的库包括Python3.6、3.7、3.8版本，不同版本的pyth
     - `xtconstant.MARKET_CONVERT_1` - 市价最优一档即成剩转[中金所]
     - `xtconstant.MARKET_CONVERT_5` - 市价最优五档即成剩转[中金所]
 - 2023-10-20
-- 委托结构`XtOrder`，成交结构`XtTrade`，持仓结构`XtPosition` 新增多空字段
-    - `direction` - 多空，股票不需要
-- 委托结构`XtOrder`，成交结构`XtTrade`新增交易操作字段
-    - `offset_flag` - 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等
+    - 委托结构`XtOrder`，成交结构`XtTrade`，持仓结构`XtPosition` 新增多空字段
+        - `direction` - 多空，股票不需要
+        - 委托结构`XtOrder`，成交结构`XtTrade`新增交易操作字段
+        - `offset_flag` - 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等
 - 2023-11-03
   - 添加券源行情查询接口 `smt_query_quoter`
   - 添加库存券约券申请接口 `smt_negotiate_order`
@@ -89,8 +89,6 @@ XtQuant目前提供的库包括Python3.6、3.7、3.8版本，不同版本的pyth
     - 委托类型增加ETF申赎
 - 2024-02-29
     - 添加期货持仓统计查询接口`query_position_statistics`
-- 2024-04-25
-    - 数据结构添加`stock_code1`字段以适配长代码
 - 2024-05-24
     - 添加通用数据导出接口export_data
     - 添加通用数据查询接口query_data
@@ -99,6 +97,39 @@ XtQuant目前提供的库包括Python3.6、3.7、3.8版本，不同版本的pyth
 - 2024-08-27
     - 成交结构`XtTrade`新增手续费字段
         - `commission` - 手续费
+- 2024-11-28
+    - 资产结构`XtAsset`新增可取资金字段
+        - `fetch_balance` - 可取资金
+    - 委托结构`XtOrder`新增证券名称、股东代码字段
+        - `instrument_name` - 证券名称
+        - `secu_account` - 股东代码
+    - 成交结构`XtTrade`新增证券名称、股东代码字段
+        - `instrument_name` - 证券名称
+        - `secu_account` - 股东代码
+    - 持仓结构`XtPosition`新增证券名称、当前价、盈亏比例、股东代码字段
+        - `instrument_name` - 证券名称
+        - `last_price` - 当前价
+        - `profit_rate` - 盈亏比例
+        - `secu_account` - 股东代码
+    - 添加银证转账（银行转证券）接口`bank_transfer_in`/`bank_transfer_in_async`
+    - 添加银证转账（证券转银行）接口`bank_transfer_out`/`bank_transfer_out_async`
+    - 添加银行信息查询接口`query_bank_info`
+    - 添加银行转账流水查询接口`query_bank_transfer_stream`
+    - 添加股东账户查询接口`query_secu_account`
+- 2025-02-13
+    - 持仓结构`XtPosition`新增浮动盈亏字段
+        - `float_profit` - 浮动盈亏
+- 2025-03-10
+    - 添加银行余额查询接口`query_bank_amount`
+- 2025-03-19
+    - 持仓结构`XtPosition`新增开仓日期字段
+      - `open_date` - 开仓日期，股票不需要
+- 2025-03-27
+    - 添加CTP资金内转（期权转期货）接口`ctp_transfer_option_to_future`/`ctp_transfer_option_to_future_async`
+    - 添加CTP资金内转（期货转期权）接口`ctp_transfer_future_to_option`/`ctp_transfer_future_to_option_async`
+- 2025-04-09
+    - 持仓结构`XtPosition`新增持仓盈亏字段
+    - `position_profit` - 持仓盈亏，股票不需要
 
 ## 快速入门 
 
@@ -385,7 +416,7 @@ XtQuant封装了策略交易所需要的Python API接口，可以和MiniQMT客�
   - 市价最优五档即成剩撤 - `xtconstant.MARKET_CANCEL_5`
   - 市价最优一档即成剩转 - `xtconstant.MARKET_CONVERT_1`
   - 市价最优五档即成剩转 - `xtconstant.MARKET_CONVERT_5`
-- 上交所 股票
+- 上交所 北交所 股票
   - 最优五档即时成交剩余撤销 - `xtconstant.MARKET_SH_CONVERT_5_CANCEL`
   - 最优五档即时成交剩转限价 - `xtconstant.MARKET_SH_CONVERT_5_LIMIT`
   - 对手方最优价格委托 - `xtconstant.MARKET_PEER_PRICE_FIRST`
@@ -466,6 +497,7 @@ cash | float | 可用金额
 frozen_cash |float | 冻结金额
 market_value | float | 持仓市值
 total_asset | float | 总资产
+fetch_balance | float | 可取资金 
 
 ### 委托XtOrder
 属性|类型|注释
@@ -488,7 +520,8 @@ strategy_name | str | 策略名称
 order_remark | str | 委托备注
 direction | int | 多空方向，股票不需要；参见数据字典 
 offset_flag | int | 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等；参见数据字典 
-stock_code1 | str | 证券代码，例如"600000.SH" 
+instrument_name | str | 证券名称 
+secu_account | str | 股东代码 
 
 ### 成交XtTrade
 属性|类型|注释
@@ -507,9 +540,10 @@ order_sysid | str | 柜台合同编号
 strategy_name | str | 策略名称
 order_remark | str | 委托备注
 direction | int | 多空方向，股票不需要；参见数据字典 
-offset_flag | int | 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等；参见数据字典 
-stock_code1 | str | 证券代码，例如"600000.SH" 
+offset_flag | int | 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等；参见数据字 
 commission | float | 手续费 
+instrument_name | str | 证券名称 
+secu_account | str | 股东代码 
 
 ### 持仓XtPosition
 属性|类型|注释
@@ -526,7 +560,13 @@ on_road_volume | int | 在途股份
 yesterday_volume | int | 昨夜拥股 
 avg_price | float | 成本价 
 direction | int | 多空方向，股票不需要；参见数据字典 
-stock_code1 | str | 证券代码，例如"600000.SH" 
+instrument_name | str | 证券名称                           
+last_price | float | 当前价                             
+profit_rate | float | 盈亏比例                           
+secu_account | str | 股东代码                           
+float_profit | float | 浮动盈亏 
+open_date | str | 开仓日期，股票不需要 
+position_profit | float | 持仓盈亏，股票不需要 
 
 ### 期货持仓统计XtPositionStatistics
 
@@ -737,6 +777,14 @@ status | int | 账号状态，参见数据字典
 | success  | bool | 申请是否成功                           |
 | msg      | str  | 反馈信息                               |
 | apply_id | str  | 若申请成功返回资券申请编号，否则返回-1 |
+
+### 银证转账异步接口的反馈XtBankTransferResponse
+
+| 属性    | 类型 | 注释         |
+| ------- | ---- | ------------ |
+| seq     | int  | 异步请求序号 |
+| success | bool | 是否成功     |
+| msg     | str  | 反馈信息     |
 
 ## XtQuant API说明
 
@@ -1145,6 +1193,253 @@ sync_transaction_from_external(operation, data_type, account, deal_list)
   #失败输出示例：{'error': {'msg': '[0-0: invalid operation type: ADDD], '}}
   ```
 
+#### 银证转账（银行转证券）同步接口
+
+```python
+bank_transfer_in(account, bank_no, bank_account, balance, bank_pwd, fund_pwd)
+```
+
+* 释义 
+
+  - 银证转账（银行转证券）
+
+* 参数 
+
+  - account - StockAccount 资金账号
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+  - balance - float 转账金额
+  - bank_pwd - str 银行账号密码
+  - fund_pwd - str 资金账号密码
+
+* 返回 
+
+  - (success, msg)
+    - success - bool 转账操作是否成功
+    - msg - str 反馈信息
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  result = xt_trader.bank_transfer_in(account, 'A', '0200205001003215076', 10, bank_pwd = 'abc123')
+  print(result)
+  ```
+
+
+#### 银证转账（银行转证券）异步接口
+
+```python
+bank_transfer_in_async(account, bank_no, bank_account, balance, bank_pwd, fund_pwd)
+```
+
+* 释义 
+
+  - 银证转账（银行转证券）的异步接口，异步接口如果正常返回了请求序号seq，会收到on_bank_transfer_async_response的反馈
+
+* 参数
+
+  - account - StockAccount 资金账号
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+  - balance - float 转账金额
+  - bank_pwd - str 银行账号密码
+  - fund_pwd - str 资金账号密码
+
+* 返回
+
+  - 返回请求序号seq，成功发起申请后的请求序号为大于0的正整数，如果为-1表示发起申请失败
+
+* 示例
+
+```python
+account = StockAccount('1000008')
+#xt_trader为XtQuant API实例对象
+seq = xt_trader.bank_transfer_in_async(account, 'A', '0200205001003215076', 10, bank_pwd = 'abc123')
+print(seq)
+```
+
+#### 银证转账（证券转银行）同步接口
+
+```python
+bank_transfer_out(account, bank_no, bank_account, balance, bank_pwd, fund_pwd)
+```
+
+* 释义 
+
+  - 银证转账（证券转银行）
+
+* 参数 
+
+  - account - StockAccount 资金账号
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+  - balance - float 转账金额
+  - bank_pwd - str 银行账号密码
+  - fund_pwd - str 资金账号密码
+
+* 返回 
+
+  - (success, msg)
+    - success - bool 转账操作是否成功
+    - msg - str 反馈信息
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  result = xt_trader.bank_transfer_out(account, 'A', '0200205001003215076', 10, fund_pwd = 'abc123')
+  print(result)
+  ```
+
+#### 银证转账（证券转银行）异步接口
+
+```python
+bank_transfer_out_async(account, bank_no, bank_account, balance, bank_pwd, fund_pwd)
+```
+
+* 释义 
+
+  - 银证转账（证券转银行）的异步接口，异步接口如果正常返回了请求序号seq，会收到on_bank_transfer_async_response的反馈
+
+* 参数
+
+  - account - StockAccount 资金账号
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+  - balance - float 转账金额
+  - bank_pwd - str 银行账号密码
+  - fund_pwd - str 资金账号密码
+
+* 返回
+
+  - 返回请求序号seq，成功发起申请后的请求序号为大于0的正整数，如果为-1表示发起申请失败
+
+* 示例
+
+```python
+account = StockAccount('1000008')
+#xt_trader为XtQuant API实例对象
+seq = xt_trader.bank_transfer_out_async(account, 'A', '0200205001003215076', 10, fund_pwd = 'abc123')
+print(seq)
+```
+
+#### CTP资金内转（期权转期货）同步接口
+
+```python
+ctp_transfer_option_to_future(opt_account_id, ft_account_id, balance)
+```
+
+* 释义 
+
+  - CTP资金内转（期权转期货）
+
+* 参数 
+
+  - opt_account_id - str 期权资金账号
+  - ft_account_id- str 期货资金账号
+  - balance - float 转账金额
+
+* 返回 
+
+  - (success, msg)
+    - success - bool 转账操作是否成功
+    - msg - str 反馈信息
+
+* 示例
+
+  ```python
+  #xt_trader为XtQuant API实例对象
+  result = xt_trader.ctp_transfer_option_to_future('60016061', '10001951', 10)
+  print(result)
+  ```
+
+
+#### CTP资金内转（期权转期货）异步接口
+
+```python
+ctp_transfer_option_to_future_async(opt_account_id, ft_account_id, balance)
+```
+
+* 释义 
+
+  - CTP资金内转（期权转期货）的异步接口，异步接口如果正常返回了请求序号seq，会收到on_ctp_internal_transfer_async_response的反馈
+
+* 参数
+
+  - opt_account_id - str 期权资金账号
+  - ft_account_id- str 期货资金账号
+  - balance - float 转账金额
+
+* 返回
+
+  - 返回请求序号seq，成功发起申请后的请求序号为大于0的正整数，如果为-1表示发起申请失败
+
+* 示例
+
+```python
+#xt_trader为XtQuant API实例对象
+seq = xt_trader.ctp_transfer_option_to_future_async('60016061', '10001951', 10)
+print(seq)
+```
+
+#### CTP资金内转（期货转期权）同步接口
+
+```python
+ctp_transfer_future_to_option(opt_account_id, ft_account_id, balance)
+```
+
+* 释义 
+
+  - CTP资金内转（期权转期货）
+
+* 参数 
+
+  - opt_account_id - str 期权资金账号
+  - ft_account_id- str 期货资金账号
+  - balance - float 转账金额
+
+* 返回 
+
+  - (success, msg)
+    - success - bool 转账操作是否成功
+    - msg - str 反馈信息
+
+* 示例
+
+  ```python
+  #xt_trader为XtQuant API实例对象
+  result = xt_trader.ctp_transfer_future_to_option('60016061', '10001951', 15)
+  print(result)
+  ```
+
+#### CTP资金内转（期货转期权）异步接口
+
+```python
+ctp_transfer_future_to_option_async(opt_account_id, ft_account_id, balance)
+```
+
+* 释义 
+
+  - CTP资金内转（期货转期权）的异步接口，异步接口如果正常返回了请求序号seq，会收到on_ctp_internal_transfer_async_response的反馈
+* 参数
+
+  - opt_account_id - str 期权资金账号
+  - ft_account_id- str 期货资金账号
+  - balance - float 转账金额
+
+* 返回
+
+  - 返回请求序号seq，成功发起申请后的请求序号为大于0的正整数，如果为-1表示发起申请失败
+* 示例
+
+```python
+#xt_trader为XtQuant API实例对象
+seq = xt_trader.ctp_transfer_future_to_option_async('60016061', '10001951', 15)
+print(seq)
+```
 
 ### 股票查询接口
 
@@ -1557,6 +1852,146 @@ query_data(account, result_path, data_type, start_time = None, end_time = None, 
   #失败输出示例：{'error': {'errorMsg': 'can not find account info, accountID:2000449 accountType:2'}}
   ```
 
+#### 银行信息查询
+
+```python
+query_bank_info(account)
+```
+
+* 释义 
+  
+  - 银行信息查询
+* 参数 
+  
+  - account - StockAccount 资金账号
+* 返回 
+  - result - dict 银行信息，包含以下字段
+    - success - bool
+    - error_msg - str
+    - money_type - str 币种
+    - bank_no - str 银行编号
+    - bank_account - str 银行账号
+    - bank_name - str 银行名称
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  datas = xt_trader.query_bank_info(account)
+  for it in datas:
+      print({x:it.__getattribute__(x) for x in dir(it) if x[0] != '_'})
+  ```
+
+#### 银行余额查询
+
+```python
+query_bank_amount(account, bank_no, bank_account, bank_pwd)
+```
+
+* 释义 
+
+  - 银行转账流水查询
+
+* 参数 
+
+  - account - StockAccount 资金账号
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+  - bank_pwd - str 银行账号密码
+
+* 返回 
+
+  - result - dict 银行转账流水信息，包含以下字段
+    - success - bool
+    - error_msg - str
+    - account_id - str 资金账号
+    - bank_account - str 银行账号
+    - money_type - str 币种
+    - balance - float 余额
+    - enable_balance - float 可转金额
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  datas = xt_trader.query_bank_amount(account, 'A', '0200205001003215076', 'abc123')
+  for it in datas:
+      print({x:it.__getattribute__(x) for x in dir(it) if x[0] != '_'})
+  ```
+
+#### 银行转账流水查询
+
+```python
+query_bank_transfer_stream(account, start_date, end_date, bank_no, bank_account)
+```
+
+* 释义 
+  
+  - 银行转账流水查询
+* 参数 
+  - account - StockAccount 资金账号
+  - start_date - str 查询起始日期，如'20241125'
+  - end_date - str 查询截至日期，如'20241129'
+  - bank_no - str 银行编号，可通过query_bank_info查回
+  - bank_account - str 银行账号
+* 返回 
+  - result - dict 银行转账流水信息，包含以下字段
+    - success - bool
+    - error_msg - str
+    - date - str 日期
+    - time - str 时间
+    - transfer_no - str 转账流水号 
+    - transfer_direction - str 转账方向 '1':银行转证券，'2':证券转银行，'5':查询
+    - bank_no - str 银行编号
+    - bank_name - str 银行名称
+    - bank_account - str 银行账号
+    - money_type - str 币种
+    - account_id - str 资金账号
+    - balance - float 金额
+    - remark - str 备注
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  datas = xt_trader.query_bank_transfer_stream(account, '20241125', '20241129')
+  for it in datas:
+      print({x:it.__getattribute__(x) for x in dir(it) if x[0] != '_'})
+  ```
+
+#### 股东账户查询
+
+```python
+query_secu_account(account)
+```
+
+* 释义 
+  
+  - 股东账户查询
+* 参数 
+  
+  - account - StockAccount 资金账号
+* 返回 
+  - result - dict 银行信息，包含以下字段
+    - success - bool
+    - error_msg - str
+    - main - bool 是否主股东
+    - market - str 证券市场
+    - secu_account - str 股东号
+
+* 示例
+
+  ```python
+  account = StockAccount('1000008')
+  #xt_trader为XtQuant API实例对象
+  datas = xt_trader.query_secu_account(account)
+  for it in datas:
+      print({x:it.__getattribute__(x) for x in dir(it) if x[0] != '_'})
+  ```
+
 ### 约券相关接口
 
 #### 券源行情查询
@@ -1773,6 +2208,13 @@ class MyXtQuantTraderCallback(XtQuantTraderCallback):
         """
         print("on_smt_appointment_async_response")
         print(response.account_id, response.order_sysid, response.error_id, response.error_msg, response.seq)
+    def on_bank_transfer_async_response(self, response):
+        """
+        :param response: XtBankTransferResponse 对象
+        :return:
+        """
+        print("on_bank_transfer_async_response")
+        print(response.seq, response.success, response.msg)
 ```
 
 #### 连接状态回调
@@ -1906,6 +2348,36 @@ on_smt_appointment_async_response(data)
   - 异步约券相关接口回报推送
 * 参数
   - data - XtSmtAppointmentResponse 约券相关异步接口的反馈
+* 返回
+  - 无 
+* 备注
+  - 无
+
+#### 银证转账异步接口的回报推送
+
+```python
+on_bank_transfer_async_response(data)
+```
+
+* 释义
+  - 银证转账异步接口的回报推送
+* 参数
+  - data - XtBankTransferResponse 银证转账异步接口的反馈
+* 返回
+  - 无 
+* 备注
+  - 无
+
+#### CTP资金内转异步接口的回报推送
+
+```python
+on_ctp_internal_transfer_async_response(data)
+```
+
+* 释义
+  - CTP资金内转异步接口的回报推送
+* 参数
+  - data - XtBankTransferResponse 银证转账异步接口的反馈
 * 返回
   - 无 
 * 备注

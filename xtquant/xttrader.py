@@ -102,6 +102,20 @@ class XtQuantTraderCallback(object):
         :return:
         """
         pass
+    
+    def on_bank_transfer_async_response(self, response):
+        """
+        :param response: XtBankTransferResponse 对象
+        :return:
+        """
+        pass
+
+    def on_ctp_internal_transfer_async_response(self, response):
+        """
+        :param response: XtBankTransferResponse 对象
+        :return:
+        """
+        pass
 
 class XtQuantTrader(object):
     def __init__(self, path, session, callback=None):
@@ -187,7 +201,13 @@ class XtQuantTrader(object):
         self.async_client.bindOnQueryPositionStatisticsRespCallback(on_common_resp_callback)
         self.async_client.bindOnExportDataRespCallback(on_common_resp_callback)
         self.async_client.bindOnSyncTransactionFromExternalRespCallback(on_common_resp_callback)
-        
+        self.async_client.bindOnBankTransferRespCallback(on_common_resp_callback)
+        self.async_client.bindOnQueryBankInfoRespCallback(on_common_resp_callback)
+        self.async_client.bindOnQueryBankAmountRespCallback(on_common_resp_callback)
+        self.async_client.bindOnQueryBankTransferStreamRespCallback(on_common_resp_callback)
+        self.async_client.bindOnQuerySecuAccountRespCallback(on_common_resp_callback)
+        self.async_client.bindOnCtpInternalTransferRespCallback(on_common_resp_callback)
+     
         self.async_client.bindOnQueryAccountInfosCallback(on_common_resp_callback)
         self.async_client.bindOnQueryAccountStatusCallback(on_common_resp_callback)
     #########################
@@ -311,7 +331,27 @@ class XtQuantTrader(object):
         
         if enable_push:
             self.async_client.bindOnSmtAppointmentRespCallback(on_common_push_callback_wrapper(2, on_push_SmtAppointmentAsyncResponse))
+   
+        def on_push_bankTransferAsyncResponse(seq, resp):
+            callback = self.cbs.pop(seq, None)
+            if callback:
+                resp = _XTTYPE_.XtBankTransferResponse(seq, resp.success, resp.error_msg)
+                callback(resp)
+            return
         
+        if enable_push:
+            self.async_client.bindOnBankTransferRespCallback(on_common_push_callback_wrapper(2, on_push_bankTransferAsyncResponse))
+
+        def on_push_ctpInternalTransferAsyncResponse(seq, resp):
+            callback = self.cbs.pop(seq, None)
+            if callback:
+                resp = _XTTYPE_.XtBankTransferResponse(seq, resp.success, resp.error_msg)
+                callback(resp)
+            return
+      
+        if enable_push:
+            self.async_client.bindOnCtpInternalTransferRespCallback(on_common_push_callback_wrapper(2, on_push_ctpInternalTransferAsyncResponse))
+
     ########################
 
     def common_op_async_with_seq(self, seq, callable, callback):
@@ -433,6 +473,7 @@ class XtQuantTrader(object):
         req.m_strOrderRemarkNew = order_remark
         req.m_dOrderAmount = order_volume
         req.m_strStockCode1 = stock_code
+        req.m_strAccountID1 = account.account_id
 
         seq = self.async_client.nextSeq()
         self.queuing_order_seq.add(seq)
@@ -466,6 +507,7 @@ class XtQuantTrader(object):
         req.m_strOrderRemarkNew = order_remark
         req.m_dOrderAmount = order_volume
         req.m_strStockCode1 = stock_code
+        req.m_strAccountID1 = account.account_id
         
         seq = self.async_client.nextSeq()
         self.queuing_order_seq.add(seq)
@@ -1473,4 +1515,258 @@ class XtQuantTrader(object):
         import json
         result = json.loads(resp)
         return result
+
+    def bank_transfer_in(self, account, bank_no, bank_account, balance, bank_pwd = '', fund_pwd = ''):
+        """
+        :param account - StockAccount: 资金账号
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :param balance - float: 转账金额
+        :param bank_pwd - str: 银行账号密码
+        :param fund_pwd - str: 资金账号密码
+        :return: 返回转账结果
+        """
+        req = _XTQC_.BankTransferReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.fund_pwd = str(fund_pwd)
+        req.direction = 501
+        req.bank_account = str(bank_account)
+        req.bank_no = str(bank_no)
+        req.bank_pwd = str(bank_pwd)
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        result = self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.bankTransferWithSeq, seq, req)
+        )
+        return result.success, result.msg
+
+    def bank_transfer_in_async(self, account, bank_no, bank_account, balance, bank_pwd = '', fund_pwd = ''):
+        """
+        :param account - StockAccount: 资金账号
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :param balance - float: 转账金额
+        :param bank_pwd - str: 银行账号密码
+        :param fund_pwd - str: 资金账号密码
+        :return: 返回请求序号, 成功请求后的序号为大于0的正整数, 如果为-1表示请求失败
+        """
+        req = _XTQC_.BankTransferReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.fund_pwd = str(fund_pwd)
+        req.direction = 501
+        req.bank_account = str(bank_account)
+        req.bank_no = str(bank_no)
+        req.bank_pwd = str(bank_pwd)
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        self.cbs[seq] = self.callback.on_bank_transfer_async_response
+        self.async_client.bankTransferWithSeq(seq, req)
+        return seq
+
+    def bank_transfer_out(self, account, bank_no, bank_account, balance, bank_pwd = '', fund_pwd = ''):
+        """
+        :param account - StockAccount: 资金账号
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :param balance - float: 转账金额
+        :param bank_pwd - str: 银行账号密码
+        :param fund_pwd - str: 资金账号密码
+        :return: 返回转账结果
+        """
+        req = _XTQC_.BankTransferReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.fund_pwd = str(fund_pwd)
+        req.direction = 502
+        req.bank_account = str(bank_account)
+        req.bank_no = str(bank_no)
+        req.bank_pwd = str(bank_pwd)
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        result = self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.bankTransferWithSeq, seq, req)
+        )
+        return result.success, result.msg
+
+    def bank_transfer_out_async(self, account, bank_no, bank_account, balance, bank_pwd = '', fund_pwd = ''):
+        """
+        :param account - StockAccount: 资金账号
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :param balance - float: 转账金额
+        :param bank_pwd - str: 银行账号密码
+        :param fund_pwd - str: 资金账号密码
+        :return: 返回请求序号, 成功请求后的序号为大于0的正整数, 如果为-1表示请求失败
+        """
+        req = _XTQC_.BankTransferReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.fund_pwd = str(fund_pwd)
+        req.direction = 502
+        req.bank_account = str(bank_account)
+        req.bank_no = str(bank_no)
+        req.bank_pwd = str(bank_pwd)
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        self.cbs[seq] = self.callback.on_bank_transfer_async_response
+        self.async_client.bankTransferWithSeq(seq, req)
+        return seq
+
+    def query_bank_info(self, account):
+        """
+        :param account - StockAccount: 资金账号
+        :return: 返回BankInfo结构组成的list
+        """
+        req = _XTQC_.QueryBankInfoReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        
+        seq = self.async_client.nextSeq()
+        return self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.queryBankInfoWithSeq, seq, req)
+        )
+
+    def query_bank_amount(self, account, bank_no, bank_account, bank_pwd):
+        """
+        :param account - StockAccount: 资金账号
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :param bank_pwd - str: 银行账号密码
+        :return: 返回BankAmount组成的list
+        """
+        req = _XTQC_.QueryBankAmountReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.bank_no = str(bank_no)
+        req.bank_account = str(bank_account)
+        req.bank_pwd = str(bank_pwd)
+
+        seq = self.async_client.nextSeq()
+        return self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.queryBankAmountWithSeq, seq, req)
+        )
+
+    def query_bank_transfer_stream(self, account, start_date, end_date, bank_no = '', bank_account = ''):
+        """
+        :param account - StockAccount: 资金账号
+        :param start_date - str: 查询起始日期，如'20241125'
+        :param end_date - str: 查询截至日期，如'20241129'
+        :param bank_no - str: 银行编号，可通过query_bank_info查回
+        :param bank_account - str: 银行账号
+        :return: 返回BankTransferStream组成的list
+        """
+        req = _XTQC_.QueryBankTransferStreamReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        req.start_date = str(start_date)
+        req.end_date = str(end_date)
+        req.bank_no = str(bank_no)
+        req.bank_account = str(bank_account)
+        
+        seq = self.async_client.nextSeq()
+        return self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.queryBankTransferStreamWithSeq, seq, req)
+        )
+
+    def query_secu_account(self, account):
+        """
+        :param account - StockAccount: 资金账号
+        :return: 返回SecuAccount结构组成的list
+        """
+        req = _XTQC_.QuerySecuAccountReq()
+        req.account_type = account.account_type
+        req.account_id = account.account_id
+        
+        seq = self.async_client.nextSeq()
+        return self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.querySecuAccountWithSeq, seq, req)
+        )
+
+    def ctp_transfer_option_to_future(self, opt_account_id, ft_account_id, balance):
+        """
+        :param opt_account_id - string: 期权资金账号
+        :param ft_account_id - string: 期货资金账号
+        :param balance - float: 转账金额
+        :return: 返回内转结果
+        """
+        req = _XTQC_.CtpInternalTransferReq()
+        req.opt_account_id = str(opt_account_id)
+        req.ft_account_id = str(ft_account_id)
+        req.direction = 515
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        result = self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.ctpInternalTransferWithSeq, seq, req)
+        )
+        return result.success, result.msg
+
+    def ctp_transfer_option_to_future_async(self, opt_account_id, ft_account_id, balance):
+        """
+        :param opt_account_id - string: 期权资金账号
+        :param ft_account_id - string: 期货资金账号
+        :param balance - float: 转账金额
+        :return: 返回请求序号, 成功请求后的序号为大于0的正整数, 如果为-1表示请求失败
+        """
+        req = _XTQC_.CtpInternalTransferReq()
+        req.opt_account_id = str(opt_account_id)
+        req.ft_account_id = str(ft_account_id)
+        req.direction = 515
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        self.cbs[seq] = self.callback.on_ctp_internal_transfer_async_response
+        self.async_client.ctpInternalTransferWithSeq(seq, req)
+        return seq
+
+    def ctp_transfer_future_to_option(self, opt_account_id, ft_account_id, balance):
+        """
+        :param opt_account_id - string: 期权资金账号
+        :param ft_account_id - string: 期货资金账号
+        :param balance - float: 转账金额
+        :return: 返回内转结果
+        """
+        req = _XTQC_.CtpInternalTransferReq()
+        req.opt_account_id = str(opt_account_id)
+        req.ft_account_id = str(ft_account_id)
+        req.direction = 516
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        result = self.common_op_sync_with_seq(
+            seq,
+            (self.async_client.ctpInternalTransferWithSeq, seq, req)
+        )
+        return result.success, result.msg
+
+    def ctp_transfer_future_to_option_async(self, opt_account_id, ft_account_id, balance):
+        """
+        :param opt_account_id - string: 期权资金账号
+        :param ft_account_id - string: 期货资金账号
+        :param balance - float: 转账金额
+        :return: 返回请求序号, 成功请求后的序号为大于0的正整数, 如果为-1表示请求失败
+        """
+        req = _XTQC_.CtpInternalTransferReq()
+        req.opt_account_id = str(opt_account_id)
+        req.ft_account_id = str(ft_account_id)
+        req.direction = 516
+        req.balance = float(balance)
+        
+        seq = self.async_client.nextSeq()
+        self.cbs[seq] = self.callback.on_ctp_internal_transfer_async_response
+        self.async_client.ctpInternalTransferWithSeq(seq, req)
+        return seq
 

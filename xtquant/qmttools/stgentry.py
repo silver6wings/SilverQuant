@@ -13,6 +13,11 @@ def run_file(user_script, param = {}):
         lib_search = [os.path.abspath(p) for p in pypath.split(';')]
         sys.path = lib_search + [p for p in sys.path if p not in lib_search]
 
+    user_args = param.get('user_args')
+    if user_args and type(user_args) == dict:
+        for k, v in user_args.items():
+            globals()[k] = v
+
     user_module = compile(open(user_script, 'rb').read(), user_script, 'exec', optimize = 2)
     #print({'user_module': user_module})
 

@@ -73,10 +73,16 @@ class StrategyLoader:
 
         if C.start_time:
             C.start_time_str = C.start_time.replace('-', '').replace(' ', '').replace(':', '')
-            C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+            try:
+                C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+            except:
+                C.start_time_num = 0
         if C.end_time:
             C.end_time_str = C.end_time.replace('-', '').replace(' ', '').replace(':', '')
-            C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+            try:
+                C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+            except:
+                C.end_time_num = 0
 
         if 1: #register
             this.create_formula()
@@ -126,11 +132,17 @@ class StrategyLoader:
             import datetime as dt
             if C.start_time:
                 C.start_time_str = C.start_time.replace('-', '').replace(' ', '').replace(':', '')
-                C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+                try:
+                    C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+                except:
+                    C.start_time_num = 0
                 init_result['backtest']['start_time'] = dt.datetime.fromtimestamp(C.start_time_num / 1000).strftime('%Y-%m-%d %H:%M:%S')
             if C.end_time:
                 C.end_time_str = C.end_time.replace('-', '').replace(' ', '').replace(':', '')
-                C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+                try:
+                    C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+                except:
+                    C.end_time_num = 0
                 init_result['backtest']['end_time'] = dt.datetime.fromtimestamp(C.end_time_num / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
             this.call_formula('initcomplete', init_result)

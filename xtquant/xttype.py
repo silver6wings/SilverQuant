@@ -36,13 +36,14 @@ class XtAsset(object):
     """
     迅投股票账号资金结构
     """
-    def __init__(self, account_id, cash, frozen_cash, market_value, total_asset):
+    def __init__(self, account_id, cash, frozen_cash, market_value, total_asset, fetch_balance):
         """
         :param account_id: 资金账号
         :param cash: 可用
         :param frozen_cash: 冻结
         :param market_value: 持仓市值
         :param total_asset: 总资产
+        :param fetch_balance: 可取资金
         """
         self.account_type = _XTCONST_.SECURITY_ACCOUNT
         self.account_id = account_id
@@ -50,6 +51,7 @@ class XtAsset(object):
         self.frozen_cash = frozen_cash
         self.market_value = market_value
         self.total_asset = total_asset
+        self.fetch_balance = fetch_balance
 
 
 class XtOrder(object):
@@ -60,7 +62,7 @@ class XtOrder(object):
                  order_id, order_sysid, order_time, order_type, order_volume,
                  price_type, price, traded_volume, traded_price,
                  order_status, status_msg, strategy_name, order_remark, direction, offset_flag,
-                 stock_code1):
+                 secu_account, instrument_name):
         """
         :param account_id: 资金账号
         :param stock_code: 证券代码, 例如"600000.SH"
@@ -79,6 +81,8 @@ class XtOrder(object):
         :param order_remark: 委托备注
         :param direction: 多空, 股票不需要
         :param offset_flag: 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等
+        :param secu_account: 股东代码
+        :param instrument_name: 证券名称
         """
         self.account_type = _XTCONST_.SECURITY_ACCOUNT
         self.account_id = account_id
@@ -98,7 +102,8 @@ class XtOrder(object):
         self.order_remark = order_remark
         self.direction = direction
         self.offset_flag = offset_flag
-        self.stock_code1 = stock_code1
+        self.secu_account = secu_account
+        self.instrument_name = instrument_name
 
 
 class XtTrade(object):
@@ -108,7 +113,7 @@ class XtTrade(object):
     def __init__(self, account_id, stock_code,
                  order_type, traded_id, traded_time, traded_price, traded_volume, traded_amount,
                  order_id, order_sysid, strategy_name, order_remark, direction, offset_flag,
-                 stock_code1, commission):
+                 commission, secu_account, instrument_name):
         """
         :param account_id: 资金账号
         :param stock_code: 证券代码, 例如"600000.SH"
@@ -125,6 +130,8 @@ class XtTrade(object):
         :param direction: 多空, 股票不需要
         :param offset_flag: 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等
         :param commission: 手续费
+        :param secu_account: 股东代码
+        :param instrument_name: 证券名称
         """
         self.account_type = _XTCONST_.SECURITY_ACCOUNT
         self.account_id = account_id
@@ -141,8 +148,9 @@ class XtTrade(object):
         self.order_remark = order_remark
         self.direction = direction
         self.offset_flag = offset_flag
-        self.stock_code1 = stock_code1
         self.commission = commission
+        self.secu_account = secu_account
+        self.instrument_name = instrument_name
 
 
 class XtPosition(object):
@@ -152,7 +160,7 @@ class XtPosition(object):
     def __init__(self, account_id, stock_code,
                  volume, can_use_volume, open_price, market_value,
                  frozen_volume, on_road_volume, yesterday_volume, avg_price, direction,
-                 stock_code1):
+                 last_price, profit_rate, secu_account, instrument_name):
         """
         :param account_id: 资金账号
         :param stock_code: 证券代码, 例如"600000.SH"
@@ -165,6 +173,10 @@ class XtPosition(object):
         :param yesterday_volume: 昨夜拥股
         :param avg_price: 成本价
         :param direction: 多空, 股票不需要
+        :param last_price: 当前价
+        :param profit_rate: 盈亏比例
+        :param secu_account: 股东代码
+        :param instrument_name: 证券名称
         """
         self.account_type = _XTCONST_.SECURITY_ACCOUNT
         self.account_id = account_id
@@ -178,7 +190,10 @@ class XtPosition(object):
         self.yesterday_volume = yesterday_volume
         self.avg_price = avg_price
         self.direction = direction
-        self.stock_code1 = stock_code1
+        self.last_price = last_price
+        self.profit_rate = profit_rate
+        self.secu_account = secu_account
+        self.instrument_name = instrument_name
 
 
 class XtOrderError(object):
@@ -371,3 +386,18 @@ class XtSmtAppointmentResponse(object):
         self.success = success
         self.msg = msg
         self.apply_id = apply_id
+
+class XtBankTransferResponse(object):
+    """
+    迅投银证转账异步接口的反馈
+    """
+    def __init__(self, seq, success, msg):
+        """
+        :param seq: 异步请求序号
+        :param success: 是否成功
+        :param msg: 反馈信息
+        """
+        self.seq = seq
+        self.success = success
+        self.msg = msg
+

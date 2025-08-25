@@ -5,6 +5,7 @@ from .meta_config import (
     get_metatable_list,
     get_metatable_info,
     get_metatable_fields,
+    download_metatable_data,
 )
 
 from . import get_arrow
