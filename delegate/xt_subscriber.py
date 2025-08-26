@@ -498,7 +498,7 @@ class XtSubscriber(BaseSubscriber):
                     f'{self.stock_names.get_name(code)} ' \
                     f'{curr_price * vol:.2f}元'
             text += '\n>\n>'
-            text += f'盈亏比:{ratio_change}</font> 盈亏额:{total_change}</font>'
+            text += f'盈亏比: {ratio_change} 盈亏额: {total_change}'
 
         title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'
