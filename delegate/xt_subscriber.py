@@ -397,7 +397,7 @@ class XtSubscriber(BaseSubscriber):
             end_date = datetime.datetime.strptime(end, '%Y%m%d')
             delta = abs(end_date - start_date)
 
-            self.cache_history = hc.daily_history.get_subset_copy(None, delta.days + 1)
+            self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                    f'加载历史{len(self.cache_history)}支')
