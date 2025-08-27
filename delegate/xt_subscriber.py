@@ -527,7 +527,7 @@ class XtSubscriber(BaseSubscriber):
             )
             text += f'当日变动: {total_change}元({ratio_change})'
 
-            if hasattr(self.delegate.xt_trader, 'query_bank_info'):
+            if hasattr(self.delegate, 'xt_trader') and hasattr(self.delegate.xt_trader, 'query_bank_info'):
                 cash_change = 0.0
                 today_xt = today.replace('-', '')
                 bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account) # 银行信息查询
