@@ -97,6 +97,8 @@ def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> t
         if days_from_end_to_today > 0:
             days_between += 1
             days_from_end_to_today -= 1
+    else:
+        days_between += 1
 
     return days_between, days_from_end_to_today
 

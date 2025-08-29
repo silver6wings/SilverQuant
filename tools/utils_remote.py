@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
-from tools.utils_basic import is_stock, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
+from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
 from tools.utils_cache import TRADE_DAY_CACHE_PATH
 from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq
 
@@ -228,18 +228,26 @@ def get_ak_daily_history(
     columns: list[str] = None,
     adjust: ExitRight = ExitRight.BFQ,
 ) -> Optional[pd.DataFrame]:
-    if not is_stock(code):
-        return None
-
     import akshare as ak
     try:
-        df = ak.stock_zh_a_hist(
-            symbol=code_to_symbol(code),
-            start_date=start_date,
-            end_date=end_date,
-            adjust=adjust,
-            period='daily',
-        )
+        if is_stock(code):
+            df = ak.stock_zh_a_hist(
+                symbol=code_to_symbol(code),
+                start_date=start_date,
+                end_date=end_date,
+                adjust=str(adjust),
+                period='daily',
+            )
+        elif is_fund_etf(code):
+            df = ak.fund_etf_hist_em(
+                symbol=code_to_symbol(code),
+                start_date=start_date,
+                end_date=end_date,
+                adjust=str(adjust),
+                period="daily",
+            )
+        else:
+            return None
     except Exception as e:
         print(f' akshare get {code} error: ', e)
         df = []
@@ -350,9 +358,6 @@ def get_mootdx_daily_history(
     columns: list[str] = None,
     adjust: ExitRight = ExitRight.BFQ,
 ) -> Optional[pd.DataFrame]:
-    if not is_stock(code):
-        return None
-
     offset, start = get_offset_start(TRADE_DAY_CACHE_PATH, start_date, end_date)
     symbol = code_to_symbol(code)
 
@@ -364,6 +369,7 @@ def get_mootdx_daily_history(
             offset=offset,  # 总共N个K线
             start=start,    # 向前数跳过几行
         )
+        # TODO_List: 对于有些期间停牌过的票，发现时间对不上这里要校正，优先级不高因为只会多不会少
     except Exception as e:
         print(f' mootdx get daily {code} error: ', e)
         return None
@@ -397,6 +403,7 @@ def get_mootdx_daily_history(
             df = df.rename(columns={'vol': 'volume'})
             df['volume'] = df['volume'].astype(int)
             df = df.reset_index(drop=True)
+
             if columns is not None:
                 return df[columns]
             return df
@@ -415,7 +422,8 @@ def get_daily_history(
     data_source=DataSource.AKSHARE,
 ) -> Optional[pd.DataFrame]:
     if data_source == DataSource.TUSHARE:
-        # Tushare 的数据免费的暂时不支持复权
+        # TuShare 的数据免费的暂时不支持复权
+        # TuShare 不支持 etf，其他两个支持
         return get_ts_daily_history(code, start_date, end_date, columns)
     elif data_source == DataSource.MOOTDX:
         # Mootdx 的复权是先截断数据然后复权，取三位小数
@@ -423,5 +431,6 @@ def get_daily_history(
         # 其它北交所股票小部分有发行脏数据情况
         return get_mootdx_daily_history(code, start_date, end_date, columns, adjust)
     else:
-        # Akshare 的复权是针对全部历史复权后截取，取两位小数
+        # AkShare 的复权是针对全部历史复权后截取，取两位小数
+        # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)

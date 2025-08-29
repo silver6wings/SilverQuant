@@ -65,8 +65,9 @@ class XtSubscriber(BaseSubscriber):
         ding_messager: BaseMessager = None,
         open_tick_memory_cache: bool = False,
         tick_memory_data_frame: bool = False,
-        open_today_deal_report: bool = False,
-        open_today_hold_report: bool = False,
+        open_today_deal_report: bool = False,   # 每日交易记录报告
+        open_today_hold_report: bool = False,   # 每日持仓记录报告
+        today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
     ):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
@@ -97,6 +98,7 @@ class XtSubscriber(BaseSubscriber):
 
         self.open_today_deal_report = open_today_deal_report
         self.open_today_hold_report = open_today_hold_report
+        self.today_report_show_bank = today_report_show_bank
 
         self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
@@ -224,8 +226,8 @@ class XtSubscriber(BaseSubscriber):
             self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                f'{"恢复" if resume else "启动"} {len(self.code_list) - 1}支')
         print('[启动行情订阅]', end='')
-        self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
         xtdata.enable_hello = False
+        self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
 
     def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -527,10 +529,13 @@ class XtSubscriber(BaseSubscriber):
             )
             text += f'当日变动: {total_change}元({ratio_change})'
 
-            if hasattr(self.delegate, 'xt_trader') and hasattr(self.delegate.xt_trader, 'query_bank_info'):
+            if self.today_report_show_bank \
+                    and hasattr(self.delegate, 'xt_trader') \
+                    and hasattr(self.delegate.xt_trader, 'query_bank_info'):
+
                 cash_change = 0.0
                 today_xt = today.replace('-', '')
-                bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account) # 银行信息查询
+                bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account)  # 银行信息查询
                 for bank in bank_info:
                     if bank.success:
                         # 银行卡流水记录查询
