@@ -163,11 +163,11 @@ def save_pickle(path: str, obj: object) -> None:
 
 
 # 读取json缓存，如果找不到文件则创建空json并返回
-def load_json(path: str) -> dict:
+def load_json(path: str, ensure_ascii=True) -> dict:
     if os.path.exists(path):
         with open(path, 'r') as r:
             ans = r.read()
-        return json.loads(ans)
+        return json.loads(ans, ensure_ascii=ensure_ascii)
     else:
         with open(path, 'w') as w:
             w.write('{}')
@@ -175,9 +175,9 @@ def load_json(path: str) -> dict:
 
 
 # 存储json缓存，全覆盖写入
-def save_json(path: str, var: dict) -> None:
+def save_json(path: str, var: dict, ensure_ascii=True) -> None:
     with open(path, 'w') as w:
-        w.write(json.dumps(var, indent=4))
+        w.write(json.dumps(var, ensure_ascii=ensure_ascii, indent=4))
 
 
 # 删除json缓存中的单个key-value，key为字符串
