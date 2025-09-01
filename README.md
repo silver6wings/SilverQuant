@@ -8,20 +8,15 @@ Github 因某些原因不便境内服务器部署，这里有：[国内镜像](h
 
 # 鸣谢
 
-> 感谢 [@owen590](https://github.com/owen590) 从第一行代码开始至今提供的宝贵意见
-> 
-> 感谢 [@dominicx](https://github.com/dominicx) 提交的PR，修复作者未覆盖的交易场景
-> 
-> 感谢 [@nackel](https://github.com/nackel) 提交的PR，添加飞书机器人模块的支持
-> 
-> 感谢 [@vipally](https://github.com/vipally) 提交的PR，优化部分MyTT公式和vscode配置
+* 感谢 [@owen590](https://github.com/owen590) 从第一行代码开始至今提供的宝贵意见 
+* 感谢 [@dominicx](https://github.com/dominicx) 提交的PR，修复作者未覆盖的交易场景细节
+* 感谢 [@nackel](https://github.com/nackel) 提交的PR，添加飞书机器人模块的支持
+* 感谢 [@vipally](https://github.com/vipally) 提交的PR，优化部分MyTT公式和vscode配置
 
 # 已知问题
 
-* 持仓价从QMT直接获取，目前不会根据除权情况动态调整，可能会因为除权价格降低导致非正常止损卖出。
-* Daily History 模块目前尚未加入除权数据更新机制，定期删除`_cache/_daily`文件夹可以保持数据一致性
-
----
+* 开仓价从`Mini QMT`直接获取，目前不会根据除权情况动态调整，可能会因为除权价格降低导致非正常止损卖出。
+* Daily History 模块目前尚未加入除权数据更新机制，需要定期删除`_cache/_daily`文件夹可以保持数据一致性
 
 # 项目简介
 
