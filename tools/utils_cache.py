@@ -337,20 +337,6 @@ def record_deal(
             ])
 
 
-# 获取总仓位价格增幅
-def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float) -> Optional[float]:
-    if os.path.exists(path_assets):
-        df = pd.read_csv(path_assets)               # 读取
-        prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
-        df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
-        df.to_csv(path_assets, index=False)         # 存储
-        return curr_asset - prev_asset
-    else:
-        df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
-        df.to_csv(path_assets, index=False)
-        return None
-
-
 # ==========
 # 交易日缓存
 # ==========
