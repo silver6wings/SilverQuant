@@ -175,9 +175,9 @@ def load_json(path: str) -> dict:
 
 
 # 存储json缓存，全覆盖写入
-def save_json(path: str, var: dict) -> None:
+def save_json(path: str, var: dict, ensure_ascii=True) -> None:
     with open(path, 'w') as w:
-        w.write(json.dumps(var, indent=4))
+        w.write(json.dumps(var, ensure_ascii=ensure_ascii, indent=4))
 
 
 # 删除json缓存中的单个key-value，key为字符串
