@@ -218,6 +218,7 @@ if __name__ == '__main__':
             my_suber.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 
     try:
+        print('策略定时器任务已经启动！')
         while True:
             schedule.run_pending()
             time.sleep(1)

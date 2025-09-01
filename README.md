@@ -42,6 +42,16 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 希望您也可以在修罗场里的磨砺中，能打造出属于自己合适的交易模式，共勉
 
+> 成功的秘诀有三条：
+> 
+> 第一，尽量避免风险，保住本金
+> 
+> 第二，尽量避免风险，保住本金
+> 
+> 第三，坚决牢记第一、二条。
+> 
+> —— Warren Edward Buffett
+
 
 # 安装说明
 
