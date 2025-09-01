@@ -2,9 +2,9 @@ import time
 from threading import Thread
 from typing import List, Optional
 
-from xtquant import xtconstant
+from xtquant import xtconstant, xtdata
 from xtquant.xtconstant import STOCK_BUY, STOCK_SELL
-from xtquant.xtdata import get_client, get_full_tick
+from xtquant.xtdata import get_full_tick
 from xtquant.xttrader import XtQuantTrader
 from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
@@ -333,7 +333,7 @@ def get_holding_position_count(positions: List[XtPosition]) -> int:
 
 def xt_stop_exit():
     import time
-    client = get_client()
+    client = xtdata.get_client()
     while True:
         time.sleep(default_wait_duration)
         if not client.is_connected():
@@ -344,10 +344,12 @@ def xt_get_ticks(code_list: list[str]):
     # http://docs.thinktrader.net/pages/36f5df/#%E8%8E%B7%E5%8F%96%E5%85%A8%E6%8E%A8%E6%95%B0%E6%8D%AE
     return get_full_tick(code_list)
 
+
 def download_sector_data():
     """解决板块数据下载卡顿问题"""
     client = xtdata.get_client()
     client.down_all_sector_data()  
+
 
 if __name__ == '__main__':
     # my_delegate = XtDelegate()
