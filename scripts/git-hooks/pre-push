@@ -1,0 +1,22 @@
+#!/bin/bash
+# 团队共享的pre-push钩子：push前运行pytest测试
+
+echo "🔍 运行单元测试（pre-push钩子）..."
+
+# 安装依赖（确保测试环境可用）
+if ! python -m pytest --version >/dev/null 2>&1; then
+    echo "⚠️ 未检测到pytest，尝试安装依赖..."
+    pip install -r requirements-dev.txt || {
+        echo "❌ 依赖安装失败，请手动安装：pip install -r requirements-dev.txt"
+        exit 1
+    }
+fi
+
+# 运行pytest测试
+python -m pytest tests/ || {
+    echo "❌ 测试失败，禁止push"
+    exit 1
+}
+
+echo "✅ 测试通过，可以push"
+exit 0
