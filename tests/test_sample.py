@@ -20,7 +20,7 @@ def divide(a: float, b: float) -> float:
 
 def test_add():
     """测试加法功能"""
-    assert add(2, 3) == 5
+    assert add(2, 3) == 4
     assert add(-1, 1) == 0
     assert add(0, 0) == 0
     assert add(2.5, 3.5) == 6.0
