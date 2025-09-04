@@ -92,6 +92,8 @@ class XtSubscriber(BaseSubscriber):
 
         self.use_outside_data = use_outside_data
         self.use_ap_scheduler = use_ap_scheduler
+        if self.use_outside_data:
+            self.use_ap_scheduler = True # 如果use_outside_data 被设置为True，则需强制使用apscheduler
 
         self.daily_reporter = DailyReporter(
             self.account_id,
