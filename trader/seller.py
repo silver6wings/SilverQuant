@@ -1,3 +1,4 @@
+import math
 import datetime
 import logging
 import pandas as pd
@@ -13,7 +14,7 @@ class BaseSeller:
     def __init__(self, strategy_name: str, delegate: BaseDelegate, parameters):
         self.strategy_name = strategy_name
         self.delegate = delegate
-        self.order_premium = parameters.order_premium
+        self.order_premium = parameters.order_premium if hasattr(parameters, 'order_premium') else 0.03
 
     def order_sell(self, code, quote, volume, remark, log=True) -> None:
         if volume > 0:
@@ -92,3 +93,13 @@ class BaseSeller:
         history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
     ) -> bool:
         return False  # False 表示没有卖过，不阻挡其他Seller卖出
+
+
+class LimitedSeller(BaseSeller):
+    def __init__(self, strategy_name: str, delegate: BaseDelegate, parameters):
+        super().__init__(strategy_name, delegate, parameters)
+        self.order_percent = parameters.order_percent if hasattr(parameters, 'order_percent') else 1.00
+
+    def order_sell(self, code, quote, volume, remark, log=True) -> None:
+        volume = math.floor(volume / 100 * self.order_percent) * 100    # 向下取整
+        super().order_sell(code, quote, volume, remark, log)

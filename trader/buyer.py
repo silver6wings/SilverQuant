@@ -14,7 +14,7 @@ class BaseBuyer:
         strategy_name: str,
         delegate: BaseDelegate,
         parameters,
-        risk_control: bool = False,
+        risk_control: bool = False,  # 打开意味着策略每次下单有最大额度限制
     ):
         self.account_id = account_id
         self.strategy_name = strategy_name
@@ -83,3 +83,36 @@ class BaseBuyer:
                     remark=remark)
         else:
             print(f'{code} 挂单买量为0，不委托')
+
+
+class LimitedBuyer(BaseBuyer):
+    def __init__(
+        self,
+        account_id: str,
+        strategy_name: str,
+        delegate: BaseDelegate,
+        parameters,
+        risk_control: bool = False,
+        volume_ratio: float = 1.00,  # 每次下单的 volume 是 capacity 的百分比可以调整
+    ):
+        super().__init__(
+            account_id,
+            strategy_name,
+            delegate,
+            parameters,
+            risk_control,
+        )
+        self.volume_ratio = volume_ratio
+
+    def order_buy(
+        self,
+        code: str,
+        price: float,
+        last_close: float,
+        volume: int,
+        remark: str,
+        market: bool = True,
+        log: bool = True,
+    ):
+        volume = math.floor(volume / 100 * self.volume_ratio) * 100     # 向下取整
+        super().order_buy(code, price, last_close, volume, remark, market, log)
