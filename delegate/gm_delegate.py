@@ -1,6 +1,7 @@
 """
 https://sim.myquant.cn/sim/help/Python.html
 """
+import datetime
 from typing import List
 
 from gmtrade.api import *
@@ -12,6 +13,7 @@ from delegate.gm_callback import GmCallback
 from credentials import GM_ACCOUNT_ID, GM_CLIENT_TOKEN
 
 from tools.utils_basic import code_to_gmsymbol, gmsymbol_to_code
+from tools.utils_cache import StockNames
 from tools.utils_ding import BaseMessager
 
 
@@ -60,6 +62,8 @@ class GmDelegate(BaseDelegate):
 
         self.account = account(account_id=GM_ACCOUNT_ID, account_alias='')
         login(self.account)
+
+        self.stock_names = StockNames()
 
         if callback is not None:
             self.callback = callback
@@ -114,10 +118,12 @@ class GmDelegate(BaseDelegate):
         """
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
-                f'{code}市买{volume}股{price:.2f}元',
-                '')
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 委买 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[+BUY]')
 
         orders = order_volume(
             symbol=code_to_gmsymbol(code),
@@ -140,10 +146,12 @@ class GmDelegate(BaseDelegate):
     ):
         print(f'[{remark}]{code}')
         if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
                 f'[{self.account_id}]{strategy_name} {remark}\n'
-                f'{code}市卖{volume}股{price:.2f}元',
-                '')
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 委卖 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[+SELL]')
 
         orders = order_volume(
             symbol=code_to_gmsymbol(code),
