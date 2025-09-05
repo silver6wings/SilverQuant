@@ -1,6 +1,8 @@
 import datetime
 import logging
 
+from decimal import Decimal, ROUND_HALF_UP
+
 
 # pandas dataframe 显示配置优化
 def pd_show_all() -> None:
@@ -263,13 +265,16 @@ def get_limiting_up_rate(code_or_symbol: str) -> float:
 
 # 获取涨停价
 def get_limit_up_price(code_or_symbol: str, pre_close: float) -> float:
-    if pre_close is None or pre_close == 0:
-        return 0
+    if pre_close is None or pre_close <= 0:
+        return 0.0
 
     limit_rate = get_limiting_up_rate(code_or_symbol)
-    limit = pre_close * limit_rate
-    limit = '%.2f' % limit
-    return float(limit)
+
+    pre_close_dec = Decimal(str(pre_close)).quantize(Decimal('0.00'))
+    limit_price_dec = pre_close_dec * Decimal(str(limit_rate))
+    limit_price_dec = limit_price_dec.quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
+
+    return float(limit_price_dec)
 
 
 # 获取跌停幅
@@ -284,13 +289,16 @@ def get_limiting_down_rate(code_or_symbol: str) -> float:
 
 # 获取跌停价
 def get_limit_down_price(code_or_symbol: str, pre_close: float) -> float:
-    if pre_close is None or pre_close == 0:
-        return 0
+    if pre_close is None or pre_close <= 0:
+        return 0.0
 
     limit_rate = get_limiting_down_rate(code_or_symbol)
-    limit = pre_close * limit_rate
-    limit = '%.2f' % limit
-    return float(limit)
+
+    pre_close_dec = Decimal(str(pre_close)).quantize(Decimal('0.00'))
+    limit_price_dec = pre_close_dec * Decimal(str(limit_rate))
+    limit_price_dec = limit_price_dec.quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
+
+    return float(limit_price_dec)
 
 
 # TODO
