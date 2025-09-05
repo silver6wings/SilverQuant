@@ -14,6 +14,7 @@ from tools.utils_basic import symbol_to_code
 
 trade_day_cache = {}
 trade_max_year_key = 'max_year'
+
 TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
@@ -97,12 +98,20 @@ def load_stock_code_and_names(retention_day: int = 1):
                 df['代码'] = df['代码'].str[2:]
 
             df = df[['代码', '名称']]
+
+            try:
+                etf_df = ak.fund_etf_spot_em()
+                etf_df = etf_df[['代码', '名称']]
+                df = pd.concat([df, etf_df])
+            except Exception as e:
+                print('Download remote ETF code and names failed! ', e)
+
             df = df.sort_values(by='代码')
             df['日期'] = datetime.datetime.today().strftime('%Y-%m-%d')
 
             df.to_csv(CODE_NAME_CACHE_PATH)
         except Exception as e:
-            print('Download remote code and names failed! ', e)
+            print('Download remote stock code and names failed! ', e)
 
     return df
 
