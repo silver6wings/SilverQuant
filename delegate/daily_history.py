@@ -1,5 +1,6 @@
 import os
 import datetime
+import time
 
 import pandas as pd
 
@@ -32,7 +33,7 @@ class DailyHistoryCache:
 class DailyHistory:
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     default_root_path: str = '_cache/_daily'
-    default_data_source: int = DataSource.MOOTDX
+    default_data_source: str = DataSource.MOOTDX
     # TUSHARE 数据源 不要超过8000，7000为安全
     # MOOTDX 数据源 不要超过800，700为安全
     default_init_day_count: int = 550   # 默认足够覆盖两年
@@ -43,7 +44,7 @@ class DailyHistory:
         data_source: DataSource = default_data_source,
         init_day_count: int = default_init_day_count,
     ):
-        self.root_path = root_path
+        self.root_path = root_path + data_source
         self.data_source = data_source
         self.init_day_count = init_day_count
 
@@ -198,6 +199,7 @@ class DailyHistory:
         updated_count = 0
         group_size = 990
         for i in range(0, len(loss_list), group_size):
+            time.sleep(0.5)
             group_codes = [sub_code for sub_code in loss_list[i:i + group_size]]
 
             dfs = get_ts_daily_histories(

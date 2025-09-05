@@ -306,12 +306,12 @@ class XtSubscriber(BaseSubscriber):
             return
 
         if self.is_ticks_df:
-            pickle_file = './_cache/debug/tick_history.pkl'
+            pickle_file = f'./_cache/debug/tick_history_{self.strategy_name}.pkl'
             with open(pickle_file, 'wb') as f:
                 pickle.dump(self.today_ticks, f)
             print(f"当日tick数据已存储为 {pickle_file} 文件")
         else:
-            json_file = './_cache/debug/tick_history.json'
+            json_file = f'./_cache/debug/tick_history_{self.strategy_name}.json'
             with open(json_file, 'w') as file:
                 json.dump(self.today_ticks, file, indent=4)
             print(f"当日tick数据已存储为 {json_file} 文件")
