@@ -338,7 +338,6 @@ class XtSubscriber(BaseSubscriber):
         down_count = 0
         for i in range(0, len(target_codes), group_size):
             sub_codes = [sub_code for sub_code in target_codes[i:i + group_size]]
-            time.sleep(1)
             print(i, sub_codes)  # 已更新数量
 
             # TUSHARE 批量下载限制总共8000天条数据，所以暂时弃用
@@ -351,11 +350,10 @@ class XtSubscriber(BaseSubscriber):
             # 默认使用 AKSHARE 数据源
             for code in sub_codes:
                 df = get_daily_history(code, start, end, columns=columns, adjust=adjust, data_source=data_source)
+                time.sleep(0.5)
                 if df is not None:
                     self.cache_history[code] = df
                     down_count += 1
-                if data_source == DataSource.TUSHARE:
-                    time.sleep(0.1)
 
         print(f'Download completed with {down_count} stock histories succeed!')
         t1 = datetime.datetime.now()

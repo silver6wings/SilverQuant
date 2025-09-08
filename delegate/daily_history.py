@@ -120,12 +120,14 @@ class DailyHistory:
                     adjust=ExitRight.QFQ,
                     data_source=self.data_source,
                 )
+                time.sleep(0.5)
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue
                 else:
                     df.to_csv(f'{self.root_path}/{code}.csv', index=False)
                     downloaded_count += 1
+
             print(f'[{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
         # 有可能是当天新股没有数据，下载失败也正常
         print(f'Download finished with {len(download_failure)} fails: {download_failure}')
