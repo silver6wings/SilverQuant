@@ -44,7 +44,7 @@ class DailyHistory:
         data_source: DataSource = default_data_source,
         init_day_count: int = default_init_day_count,
     ):
-        self.root_path = root_path + data_source
+        self.root_path = f'{root_path}_{data_source}'
         self.data_source = data_source
         self.init_day_count = init_day_count
 
