@@ -9,7 +9,7 @@ from xtquant.xttrader import XtQuantTrader
 from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
 from credentials import *
-from tools.utils_basic import get_code_exchange
+from tools.utils_basic import get_code_exchange, is_stock
 from delegate.base_delegate import BaseDelegate
 from delegate.xt_callback import XtDefaultCallback
 
@@ -327,8 +327,11 @@ def is_position_holding(position: XtPosition) -> bool:
     return position.volume > 0
 
 
-def get_holding_position_count(positions: List[XtPosition]) -> int:
-    return sum(1 for position in positions if is_position_holding(position))
+def get_holding_position_count(positions: List[XtPosition], only_stock=False) -> int:
+    if only_stock:
+        return sum(1 for position in positions if is_stock(position.stock_code) and is_position_holding(position))
+    else:
+        return sum(1 for position in positions if is_position_holding(position))
 
 
 def xt_stop_exit():
