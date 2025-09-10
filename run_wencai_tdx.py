@@ -74,7 +74,7 @@ class SellConf:
     switch_hold_days = 5            # 持仓天数
     switch_demand_daily_up = 0.002  # 换仓上限乘数
 
-    # 利润从最高点回撤卖出
+    # 利润从最高点回落卖出
     fall_time_range = ['09:31', '14:57']
     fall_from_top = [
         (1.08, 9.99, 0.02),
@@ -244,7 +244,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
-    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "(测)"
+    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
     print(f'正在启动 {STRATEGY_NAME}...')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback

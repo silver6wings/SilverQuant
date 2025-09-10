@@ -70,7 +70,7 @@ class SellConf:
     risk_limit = 1 - 0.03           # 硬性止损率
     risk_tight = 0.003              # 硬性止损率每日上移
 
-    # 利润从最高点回撤卖出
+    # 利润从最高点回落卖出
     fall_time_range = ['09:31', '14:57']
     fall_from_top = [         # 至少保留收益范围
         (1.05, 9.99, 0.02),  # [2.900 % ~ 879.020 %)
@@ -128,7 +128,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
-    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "(测)"
+    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
     print(f'正在启动 {STRATEGY_NAME}...')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
