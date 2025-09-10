@@ -28,6 +28,7 @@ class XtDelegate(BaseDelegate):
         client_path: str = None,
         callback: object = None,
         keep_run: bool = True,
+        account_type: str = 'STOCK',
     ):
         super().__init__()
         self.xt_trader: Optional[XtQuantTrader] = None
@@ -38,7 +39,7 @@ class XtDelegate(BaseDelegate):
 
         if account_id is None:
             account_id = default_account_id
-        self.account = StockAccount(account_id=account_id, account_type='STOCK')
+        self.account = StockAccount(account_id=account_id, account_type=account_type)
         self.callback = callback
         self.connect(self.callback)
         if keep_run:
