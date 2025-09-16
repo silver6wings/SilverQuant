@@ -21,7 +21,7 @@ class DailyHistoryCache:
 
     def __init__(self):
         self.data_source = DailyHistory.default_data_source
-        self.set_data_source(self.data_source)
+        # init 之后一定set之后daily_history才不会是None
 
     def set_data_source(self, data_source: DataSource):
         if self.daily_history is None or self.data_source != data_source:
@@ -33,7 +33,7 @@ class DailyHistoryCache:
 class DailyHistory:
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     default_root_path: str = '_cache/_daily'
-    default_data_source: str = DataSource.MOOTDX
+    default_data_source: DataSource = DataSource.MOOTDX
     # TUSHARE 数据源 不要超过8000，7000为安全
     # MOOTDX 数据源 不要超过800，700为安全
     default_init_day_count: int = 550   # 默认足够覆盖两年

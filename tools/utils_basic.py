@@ -89,13 +89,16 @@ def code_to_tdxsymbol(code: str) -> str:
 
 
 def tdxsymbol_to_code(tdxsymbol: str) -> str:
-    if tdxsymbol[0] == '0':
+    if len(tdxsymbol) != 7:
+        return tdxsymbol    # 这里先不变，不报错
+    elif tdxsymbol[0] == '0':
         return tdxsymbol[1:7] + '.SZ'
     elif tdxsymbol[0] == '1':
         return tdxsymbol[1:7] + '.SH'
     elif tdxsymbol[0] == '2':
         return tdxsymbol[1:7] + '.BJ'
-    return tdxsymbol    # 这里先不变，不报错
+    else:
+        return tdxsymbol    # 这里先不变，不报错
 
 
 def symbol_to_tdxsymbol(code: str) -> str:
@@ -172,6 +175,12 @@ def is_stock_20cm(code_or_symbol: str | int):
     """ 判断是不是20cm票 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
     return code_or_symbol[:2] in ['30', '68']
+
+
+def is_stock_30cm(code_or_symbol: str | int):
+    """ 判断是不是20cm票 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    return code_or_symbol[:2] in ['82', '83', '87', '88', '43', '92']
 
 
 def is_stock_cy(code_or_symbol: str | int):

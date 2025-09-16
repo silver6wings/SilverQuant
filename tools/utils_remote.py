@@ -41,7 +41,9 @@ def get_tdx_zxg_code(filename: str = DEFAULT_ZXG_FILE) -> list[str]:
     with open(filename) as f:
         f_reader = csv.reader(f)
         for row in f_reader:
-            ret_list.append(tdxsymbol_to_code(''.join(row)))
+            code = tdxsymbol_to_code(''.join(row))
+            if len(code) > 0:
+                ret_list.append(code)
     return ret_list
 
 

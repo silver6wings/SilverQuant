@@ -1,4 +1,5 @@
 import time
+import datetime
 from threading import Thread
 from typing import List, Optional
 
@@ -10,6 +11,9 @@ from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
 from credentials import *
 from tools.utils_basic import get_code_exchange, is_stock
+from tools.utils_cache import StockNames
+from tools.utils_ding import BaseMessager
+
 from delegate.base_delegate import BaseDelegate
 from delegate.xt_callback import XtDefaultCallback
 
@@ -28,9 +32,13 @@ class XtDelegate(BaseDelegate):
         client_path: str = None,
         callback: object = None,
         keep_run: bool = True,
+        ding_messager: BaseMessager = None,
         account_type: str = 'STOCK',
     ):
         super().__init__()
+        self.ding_messager = ding_messager
+        self.stock_names = StockNames()
+
         self.xt_trader: Optional[XtQuantTrader] = None
 
         if client_path is None:
@@ -222,6 +230,13 @@ class XtDelegate(BaseDelegate):
             order_remark=remark,
         )
 
+        if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市买 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[MB]')
+
     def order_market_close(
         self,
         code: str,
@@ -249,6 +264,13 @@ class XtDelegate(BaseDelegate):
             order_remark=remark,
         )
 
+        if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市卖 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[MS]')
+
     def order_limit_open(
         self,
         code: str,
@@ -266,6 +288,13 @@ class XtDelegate(BaseDelegate):
             strategy_name=strategy_name,
             order_remark=remark,
         )
+
+        if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限买 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[LB]')
 
     def order_limit_close(
         self,
@@ -285,6 +314,13 @@ class XtDelegate(BaseDelegate):
             order_remark=remark,
         )
 
+        if self.ding_messager is not None:
+            name = self.stock_names.get_name(code)
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限卖 {code}\n'
+                f'{name} {volume}股 {price:.2f}元',
+                '[LS]')
+
     # # 已报
     # ORDER_REPORTED = 50
     # # 已报待撤
@@ -294,22 +330,37 @@ class XtDelegate(BaseDelegate):
     # # 部撤
     # ORDER_PART_CANCEL = 53
 
-    def order_cancel_all(self):
+    def order_cancel_all(self, strategy_name: str = 'non-name'):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             self.order_cancel_async(order.order_id)
 
-    def order_cancel_buy(self, code: str):
+        if self.ding_messager is not None:
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 全撤\n'
+                '[CA]')
+
+    def order_cancel_buy(self, code: str, strategy_name: str = 'non-name'):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_BUY:
                 self.order_cancel_async(order.order_id)
 
-    def order_cancel_sell(self, code: str):
+        if self.ding_messager is not None:
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤买 {code}\n'
+                '[CB]')
+
+    def order_cancel_sell(self, code: str, strategy_name: str = 'non-name'):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_SELL:
                 self.order_cancel_async(order.order_id)
+
+        if self.ding_messager is not None:
+            self.ding_messager.send_text_as_md(
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤卖 {code}\n'
+                '[CS]')
 
     def check_ipo_data(self) -> dict:
         if self.xt_trader is not None:

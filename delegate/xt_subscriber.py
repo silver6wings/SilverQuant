@@ -18,7 +18,7 @@ from delegate.daily_reporter import DailyReporter
 from tools.utils_cache import StockNames, check_is_open_day
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
-from tools.utils_remote import DataSource, get_daily_history, qmt_quote_to_tick
+from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
 
 
 def check_open_day(func):
@@ -93,7 +93,7 @@ class XtSubscriber(BaseSubscriber):
         self.use_outside_data = use_outside_data
         self.use_ap_scheduler = use_ap_scheduler
         if self.use_outside_data:
-            self.use_ap_scheduler = True # 如果use_outside_data 被设置为True，则需强制使用apscheduler
+            self.use_ap_scheduler = True  # 如果use_outside_data 被设置为True，则需强制使用apscheduler
 
         self.daily_reporter = DailyReporter(
             self.account_id,
@@ -326,9 +326,9 @@ class XtSubscriber(BaseSubscriber):
         target_codes: list,
         start: str,
         end: str,
-        adjust: str,
+        adjust: ExitRight,
         columns: list[str],
-        data_source: int,
+        data_source: DataSource,
     ):
         print(f'Prepared TIME RANGE: {start} - {end}')
         t0 = datetime.datetime.now()
@@ -365,7 +365,7 @@ class XtSubscriber(BaseSubscriber):
         code_list: list[str],
         start: str,
         end: str,
-        adjust: str,
+        adjust: ExitRight,
         columns: list[str],
         data_source: DataSource,
     ):
@@ -490,10 +490,10 @@ class XtSubscriber(BaseSubscriber):
         self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=1, second=0)
 
         try:
-            print('策略定时器任务已经启动！')
+            print('[定时器已启动]')
             self.scheduler.start()
         except KeyboardInterrupt:
-            print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+            print('[手动结束进程]')
         except Exception as e:
             print('策略定时器出错：', e)
         finally:
@@ -567,10 +567,10 @@ class XtSubscriber(BaseSubscriber):
 
             # 启动定时器
             try:
-                print('策略定时器任务已经启动！')
+                print('[定时器已启动]')
                 self.scheduler.start()
             except KeyboardInterrupt:
-                print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+                print('[手动结束进程]')
             except Exception as e:
                 print('策略定时器出错：', e)
             finally:
@@ -599,7 +599,7 @@ class XtSubscriber(BaseSubscriber):
             #         schedule.run_pending()
             #         time.sleep(1)
             # except KeyboardInterrupt:
-            #     print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+            #     print('[手动结束进程]')
             # finally:
             #     schedule.clear()
             #     self.delegate.shutdown()

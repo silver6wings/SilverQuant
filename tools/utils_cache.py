@@ -80,6 +80,8 @@ class StockNames:
 def load_stock_code_and_names(retention_day: int = 1):
     cache_available = False
     df = pd.DataFrame(columns=['代码', '名称', '日期'])
+
+    # 如果有缓存就先Load，然后再看是否过期
     if os.path.exists(CODE_NAME_CACHE_PATH):
         df = pd.read_csv(CODE_NAME_CACHE_PATH, dtype={'代码': str})
         cache_date_str = df['日期'].head(1).values[0]
@@ -88,6 +90,7 @@ def load_stock_code_and_names(retention_day: int = 1):
         if curr_date - cache_date < datetime.timedelta(days=retention_day):
             cache_available = True
 
+    # 过期就尝试下载并缓存新的覆盖旧版本
     if not cache_available:
         try:
             df = ak.stock_info_a_code_name()
@@ -104,14 +107,14 @@ def load_stock_code_and_names(retention_day: int = 1):
                 etf_df = etf_df[['代码', '名称']]
                 df = pd.concat([df, etf_df])
             except Exception as e:
-                print('Download remote ETF code and names failed! ', e)
+                print('Update remote ETF code and names failed! ', e)
 
             df = df.sort_values(by='代码')
             df['日期'] = datetime.datetime.today().strftime('%Y-%m-%d')
 
             df.to_csv(CODE_NAME_CACHE_PATH)
         except Exception as e:
-            print('Download remote stock code and names failed! ', e)
+            print('Update remote stock code and names failed! ', e)
 
     return df
 

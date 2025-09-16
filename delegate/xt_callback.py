@@ -134,7 +134,7 @@ class XtCustomCallback(XtBaseCallback):
                     f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
-                    '[SELL]')
+                    '[SOLD]')
 
         elif trade.order_type == xtconstant.STOCK_BUY:
             new_held(self.disk_lock, self.path_held, [stock_code])
@@ -153,7 +153,7 @@ class XtCustomCallback(XtBaseCallback):
                     f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
-                    '[BUY]')
+                    '[BOUGHT]')
 
         if self.stock_traded_callback is not None:
             self.stock_traded_callback(trade)
@@ -173,8 +173,8 @@ class XtCustomCallback(XtBaseCallback):
         logging.warning(log)
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name} 低封撤单\n'
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤成\n'
+                f'[{self.account_id}]{self.strategy_name} 撤单成功\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} {res.cancel_result}\n'
                 '[CANCEL]')
 
     def on_cancel_error(self, cancel_error: XtCancelError):

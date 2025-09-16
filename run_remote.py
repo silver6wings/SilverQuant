@@ -34,11 +34,9 @@ PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
 PATH_HELD = PATH_BASE + '/held_days.json'       # 记录持仓日期
 PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
-PATH_LOGS = PATH_BASE + '/logs.txt'             # 用来存储选股和委托操作
+PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
 PATH_INFO = PATH_BASE + '/tmp_{}.pkl'           # 用来缓存当天的指标信息
-
-disk_lock = threading.Lock()           # 操作磁盘文件缓存的锁
-
+disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 
 
@@ -298,6 +296,7 @@ if __name__ == '__main__':
             account_id=QMT_ACCOUNT_ID,
             client_path=QMT_CLIENT_PATH,
             callback=my_callback,
+            ding_messager=DING_MESSAGER,
         )
     else:
         from delegate.gm_callback import GmCallback
@@ -372,12 +371,12 @@ if __name__ == '__main__':
             my_suber.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 
     try:
-        print('策略定时器任务已经启动！')
+        print('[定时器已启动]')
         while True:
             schedule.run_pending()
             time.sleep(1)
     except KeyboardInterrupt:
-        print('手动结束进程，请检查缓存文件是否因读写中断导致空文件错误')
+        print('[手动结束进程]')
     finally:
         schedule.clear()
         my_delegate.shutdown()

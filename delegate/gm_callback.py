@@ -149,18 +149,18 @@ class GmCallback:
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text_as_md(
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖出成交 {stock_code}\n'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
-                    '[SELL]')
+                    '[SOLD]')
 
-            if order.side == OrderSide_Buy:
+            elif order.side == OrderSide_Buy:
                 new_held(self.disk_lock, self.path_held, [stock_code])
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text_as_md(
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买入成交 {stock_code}\n'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
-                    '[BUY]')
+                    '[BOUGHT]')
 
         else:
             print(order.status, order.symbol)

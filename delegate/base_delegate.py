@@ -62,13 +62,13 @@ class BaseDelegate(ABC):
         pass
 
     @abstractmethod
-    def order_cancel_all(self):
+    def order_cancel_all(self, strategy_name: str = 'non-name'):
         pass
 
     @abstractmethod
-    def order_cancel_buy(self, code: str):
+    def order_cancel_buy(self, code: str, strategy_name: str = 'non-name'):
         pass
 
     @abstractmethod
-    def order_cancel_sell(self, code: str):
+    def order_cancel_sell(self, code: str, strategy_name: str = 'non-name'):
         pass
