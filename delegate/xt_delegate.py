@@ -211,21 +211,22 @@ class XtDelegate(BaseDelegate):
         remark: str,
         strategy_name: str = 'non-name',
     ):
-        price_type = xtconstant.LATEST_PRICE
-
         if get_code_exchange(code) == 'SZ':
             price_type = xtconstant.MARKET_SZ_CONVERT_5_CANCEL
-            price = -1
-        if get_code_exchange(code) == 'SH':
+            price_submit = -1
+        elif get_code_exchange(code) == 'SH':
             price_type = xtconstant.MARKET_PEER_PRICE_FIRST
-            price = price
+            price_submit = price
+        else:
+            price_type = xtconstant.LATEST_PRICE
+            price_submit = price
 
         self.order_submit(
             stock_code=code,
             order_type=xtconstant.STOCK_BUY,
             order_volume=volume,
             price_type=price_type,
-            price=price,
+            price=price_submit,
             strategy_name=strategy_name,
             order_remark=remark,
         )
@@ -245,21 +246,22 @@ class XtDelegate(BaseDelegate):
         remark: str,
         strategy_name: str = 'non-name',
     ):
-        price_type = xtconstant.LATEST_PRICE
-
         if get_code_exchange(code) == 'SZ':
             price_type = xtconstant.MARKET_SZ_CONVERT_5_CANCEL
-            price = -1
-        if get_code_exchange(code) == 'SH':
+            price_submit = -1
+        elif get_code_exchange(code) == 'SH':
             price_type = xtconstant.MARKET_PEER_PRICE_FIRST
-            price = price
+            price_submit = price
+        else:
+            price_type = xtconstant.LATEST_PRICE
+            price_submit = price
 
         self.order_submit(
             stock_code=code,
             order_type=xtconstant.STOCK_SELL,
             order_volume=volume,
             price_type=price_type,
-            price=price,
+            price=price_submit,
             strategy_name=strategy_name,
             order_remark=remark,
         )
