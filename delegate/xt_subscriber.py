@@ -89,6 +89,7 @@ class XtSubscriber(BaseSubscriber):
         self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
         self.last_callback_time = datetime.datetime.now()
+        self.__extend_codes = ['399001.SZ', '510230.SH', '512680.SH', '159915.SZ', '510500.SH', '588000.SH', '159101.SZ', '399006.SZ', '159315.SZ']
 
         self.use_outside_data = use_outside_data
         self.use_ap_scheduler = use_ap_scheduler
@@ -257,6 +258,9 @@ class XtSubscriber(BaseSubscriber):
     def update_code_list(self, code_list: list[str]):
         # 加上证指数防止没数据不打点
         self.code_list = ['000001.SH'] + code_list
+        extend = 10 - len(self.code_list)
+        if extend > 0:
+            self.code_list.extend(self.__extend_codes[:extend]) #防止数据太少长时间不返回数据导致断流
 
     # -----------------------
     # 盘中实时的tick历史
