@@ -357,13 +357,13 @@ def hms_to_past_seconds(hour: int, minute: int, second: int) -> int:
         return 3600 * 4
 
 
-def xt_time_tag_to_hms(time_tag: str) -> int:
+def xt_time_tag_to_hms(time_tag: str) -> tuple[int, int, int]:
     dt = datetime.datetime.strptime(time_tag, '%Y%m%d %H:%M:%S')
     return dt.hour, dt.minute, dt.second
 
 
-def xt_time_tag_to_past_seconds(time_tag: int) -> int:
-    hour, minute, second = xt_time_tag_to_hms(time_tag)
+def xt_time_tag_to_past_seconds(time_tag: int | str) -> int:
+    hour, minute, second = xt_time_tag_to_hms(str(time_tag))
     return hms_to_past_seconds(hour, minute, second)
 
 

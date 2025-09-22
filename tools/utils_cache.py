@@ -434,11 +434,13 @@ def get_index_constituent_symbols(index_symbol: str) -> list[str]:
     if index_symbol[:2] in ['00', '93', '89']:
         # 中证指数接口
         index_file = f'./_cache/_index_{index_symbol}.pkl'
-        if not os.path.exists(index_file) or (datetime.datetime.now().timestamp() - os.path.getmtime(index_file) > 23*60*60): #很难遇到的情况就是中证网站卡死
+        if not os.path.exists(index_file) or \
+                (datetime.datetime.now().timestamp() - os.path.getmtime(index_file) > 23 * 60 * 60):
             try:
                 df = ak.index_stock_cons_csindex(symbol=index_symbol)
                 df.to_pickle(index_file)
             except Exception as e:
+                # 很难遇到的情况就是中证网站维护不可用
                 if os.path.exists(index_file):
                     df = pd.read_pickle(index_file)
                 else:
