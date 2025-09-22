@@ -293,6 +293,8 @@ class XtDelegate(BaseDelegate):
 
         if self.ding_messager is not None:
             name = self.stock_names.get_name(code)
+            if name == '[Unknown]': #打新申购
+                return
             self.ding_messager.send_text_as_md(
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 限买 {code}\n'
                 f'{name} {volume}股 {price:.2f}元',
