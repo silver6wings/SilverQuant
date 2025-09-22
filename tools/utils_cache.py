@@ -433,7 +433,18 @@ def check_is_open_day(curr_date: str) -> bool:
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
     if index_symbol[:2] in ['00', '93', '89']:
         # 中证指数接口
-        df = ak.index_stock_cons_csindex(symbol=index_symbol)
+        index_file = f'./_cache/_index_{index_symbol}.pkl'
+        if not os.path.exists(index_file) or (datetime.datetime.now().timestamp() - os.path.getmtime(index_file) > 23*60*60): #很难遇到的情况就是中证网站卡死
+            try:
+                df = ak.index_stock_cons_csindex(symbol=index_symbol)
+                df.to_pickle(index_file)
+            except Exception as e:
+                if os.path.exists(index_file):
+                    df = pd.read_pickle(index_file)
+                else:
+                    df = ak.index_stock_cons(symbol=index_symbol)
+        else:
+            df = pd.read_pickle(index_file)
     else:
         # 普通指数接口：有重复不全，需要注意
         df = ak.index_stock_cons(symbol=index_symbol)
