@@ -393,6 +393,7 @@ class XtSubscriber(BaseSubscriber):
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
+            hc.daily_history.remove_recent_exit_right_histories(20)
             hc.daily_history.download_recent_daily(20)  # 一个月数据
 
             # 计算两个日期之间的差值
@@ -477,12 +478,15 @@ class XtSubscriber(BaseSubscriber):
             self.scheduler.add_job(self.callback_run_no_quotes, 'cron', **cron_params, id=f"run_{idx}")
 
         if self.before_trade_day is not None:
-            self.scheduler.add_job(self.before_trade_day_wrapper, 'cron', hour=8, minute=random.randint(0, 25) + 5)
+            random_hour = random.randint(0, 3) + 3
+            random_minute = random.randint(0, 59)
+            self.scheduler.add_job(self.before_trade_day_wrapper, 'cron', hour=random_hour, minute=random_minute)
 
         if self.finish_trade_day is not None:
-            self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random.randint(0, 10) + 5)
+            random_minute = random.randint(0, 10) + 5
+            self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
-        self.scheduler.add_job(prev_check_open_day, 'cron', hour=8, minute=0, second=0)
+        self.scheduler.add_job(prev_check_open_day, 'cron', hour=1, minute=0, second=0)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=9, minute=14, second=59)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=11, minute=30, second=0)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=12, minute=59, second=59)
@@ -575,6 +579,12 @@ class XtSubscriber(BaseSubscriber):
                 print('策略定时器出错：', e)
             finally:
                 self.delegate.shutdown()
+                try:
+                    import sys
+                    sys.exit(0)
+                except SystemExit:
+                    import os
+                    os._exit(0)
         else:
             # 旧版 schedule
             import schedule

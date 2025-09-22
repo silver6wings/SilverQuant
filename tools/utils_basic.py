@@ -339,3 +339,42 @@ def time_diff_seconds(later_time: datetime.datetime.time, early_time: datetime.d
     diff_seconds = abs(total_seconds_time1 - total_seconds_time2)
 
     return diff_seconds
+
+
+# 迅投相关数据
+# past_seconds 当日交易日已经过去多少秒，计算量比这类指标需要
+def hms_to_past_seconds(hour: int, minute: int, second: int) -> int:
+    time_int = hour * 100 + minute
+    if time_int < 930:
+        return 0
+    elif 930 <= time_int < 1130:
+        return hour * 3600 + minute * 60 + second - (3600 * 9 + 60 * 30)
+    elif 1130 <= time_int < 1300:
+        return 3600 * 2
+    elif 1300 <= time_int < 1500:
+        return hour * 3600 + minute * 60 + second - (3600 * 13) + 3600 * 2
+    else:
+        return 3600 * 4
+
+
+def xt_time_tag_to_hms(time_tag: str) -> int:
+    dt = datetime.datetime.strptime(time_tag, '%Y%m%d %H:%M:%S')
+    return dt.hour, dt.minute, dt.second
+
+
+def xt_time_tag_to_past_seconds(time_tag: int) -> int:
+    hour, minute, second = xt_time_tag_to_hms(time_tag)
+    return hms_to_past_seconds(hour, minute, second)
+
+
+# sub_whole 的 quotes 时间格式
+def xt_time_to_hms(timestamp: int) -> tuple[int, int, int]:
+    if len(str(timestamp)) > 10:
+        timestamp = timestamp // 1000
+        dt = datetime.datetime.fromtimestamp(timestamp)
+        return dt.hour, dt.minute, dt.second
+
+
+def xt_time_to_past_seconds(timestamp: int) -> int:
+    hour, minute, second = xt_time_to_hms(timestamp)
+    return hms_to_past_seconds(hour, minute, second)

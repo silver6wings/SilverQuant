@@ -316,3 +316,50 @@ class DailyHistory:
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
         print(f'\nFinished with {i} files updated')
+
+
+    # ==============
+    #  除权更新逻辑
+    # ==============
+    def remove_single_history(self, code: str) -> bool:
+        file_path = f'{self.root_path}/{code}.csv'
+        try:
+            if not os.path.exists(file_path):
+                return False
+
+            if not os.path.isfile(file_path):
+                return False
+
+            os.remove(file_path)
+            return True
+
+        except PermissionError:
+            print(f'No Permission deleting {file_path}')
+            return False
+        except OSError as e:
+            print('Error when deleting: {e}')
+            return False
+
+    def get_recent_exit_right_codes(self, days: int) -> list[str]:
+        import akshare as ak
+        ans = []
+        now = datetime.datetime.now()
+        for i in range(days-1, -1, -1):
+            date_str = get_prev_trading_date(now, i)
+            df = ak.news_trade_notify_dividend_baidu(date=date_str)
+            if df is not None and len(df) > 0 and '股票代码' in df.columns:
+                codes = [symbol_to_code(symbol) for symbol in df['股票代码'].values if len(symbol) == 6]
+                print(codes)
+                ans += codes
+        return ans
+
+    def remove_recent_exit_right_histories(self, days: int) -> None:
+        codes = self.get_recent_exit_right_codes(days)
+
+        removed_count = 0
+        for code in codes:
+            print(code)
+            if self.remove_single_history(code):
+                removed_count += 1
+
+        print(f'Removed {removed_count} histories with Exit Right announced')

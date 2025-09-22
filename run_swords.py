@@ -358,3 +358,8 @@ if __name__ == '__main__':
     finally:
         schedule.clear()
         my_delegate.shutdown()
+        try:
+            import sys
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
