@@ -324,9 +324,6 @@ class DailyHistory:
     def remove_single_history(self, code: str) -> bool:
         file_path = f'{self.root_path}/{code}.csv'
         try:
-            if not os.path.exists(file_path):
-                return False
-
             if not os.path.isfile(file_path):
                 return False
 

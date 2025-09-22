@@ -406,10 +406,3 @@ def download_sector_data():
     """解决板块数据下载卡顿问题"""
     client = xtdata.get_client()
     client.down_all_sector_data()  
-
-
-if __name__ == '__main__':
-    # my_delegate = XtDelegate()
-    # my_delegate.xt_trader.run_forever()
-    # my_delegate.xt_trader.stop()
-    print(xt_get_ticks(['000001.SZ']))
