@@ -515,7 +515,7 @@ class XtSubscriber(BaseSubscriber):
 
         # 默认定时任务列表
         cron_jobs = [
-            ['08:00', prev_check_open_day, None],
+            ['01:00', prev_check_open_day, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],
