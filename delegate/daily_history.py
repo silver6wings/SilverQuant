@@ -328,6 +328,7 @@ class DailyHistory:
                 return False
 
             os.remove(file_path)
+            # del self.cache_history[code]
             return True
 
         except PermissionError:
@@ -346,7 +347,7 @@ class DailyHistory:
             df = ak.news_trade_notify_dividend_baidu(date=date_str)
             if df is not None and len(df) > 0 and '股票代码' in df.columns:
                 codes = [symbol_to_code(symbol) for symbol in df['股票代码'].values if len(symbol) == 6]
-                print(codes)
+                # print(codes)
                 ans += codes
         return ans
 
@@ -355,7 +356,7 @@ class DailyHistory:
 
         removed_count = 0
         for code in codes:
-            print(code)
+            # print(code)
             if self.remove_single_history(code):
                 removed_count += 1
 

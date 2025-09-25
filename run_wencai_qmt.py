@@ -92,7 +92,8 @@ class SellConf:
 # ======== 盘前 ========
 
 
-def held_increase() -> None:
+def before_trade_day() -> None:
+    # held_increase() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
         return
 
@@ -101,8 +102,7 @@ def held_increase() -> None:
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'All held stock day +1!')
 
-
-def refresh_code_list():
+    # refresh_code_list() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
         return
 
@@ -300,6 +300,7 @@ if __name__ == '__main__':
         path_deal=PATH_DEAL,
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
+        before_trade_day=before_trade_day,
         use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_today_deal_report=True,

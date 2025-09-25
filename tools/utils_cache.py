@@ -57,9 +57,9 @@ class StockNames:
             self.load_codes_and_names()
 
     def load_codes_and_names(self):
-        print('Loading codes and names...', end='')
+        print('Loading codes and names started.', end='')
         self._data = get_stock_codes_and_names()
-        print('Complete!')
+        print('Loading codes and names finished!')
 
     def get_code_list(self) -> list:
         return list(self._data.keys())
@@ -444,12 +444,15 @@ def get_index_constituent_symbols(index_symbol: str) -> list[str]:
                 if os.path.exists(index_file):
                     df = pd.read_pickle(index_file)
                 else:
+                    # 实在不行用一些会出现重复不全问题的接口作为 fallback
                     df = ak.index_stock_cons(symbol=index_symbol)
+                    print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
         else:
             df = pd.read_pickle(index_file)
     else:
         # 普通指数接口：有重复不全，需要注意
         df = ak.index_stock_cons(symbol=index_symbol)
+        print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
 
     if '品种代码' in df.columns:
         return [str(code).zfill(6) for code in df['品种代码'].values]

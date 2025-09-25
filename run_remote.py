@@ -111,7 +111,7 @@ def held_increase() -> None:
         print(f'All held stock day +1!')
 
 
-def refresh_code_list():
+def refresh_code_list() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
         return
 

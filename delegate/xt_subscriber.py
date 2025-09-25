@@ -131,15 +131,14 @@ class XtSubscriber(BaseSubscriber):
         with self.lock_quotes_update:
             self.cache_quotes.update(quotes)  # 合并最新数据
 
-        if self.open_tick and (not self.quick_ticks):
-            self.record_tick_to_memory(quotes)  # 更全（默认：先记录再执行）
-
         # 执行策略
         if self.cache_limits['prev_seconds'] != curr_seconds:
             self.cache_limits['prev_seconds'] = curr_seconds
 
             if int(curr_seconds) % self.execute_interval == 0:
-                print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
+                # 更全（默认：先记录再执行）
+                if self.open_tick and (not self.quick_ticks):
+                    self.record_tick_to_memory(quotes)
 
                 if self.execute_strategy(
                     curr_date,      # str(%Y-%m-%d)
@@ -148,9 +147,13 @@ class XtSubscriber(BaseSubscriber):
                     self.cache_quotes,
                 ):
                     with self.lock_quotes_update:
-                        if self.open_tick and self.quick_ticks:
-                            self.record_tick_to_memory(self.cache_quotes)  # 更快（先执行再记录）
                         self.cache_quotes.clear()  # execute_strategy() return True means need clear
+
+                # 更快（先执行再记录）
+                if self.open_tick and self.quick_ticks:
+                    self.record_tick_to_memory(self.cache_quotes)
+
+                print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
 
     def callback_run_no_quotes(self) -> None:
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -226,8 +229,8 @@ class XtSubscriber(BaseSubscriber):
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                          f'{"恢复" if resume else "启动"} {len(self.code_list) - 1}支')
-        print('[启动行情订阅]', end='')
+                                          f'{"恢复" if resume else "开启"} {len(self.code_list)}支')
+        print('[开启行情订阅]', end='')
         xtdata.enable_hello = False
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
 
@@ -237,7 +240,7 @@ class XtSubscriber(BaseSubscriber):
 
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
-            print('\n[关闭行情订阅]')
+            print('\n[结束行情订阅]')
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                               f'{"暂停" if pause else "关闭"}')
@@ -253,7 +256,7 @@ class XtSubscriber(BaseSubscriber):
 
         if self.messager is not None and notice:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                          f'重启 {len(self.code_list) - 1}支')
+                                          f'重启 {len(self.code_list)}支')
         print('\n[重启行情订阅]', end='')
     
     def update_code_list(self, code_list: list[str]):
