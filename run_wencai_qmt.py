@@ -17,9 +17,9 @@ from trader.seller_groups import ClassicGroupSeller as Seller
 
 from selector.select_wencai import get_prompt
 
-select_prompt = get_prompt()
 
 STRATEGY_NAME = '问财选股'
+SELECT_PROMPT = get_prompt()
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
@@ -103,9 +103,6 @@ def before_trade_day() -> None:
         print(f'All held stock day +1!')
 
     # refresh_code_list() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
     my_pool.refresh()
     positions = my_delegate.check_positions()
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
@@ -116,7 +113,7 @@ def before_trade_day() -> None:
 
 
 def pull_stock_codes() -> List[str]:
-    codes_wencai = get_wencai_codes([select_prompt])
+    codes_wencai = get_wencai_codes([SELECT_PROMPT])
     codes_top = []
 
     for code in codes_wencai:

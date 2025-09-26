@@ -135,6 +135,8 @@ class XtSubscriber(BaseSubscriber):
         if self.cache_limits['prev_seconds'] != curr_seconds:
             self.cache_limits['prev_seconds'] = curr_seconds
 
+            print_mark = '.' if len(self.cache_quotes) > 0 else 'x'
+
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
                 if self.open_tick and (not self.quick_ticks):
@@ -153,7 +155,7 @@ class XtSubscriber(BaseSubscriber):
                 if self.open_tick and self.quick_ticks:
                     self.record_tick_to_memory(self.cache_quotes)
 
-                print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
+                print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
     def callback_run_no_quotes(self) -> None:
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -412,7 +414,7 @@ class XtSubscriber(BaseSubscriber):
             self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'加载历史{len(self.cache_history)}支')
+                                              f'日线{len(self.cache_history)}支')
         else:
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
@@ -485,12 +487,12 @@ class XtSubscriber(BaseSubscriber):
         for idx, cron_params in enumerate(run_time_ranges):
             self.scheduler.add_job(self.callback_run_no_quotes, 'cron', **cron_params, id=f"run_{idx}")
 
-        if self.before_trade_day is not None:
+        if self.before_trade_day is not None:   # 03:00 ~ 06:59
             random_hour = random.randint(0, 3) + 3
             random_minute = random.randint(0, 59)
             self.scheduler.add_job(self.before_trade_day_wrapper, 'cron', hour=random_hour, minute=random_minute)
 
-        if self.finish_trade_day is not None:
+        if self.finish_trade_day is not None:   # 16:05 ~ 16:15
             random_minute = random.randint(0, 10) + 5
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
@@ -530,14 +532,14 @@ class XtSubscriber(BaseSubscriber):
             cron_jobs.append(['15:10', self.save_tick_history, None])
 
         if self.before_trade_day is not None:
-            cron_jobs.append([
-                f'0{random.randint(0, 3) + 4}:{random.randint(0, 59)}',
+            cron_jobs.append([  # 03:00 ~ 06:59
+                f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}',
                 self.before_trade_day_wrapper,
                 None,
             ])  # random时间为了跑多个策略时防止短期预加载数据流量压力过大
 
         if self.finish_trade_day is not None:
-            cron_jobs.append([
+            cron_jobs.append([  # 16:05 ~ 16:15
                 f'16:{random.randint(0, 10) + 5}',
                 self.finish_trade_day_wrapper,
                 None,
@@ -662,3 +664,11 @@ def update_position_held(lock: threading.Lock, delegate: XtDelegate, path: str):
             print('当前空仓！')
 
         save_json(path, held_days)
+
+
+# -----------------------
+# 临时获取quotes
+# -----------------------
+def xt_get_ticks(code_list: list[str]) -> dict[str, any]:
+    # http://docs.thinktrader.net/pages/36f5df/#%E8%8E%B7%E5%8F%96%E5%85%A8%E6%8E%A8%E6%95%B0%E6%8D%AE
+    return xtdata.get_full_tick(code_list)

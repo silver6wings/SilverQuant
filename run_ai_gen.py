@@ -98,6 +98,7 @@ class SellConf:
 
 # ======== 盘前 ========
 
+
 def before_trade_day() -> None:
     # held_increase() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -109,18 +110,12 @@ def before_trade_day() -> None:
         print(f'All held stock day +1!')
 
     # refresh_code_list() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
     my_pool.refresh()
     positions = my_delegate.check_positions()
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
     my_suber.update_code_list(my_pool.get_code_list() + hold_list)
 
     # prepare_history() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
     now = datetime.datetime.now()
     for i in range(15, 30):
         delete_file(PATH_INFO.format((now - datetime.timedelta(days=i)).strftime('%Y_%m_%d')))

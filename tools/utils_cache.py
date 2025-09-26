@@ -57,7 +57,7 @@ class StockNames:
             self.load_codes_and_names()
 
     def load_codes_and_names(self):
-        print('Loading codes and names started.', end='')
+        print('Loading codes and names started... ', end='')
         self._data = get_stock_codes_and_names()
         print('Loading codes and names finished!')
 

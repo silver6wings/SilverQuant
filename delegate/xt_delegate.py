@@ -5,7 +5,6 @@ from typing import List, Optional
 
 from xtquant import xtconstant, xtdata
 from xtquant.xtconstant import STOCK_BUY, STOCK_SELL
-from xtquant.xtdata import get_full_tick
 from xtquant.xttrader import XtQuantTrader
 from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
@@ -395,11 +394,6 @@ def xt_stop_exit():
         time.sleep(default_wait_duration)
         if not client.is_connected():
             print('行情服务连接断开...')
-
-
-def xt_get_ticks(code_list: list[str]):
-    # http://docs.thinktrader.net/pages/36f5df/#%E8%8E%B7%E5%8F%96%E5%85%A8%E6%8E%A8%E6%95%B0%E6%8D%AE
-    return get_full_tick(code_list)
 
 
 def download_sector_data():
