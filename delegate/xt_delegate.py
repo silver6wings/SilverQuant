@@ -37,6 +37,7 @@ class XtDelegate(BaseDelegate):
         super().__init__()
         self.ding_messager = ding_messager
         self.stock_names = StockNames()
+        self.is_open_day = True # 默认交易日
 
         self.xt_trader: Optional[XtQuantTrader] = None
 
@@ -90,7 +91,7 @@ class XtDelegate(BaseDelegate):
         return self.xt_trader, True
 
     def reconnect(self) -> None:
-        if self.xt_trader is None:
+        if self.xt_trader is None and self.is_open_day == True: # 仅交易日重连
             print('开始重连交易接口')
             _, success = self.connect(self.callback)
             if success:
