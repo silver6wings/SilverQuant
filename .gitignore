@@ -169,6 +169,3 @@ _cache/debug/
 _cache/prod_pwc/
 _cache/staging_pwc/
 _cache/test_pwc/
-
-# credential
-credentials.py
