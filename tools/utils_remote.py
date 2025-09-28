@@ -388,9 +388,12 @@ def get_mootdx_daily_history(
 
                 is_appended = False
                 xdxr_info = xdxr.loc[xdxr['category'] == 1]
+
                 now = datetime.datetime.now()
                 curr_date = now.strftime("%Y-%m-%d")
-                if not xdxr_info.empty and xdxr_info.index[-1].date() == now.date():
+
+                # 默认除权日当天之前的数据一样进行处理
+                if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
                     last_row = df.iloc[-1].copy()
                     last_row['datetime'] = curr_date
                     df.loc[len(df)] = last_row
@@ -401,8 +404,10 @@ def get_mootdx_daily_history(
                     df = make_qfq(df, xdxr)
                 elif adjust == ExitRight.HFQ:
                     df = make_hfq(df, xdxr)
+
                 if is_appended  == True:
                     df = df[:-1]
+
         except Exception as e:
             print(f' mootdx get xdxr {code} error: ', e)
             return None
