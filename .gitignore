@@ -159,13 +159,12 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 
 .DS_Store
-
 .idea/
-
-# project only
 *.dmp
 
 _cache/debug/
 _cache/prod_pwc/
 _cache/staging_pwc/
 _cache/test_pwc/
+
+credentials.py

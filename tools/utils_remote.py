@@ -9,11 +9,6 @@ from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_t
 from tools.utils_cache import TRADE_DAY_CACHE_PATH
 from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq
 
-from credentials import TDX_FOLDER
-
-
-DEFAULT_ZXG_FILE = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
-
 
 class DataSource:
     AKSHARE = 'akshare'
@@ -27,8 +22,10 @@ class ExitRight:
     HFQ = 'hfq'  # 后复权
 
 
-def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_ZXG_FILE):
-    # 打开或创建CSV文件并指定写入模式, newline=''则不生成空行
+def set_tdx_zxg_code(data: list[str], filename: str = None):
+    if filename is None:
+        from credentials import TDX_FOLDER
+        filename = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         for item in data:
@@ -36,7 +33,10 @@ def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_ZXG_FILE):
     print(f"已成功将数据写入{filename}文件！")
 
 
-def get_tdx_zxg_code(filename: str = DEFAULT_ZXG_FILE) -> list[str]:
+def get_tdx_zxg_code(filename: str = None) -> list[str]:
+    if filename is None:
+        from credentials import TDX_FOLDER
+        filename = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
     ret_list = []
     with open(filename) as f:
         f_reader = csv.reader(f)
