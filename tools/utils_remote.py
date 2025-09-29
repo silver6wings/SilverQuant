@@ -21,22 +21,29 @@ class ExitRight:
     QFQ = 'qfq'  # 前复权
     HFQ = 'hfq'  # 后复权
 
+try:
+    from credentials import TDX_FOLDER
+    DEFAULT_TDX_PATH = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'  # 自选股文件
+except:
+    DEFAULT_TDX_PATH = None
 
-def set_tdx_zxg_code(data: list[str], filename: str = None):
+
+def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_TDX_PATH) -> None:
     if filename is None:
-        from credentials import TDX_FOLDER
-        filename = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
+        print(f'路径为空，放弃写入自选股')
+        return
+
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         for item in data:
             writer.writerow([code_to_tdxsymbol(item)])
-    print(f"已成功将数据写入{filename}文件！")
+    print(f'已成功将数据写入自选股文件：{filename}')
 
 
-def get_tdx_zxg_code(filename: str = None) -> list[str]:
+def get_tdx_zxg_code(filename: str = DEFAULT_TDX_PATH) -> list[str]:
     if filename is None:
-        from credentials import TDX_FOLDER
-        filename = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
+        return []
+
     ret_list = []
     with open(filename) as f:
         f_reader = csv.reader(f)
