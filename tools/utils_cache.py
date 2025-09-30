@@ -379,6 +379,24 @@ def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool
         return trading_day_list[trading_index - count]
 
 
+def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool = True) -> str:
+    trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    today = now.strftime('%Y-%m-%d')
+    try:
+        trading_index = list(trading_day_list).index(today)
+    except ValueError:
+        trading_index = np.searchsorted(trading_day_list, today) - 1
+
+    if trading_index + count < len(trading_day_list):
+        if basic_format:
+            return trading_day_list[trading_index + count].replace('-', '')
+        else:
+            return trading_day_list[trading_index + count]
+    else:
+        print('找不到目标，默认返回已知最晚的交易日')
+        return trading_day_list[-1]
+
+
 # 检查当日是否是交易日，使用sina数据源
 def check_is_open_day_sina(curr_date: str) -> bool:
     """

@@ -58,6 +58,7 @@ class XtSubscriber(BaseSubscriber):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
         self.delegate = delegate
+        self.delegate.subscriber = self
 
         self.path_deal = path_deal
         self.path_assets = path_assets

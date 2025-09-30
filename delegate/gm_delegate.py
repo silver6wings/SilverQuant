@@ -17,7 +17,8 @@ from tools.utils_cache import StockNames
 from tools.utils_ding import BaseMessager
 
 
-GM_SERVER_HOST = 'api.myquant.cn:9000'
+DEFAULT_GM_SERVER_HOST = 'api.myquant.cn:9000'
+DEFAULT_GM_STRATEGY_NAME = '模拟策略'
 
 
 class GmAsset:
@@ -64,7 +65,7 @@ class GmDelegate(BaseDelegate):
 
         self.account_id = '**' + str(account_id)[-4:]
 
-        set_endpoint(GM_SERVER_HOST)
+        set_endpoint(DEFAULT_GM_SERVER_HOST)
         set_token(GM_CLIENT_TOKEN)
 
         self.account = account(account_id=GM_ACCOUNT_ID, account_alias='')
@@ -95,7 +96,7 @@ class GmDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_GM_STRATEGY_NAME,
     ):
         """
         [
@@ -146,7 +147,7 @@ class GmDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_GM_STRATEGY_NAME,
     ):
         orders = order_volume(
             symbol=code_to_gmsymbol(code),
@@ -173,7 +174,7 @@ class GmDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_GM_STRATEGY_NAME,
     ):
         """
         [
@@ -223,7 +224,7 @@ class GmDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_GM_STRATEGY_NAME,
     ):
         orders = order_volume(
             symbol=code_to_gmsymbol(code),
@@ -243,7 +244,7 @@ class GmDelegate(BaseDelegate):
                 '[LS]')
         return orders
 
-    def order_cancel_all(self, strategy_name: str = 'non-name'):
+    def order_cancel_all(self, strategy_name: str = DEFAULT_GM_STRATEGY_NAME):
         order_cancel_all()
 
         if self.ding_messager is not None:
@@ -256,7 +257,7 @@ class GmDelegate(BaseDelegate):
     # orders = [order_1, order_2]
     # order_cancel(wait_cancel_orders=orders)
 
-    def order_cancel_buy(self, code: str, strategy_name: str = 'non-name'):
+    def order_cancel_buy(self, code: str, strategy_name: str = DEFAULT_GM_STRATEGY_NAME):
         orders = get_orders()
         candidate = []
         for order in orders:
@@ -274,7 +275,7 @@ class GmDelegate(BaseDelegate):
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤买 {code}\n'
                 '[CB]')
 
-    def order_cancel_sell(self, code: str, strategy_name: str = 'non-name'):
+    def order_cancel_sell(self, code: str, strategy_name: str = DEFAULT_GM_STRATEGY_NAME):
         orders = get_orders()
         candidate = []
         for order in orders:
