@@ -1,3 +1,4 @@
+import sys
 import time
 import datetime
 from threading import Thread
@@ -15,7 +16,8 @@ from tools.utils_ding import BaseMessager
 
 from delegate.base_delegate import BaseDelegate
 from delegate.xt_callback import XtDefaultCallback
-from delegate.xt_subscriber import XtSubscriber
+if 'delegate.xt_subscriber' not in sys.modules:
+    from delegate.xt_subscriber import XtSubscriber
 
 
 DEFAULT_RECONNECT_SECONDS = 60
