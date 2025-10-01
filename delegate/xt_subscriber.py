@@ -15,7 +15,7 @@ from delegate.xt_delegate import XtDelegate
 from delegate.daily_history import DailyHistoryCache
 from delegate.daily_reporter import DailyReporter
 
-from tools.utils_cache import StockNames, check_is_open_day
+from tools.utils_cache import StockNames, InfoItem, check_is_open_day
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
@@ -625,7 +625,6 @@ class XtSubscriber(BaseSubscriber):
             #     schedule.clear()
             #     self.delegate.shutdown()
 
-
     # -----------------------
     # 检查是否交易日
     # -----------------------
@@ -644,28 +643,26 @@ class XtSubscriber(BaseSubscriber):
 def update_position_held(lock: threading.Lock, delegate: XtDelegate, path: str):
     with lock:
         positions = delegate.check_positions()
+        held_info = load_json(path)
 
-        held_days = load_json(path)
-
-        # 添加未被缓存记录的持仓
+        # 添加未被缓存记录的持仓：默认当日买入
         for position in positions:
             if position.can_use_volume > 0:
-                if position.stock_code not in held_days.keys():
-                    held_days[position.stock_code] = 0
+                if position.stock_code not in held_info.keys():
+                    held_info[position.stock_code] = {InfoItem.DayCount: 0}
 
+        # 删除已清仓的held_info记录
         if positions is not None and len(positions) > 0:
-            # 删除已清仓的held_days记录
             position_codes = [position.stock_code for position in positions]
             print('当前持仓：', position_codes)
-            holding_codes = list(held_days.keys())
+            holding_codes = list(held_info.keys())
             for code in holding_codes:
-                if len(code) > 0 and code[0] != '_':
-                    if code not in position_codes:
-                        del held_days[code]
+                if len(code) > 0 and code[0] != '_' and (code not in position_codes):
+                    del held_info[code]
         else:
             print('当前空仓！')
 
-        save_json(path, held_days)
+        save_json(path, held_info)
 
 
 # -----------------------

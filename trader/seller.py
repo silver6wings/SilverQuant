@@ -8,6 +8,7 @@ from xtquant.xttype import XtPosition
 
 from delegate.base_delegate import BaseDelegate
 from tools.utils_basic import get_limit_down_price
+from tools.utils_cache import InfoItem
 
 
 class BaseSeller:
@@ -57,7 +58,7 @@ class BaseSeller:
         curr_date: str,
         curr_time: str,
         positions: List[XtPosition],
-        held_days: Dict[str, int],
+        held_info: Dict[str, Dict],
         max_prices: Dict[str, float],
         cache_history: Dict[str, pd.DataFrame],
         today_ticks: Dict[str, list] = None,
@@ -72,9 +73,8 @@ class BaseSeller:
         for position in positions:
             code = position.stock_code
 
-
             # 如果有数据且有持仓时间记录
-            if (code in quotes) and (code in held_days):
+            if (code in quotes) and (code in held_info):
                 quote = quotes[code]
                 if quote['open'] > 0 and quote['volume'] > 0:  # 确认当前股票没有停牌
                     self.check_sell(
@@ -83,7 +83,7 @@ class BaseSeller:
                         curr_date=curr_date,
                         curr_time=curr_time,
                         position=position,
-                        held_day=held_days[code],
+                        held_day=held_info[code][InfoItem.DayCount],
                         max_price=max_prices[code] if code in max_prices else None,
                         history=cache_history[code] if code in cache_history else None,
                         ticks=today_ticks[code] if code in today_ticks else None,

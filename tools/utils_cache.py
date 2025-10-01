@@ -19,6 +19,7 @@ TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
 
+
 # 指数常量
 class IndexSymbol:
     INDEX_SH_ZS = '000001'      # 上证指数
@@ -39,6 +40,12 @@ class IndexSymbol:
     INDEX_ZX_100 = '399005'     # 中小100
     INDEX_ZZ_A50 = '000050'     # 中证A50
     INDEX_ZZ_A500 = '000510'    # 中证A500
+
+
+# 仓位项常量
+class InfoItem:
+    DayCount = 'day_count'
+    IncDate = '_inc_date'
 
 
 # 查询股票名称
@@ -214,19 +221,17 @@ def del_keys(lock: threading.Lock, path: str, keys: List[str]) -> None:
 # 所有缓存持仓天数+1，_inc_date为单日判重标记位
 def all_held_inc(held_operation_lock: threading.Lock, path: str) -> bool:
     with held_operation_lock:
-        held_days = load_json(path)
-
+        held_info = load_json(path)
         today = datetime.datetime.now().strftime('%Y-%m-%d')
-        inc_date_key = '_inc_date'
 
         try:
-            if (inc_date_key not in held_days) or (held_days[inc_date_key] != today):
-                held_days[inc_date_key] = today
-                for code in held_days.keys():
-                    if code != inc_date_key:
-                        held_days[code] += 1
+            if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
+                held_info[InfoItem.IncDate] = today
+                for code in held_info.keys():
+                    if code != InfoItem.IncDate:
+                        held_info[code][InfoItem] += 1
 
-                save_json(path, held_days)
+                save_json(path, held_info)
                 return True
             else:
                 return False
@@ -238,10 +243,10 @@ def all_held_inc(held_operation_lock: threading.Lock, path: str) -> bool:
 # 增加新的持仓记录
 def new_held(held_operation_lock: threading.Lock, path: str, codes: List[str]) -> None:
     with held_operation_lock:
-        held_days = load_json(path)
+        held_info = load_json(path)
         for code in codes:
-            held_days[code] = 0
-        save_json(path, held_days)
+            held_info[code][InfoItem.DayCount] = 0
+        save_json(path, held_info)
 
 
 # 更新持仓股买入开始最高价格
@@ -251,10 +256,10 @@ def update_max_prices(
     positions: list,
     path_max_prices: str,
     path_min_prices: str,
-    path_held_days: str,
+    path_held_info: str,
     ignore_open_day: bool = True,  # 是否忽略开仓日，从次日开始计算最高价
 ):
-    held_days = load_json(path_held_days)
+    held_info = load_json(path_held_info)
 
     with lock:
         max_prices = load_json(path_max_prices)
@@ -265,9 +270,9 @@ def update_max_prices(
 
     for position in positions:
         code = position.stock_code
-        if code in held_days:  # 只更新持仓超过一天的
+        if code in held_info:  # 只更新持仓超过一天的
             if ignore_open_day:  # 忽略开仓日的最高价
-                held_day = held_days[code]
+                held_day = held_info[code][InfoItem.DayCount]
                 if held_day <= 0:
                     continue
 
@@ -302,7 +307,7 @@ def update_max_prices(
         with lock:
             save_json(path_min_prices, min_prices)
 
-    return max_prices, held_days
+    return max_prices, held_info
 
 
 # 获取磁盘文件中的symbol列表，假设一行是一个symbol
