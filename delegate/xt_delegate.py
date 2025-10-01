@@ -371,13 +371,49 @@ class XtDelegate(BaseDelegate):
             return self.xt_trader.query_ipo_data()
         else:
             raise Exception('xt_trader为空')
-        
+
     def check_new_purchase_limit(self) -> dict:
         if self.xt_trader is not None:
             return self.xt_trader.query_new_purchase_limit(self.account)
         else:
             raise Exception('xt_trader为空')
 
+    @check_open_day
+    def purchase_ipo_stocks(self, buy_type = 'ALL'):
+        '''
+        申购新股，可自行定时运行
+        :param buy_type: 'ALL' 申购所有新股，'STOCK' 只申购新股不申购新债
+        :return: 返回申购的新股列表
+        '''
+        selections = []
+        if self.xt_trader is not None:
+            ipodata = self.xt_trader.query_ipo_data()
+            limit_info = self.xt_trader.query_new_purchase_limit(self.account)
+        else:
+            return selections
+
+        for code in ipodata:
+            issuePrice = ipodata[code]['issuePrice']
+            market = code[-2:]
+            if market not in limit_info:
+                continue
+            if buy_type == 'STOCK' and ipodata[code]['type'] == 'BOND':
+                continue
+            volume = min(ipodata[code]['maxPurchaseNum'], limit_info[market])
+            if volume <= 0:
+                continue
+            selection = {
+                            'code': code,
+                            'volume': volume,
+                            'name': ipodata[code]['name'],
+                            'type': ipodata[code]['type'],
+                            'issuePrice': issuePrice,
+                        }
+            self.stock_names._data[code] = ipodata[code]['name']  # 临时加入股票名称缓存
+            self.order_limit_open(code, issuePrice, volume, '新股申购', self.strategy_name)
+            selections.append(selection)
+        return selections
+    
 
 def is_position_holding(position: XtPosition) -> bool:
     return position.volume > 0
