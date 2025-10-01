@@ -1,5 +1,10 @@
+import os
+import sys
 import math
 import logging
+
+# 添加父目录到模块搜索路径，方便设置开机启动任务
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from credentials import *
 
@@ -17,7 +22,7 @@ from trader.seller_groups import WencaiGroupSeller as Seller
 from selector.select_wencai import get_prompt
 
 
-STRATEGY_NAME = '问财选股'
+STRATEGY_NAME = '问财TDX'
 SELECT_PROMPT = get_prompt()
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
@@ -27,7 +32,7 @@ PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
-PATH_HELD = PATH_BASE + '/held_days.json'       # 记录持仓日期
+PATH_HELD = PATH_BASE + '/positions.json'       # 记录持仓信息
 PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
@@ -116,7 +121,6 @@ def before_trade_day() -> None:
 
 def pull_stock_codes() -> List[str]:
     codes_wencai = get_wencai_codes([SELECT_PROMPT])
-    print(codes_wencai)
     codes_top = []
 
     for code in codes_wencai:
@@ -211,10 +215,10 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
     tdx_quotes = get_mootdx_quotes(hold_list)
-    print(f'[{len(tdx_quotes.keys())}|{len(quotes)}]', end='')
+    print(f'[{hold_list}|{len(tdx_quotes.keys())}|{len(quotes)}]', end='')
 
-    max_prices, held_days = update_max_prices(disk_lock, tdx_quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
-    my_seller.execute_sell(tdx_quotes, curr_date, curr_time, positions, held_days, max_prices, my_suber.cache_history)
+    max_prices, held_info = update_max_prices(disk_lock, tdx_quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+    my_seller.execute_sell(tdx_quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========

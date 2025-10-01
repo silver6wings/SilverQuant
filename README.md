@@ -216,7 +216,7 @@ Sell Conf 卖点相关的参数
 > * `deal_hist.csv` 里记录的是交易单委托历史
 > 
 > 要在`CACHE_BASE_PATH`对应的目录里查看缓存是否正确，可以参考如下：
-> * `held_days.json` 里记录的是持仓天数
+> * `positions.json` 里记录的是持仓天数
 > * `max_price.json` 里记录的是历史最高价格
 
 ## 设计理念

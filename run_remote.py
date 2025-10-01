@@ -30,7 +30,7 @@ PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
-PATH_HELD = PATH_BASE + '/held_days.json'       # 记录持仓日期
+PATH_HELD = PATH_BASE + '/positions.json'       # 记录持仓信息
 PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
@@ -249,8 +249,8 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 
 
 def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_days = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
-    my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_days, max_prices, my_suber.cache_history)
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+    my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
