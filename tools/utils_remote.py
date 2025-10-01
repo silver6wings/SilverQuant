@@ -9,11 +9,6 @@ from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_t
 from tools.utils_cache import TRADE_DAY_CACHE_PATH
 from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq
 
-from credentials import TDX_FOLDER
-
-
-DEFAULT_ZXG_FILE = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'     # 自选股文件
-
 
 class DataSource:
     AKSHARE = 'akshare'
@@ -26,17 +21,29 @@ class ExitRight:
     QFQ = 'qfq'  # 前复权
     HFQ = 'hfq'  # 后复权
 
+try:
+    from credentials import TDX_FOLDER
+    DEFAULT_TDX_PATH = TDX_FOLDER + r'\T0002\blocknew\ZXG.blk'  # 自选股文件
+except:
+    DEFAULT_TDX_PATH = None
 
-def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_ZXG_FILE):
-    # 打开或创建CSV文件并指定写入模式, newline=''则不生成空行
+
+def set_tdx_zxg_code(data: list[str], filename: str = DEFAULT_TDX_PATH) -> None:
+    if filename is None:
+        print(f'路径为空，放弃写入自选股')
+        return
+
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         for item in data:
             writer.writerow([code_to_tdxsymbol(item)])
-    print(f"已成功将数据写入{filename}文件！")
+    print(f'已成功将数据写入自选股文件：{filename}')
 
 
-def get_tdx_zxg_code(filename: str = DEFAULT_ZXG_FILE) -> list[str]:
+def get_tdx_zxg_code(filename: str = DEFAULT_TDX_PATH) -> list[str]:
+    if filename is None:
+        return []
+
     ret_list = []
     with open(filename) as f:
         f_reader = csv.reader(f)
@@ -386,10 +393,28 @@ def get_mootdx_daily_history(
                 xdxr['datetime'] = pd.to_datetime(xdxr['date_str'] + ' 15:00:00')
                 xdxr = xdxr.set_index('datetime')
 
+                is_appended = False
+                xdxr_info = xdxr.loc[xdxr['category'] == 1]
+
+                now = datetime.datetime.now()
+                curr_date = now.strftime("%Y-%m-%d")
+
+                # 默认除权日当天之前的数据一样进行处理
+                if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
+                    last_row = df.iloc[-1].copy()
+                    last_row['datetime'] = curr_date
+                    df.loc[len(df)] = last_row
+                    df.index = pd.to_datetime(df['datetime'].astype(str), errors="coerce")
+                    is_appended  = True
+                
                 if adjust == ExitRight.QFQ:
                     df = make_qfq(df, xdxr)
                 elif adjust == ExitRight.HFQ:
                     df = make_hfq(df, xdxr)
+
+                if is_appended  == True:
+                    df = df[:-1]
+
         except Exception as e:
             print(f' mootdx get xdxr {code} error: ', e)
             return None
@@ -436,3 +461,77 @@ def get_daily_history(
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
         # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)
+
+
+# =======================
+#  Convert daily history
+# =======================
+
+
+def convert_daily_to_weekly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为周线数据（datetime为该周内最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 周线数据的DataFrame，按周一到周日合并，datetime为周内最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，同时新增datetime类型列用于分组（确定属于哪一周）
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime类型索引进行周分组
+
+    # 2. 按周一到周日分组（周区间：[周一, 下周一)）
+    weekly_groups = data.resample('W-MON', closed='left', label='left')  # 分组逻辑不变，仅用于划分周范围
+
+    # 3. 聚合规则：核心是对原始datetime取组内最后一个值
+    weekly_data = weekly_groups.agg({
+        'datetime': 'last',       # 周内最后一个交易日的原始整数日期
+        'open': 'first',          # 周内第一个开盘价
+        'high': 'max',            # 周内最高价
+        'low': 'min',             # 周内最低价
+        'close': 'last',          # 周内最后一个收盘价
+        'volume': 'sum',          # 周内成交量总和
+        'amount': 'sum'           # 周内成交额总和
+    }).dropna()  # 移除无数据的周
+
+    # 4. 恢复列顺序和原始数据类型
+    weekly_data = weekly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in weekly_data.columns:
+        weekly_data[col] = weekly_data[col].astype(df[col].dtype)
+
+    return weekly_data
+
+
+def convert_daily_to_monthly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为月线数据（datetime为当月最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 月线数据的DataFrame，按自然月划分（1月-12月），datetime为当月最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，新增datetime类型列用于按月分组
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime索引进行月份分组
+
+    # 2. 按自然月分组（1月1日-1月最后一天，2月1日-2月最后一天...）
+    # 频率'M'表示按月分组，默认按自然月划分
+    monthly_groups = data.resample('M')
+
+    # 3. 聚合规则：与周线逻辑一致，仅周期改为月
+    monthly_data = monthly_groups.agg({
+        'datetime': 'last',       # 当月最后一个交易日的原始整数日期
+        'open': 'first',          # 当月第一个交易日的开盘价
+        'high': 'max',            # 当月最高价
+        'low': 'min',             # 当月最低价
+        'close': 'last',          # 当月最后一个交易日的收盘价
+        'volume': 'sum',          # 当月成交量总和
+        'amount': 'sum'           # 当月成交额总和
+    }).dropna()  # 移除无数据的月份
+
+    # 4. 恢复列顺序和原始数据类型
+    monthly_data = monthly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in monthly_data.columns:
+        monthly_data[col] = monthly_data[col].astype(df[col].dtype)
+
+    return monthly_data

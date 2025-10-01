@@ -49,6 +49,7 @@ class XtSubscriber(BaseSubscriber):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
         self.delegate = delegate
+        self.delegate.subscriber = self
 
         self.path_deal = path_deal
         self.path_assets = path_assets
@@ -487,7 +488,7 @@ class XtSubscriber(BaseSubscriber):
             random_minute = random.randint(0, 10) + 5
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
-        self.scheduler.add_job(prev_check_open_day, 'cron', hour=1, minute=0, second=0)
+        self.scheduler.add_job(self.prev_check_open_day, 'cron', hour=1, minute=0, second=0)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=9, minute=14, second=59)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=11, minute=30, second=0)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=12, minute=59, second=59)
@@ -511,7 +512,7 @@ class XtSubscriber(BaseSubscriber):
 
         # 默认定时任务列表
         cron_jobs = [
-            ['01:00', prev_check_open_day, None],
+            ['01:00', self.prev_check_open_day, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],
@@ -616,15 +617,16 @@ class XtSubscriber(BaseSubscriber):
             #     self.delegate.shutdown()
 
 
-# -----------------------
-# 检查是否交易日
-# -----------------------
-def prev_check_open_day():
-    now = datetime.datetime.now()
-    curr_date = now.strftime('%Y-%m-%d')
-    curr_time = now.strftime('%H:%M')
-    print(f'[{curr_time}]', end='')
-    check_is_open_day(curr_date)
+    # -----------------------
+    # 检查是否交易日
+    # -----------------------
+    def prev_check_open_day(self):
+        now = datetime.datetime.now()
+        curr_date = now.strftime('%Y-%m-%d')
+        curr_time = now.strftime('%H:%M')
+        print(f'[{curr_time}]', end='')
+        is_open_day = check_is_open_day(curr_date)
+        self.delegate.is_open_day = is_open_day
 
 
 # -----------------------

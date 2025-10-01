@@ -15,13 +15,14 @@ from tools.utils_ding import BaseMessager
 
 from delegate.base_delegate import BaseDelegate
 from delegate.xt_callback import XtDefaultCallback
+from delegate.xt_subscriber import XtSubscriber
 
 
-default_client_path = QMT_CLIENT_PATH
-default_account_id = QMT_ACCOUNT_ID
+DEFAULT_RECONNECT_SECONDS = 60
+DEFAULT_XT_STRATEGY_NAME = '默认策略'
 
-default_reconnect_duration = 60
-default_wait_duration = 15
+DEFAULT_CLIENT_PATH = QMT_CLIENT_PATH
+DEFAULT_ACCOUNT_ID = QMT_ACCOUNT_ID
 
 
 class XtDelegate(BaseDelegate):
@@ -37,15 +38,16 @@ class XtDelegate(BaseDelegate):
         super().__init__()
         self.ding_messager = ding_messager
         self.stock_names = StockNames()
-
-        self.xt_trader: Optional[XtQuantTrader] = None
+        self.subscriber: Optional[XtSubscriber] = None  # 数据代理
+        self.xt_trader: Optional[XtQuantTrader] = None  # 交易代理
+        self.is_open_day = True  # 默认当前是交易日
 
         if client_path is None:
-            client_path = default_client_path
+            client_path = DEFAULT_CLIENT_PATH
         self.path = client_path
 
         if account_id is None:
-            account_id = default_account_id
+            account_id = DEFAULT_ACCOUNT_ID
         self.account = StockAccount(account_id=account_id, account_type=account_type)
         self.callback = callback
         self.connect(self.callback)
@@ -90,21 +92,22 @@ class XtDelegate(BaseDelegate):
         return self.xt_trader, True
 
     def reconnect(self) -> None:
-        if self.xt_trader is None:
+        if self.xt_trader is None and self.is_open_day:  # 仅在交易日重连
             print('开始重连交易接口')
             _, success = self.connect(self.callback)
             if success:
                 print('交易接口重连成功')
+                if self.subscriber is not None:
+                    self.subscriber.resubscribe_tick(True)
         # else:
         #     print('无需重连交易接口')
-        #     pass
 
     def keep_connected(self) -> None:
         while True:
-            time.sleep(default_reconnect_duration)
+            time.sleep(DEFAULT_RECONNECT_SECONDS)
             self.reconnect()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.xt_trader.stop()
         self.xt_trader = None
 
@@ -208,7 +211,7 @@ class XtDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_XT_STRATEGY_NAME,
     ):
         if get_code_exchange(code) == 'SZ':
             price_type = xtconstant.MARKET_SZ_CONVERT_5_CANCEL
@@ -243,7 +246,7 @@ class XtDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_XT_STRATEGY_NAME,
     ):
         if get_code_exchange(code) == 'SZ':
             price_type = xtconstant.MARKET_SZ_CONVERT_5_CANCEL
@@ -278,7 +281,7 @@ class XtDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_XT_STRATEGY_NAME,
     ):
         self.order_submit(
             stock_code=code,
@@ -303,7 +306,7 @@ class XtDelegate(BaseDelegate):
         price: float,
         volume: int,
         remark: str,
-        strategy_name: str = 'non-name',
+        strategy_name: str = DEFAULT_XT_STRATEGY_NAME,
     ):
         self.order_submit(
             stock_code=code,
@@ -331,7 +334,7 @@ class XtDelegate(BaseDelegate):
     # # 部撤
     # ORDER_PART_CANCEL = 53
 
-    def order_cancel_all(self, strategy_name: str = 'non-name'):
+    def order_cancel_all(self, strategy_name: str = DEFAULT_XT_STRATEGY_NAME):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             self.order_cancel_async(order.order_id)
@@ -341,7 +344,7 @@ class XtDelegate(BaseDelegate):
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 全撤\n'
                 '[CA]')
 
-    def order_cancel_buy(self, code: str, strategy_name: str = 'non-name'):
+    def order_cancel_buy(self, code: str, strategy_name: str = DEFAULT_XT_STRATEGY_NAME):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_BUY:
@@ -352,7 +355,7 @@ class XtDelegate(BaseDelegate):
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤买 {code}\n'
                 '[CB]')
 
-    def order_cancel_sell(self, code: str, strategy_name: str = 'non-name'):
+    def order_cancel_sell(self, code: str, strategy_name: str = DEFAULT_XT_STRATEGY_NAME):
         orders = self.check_orders(cancelable_only=True)
         for order in orders:
             if order.stock_code == code and order.order_type == STOCK_SELL:
@@ -391,7 +394,7 @@ def xt_stop_exit():
     import time
     client = xtdata.get_client()
     while True:
-        time.sleep(default_wait_duration)
+        time.sleep(15)  # 默认15秒之后断开
         if not client.is_connected():
             print('行情服务连接断开...')
 

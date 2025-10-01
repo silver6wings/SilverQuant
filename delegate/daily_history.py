@@ -48,7 +48,7 @@ class DailyHistory:
         self.data_source = data_source
         self.init_day_count = init_day_count
 
-        os.makedirs(root_path, exist_ok=True)
+        os.makedirs(self.root_path, exist_ok=True)
         self.cache_history: dict[str, pd.DataFrame] = {}
 
     def __getitem__(self, item: str) -> pd.DataFrame:

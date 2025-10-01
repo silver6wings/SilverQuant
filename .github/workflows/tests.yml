@@ -26,6 +26,7 @@ jobs:
 
       - name: Run tests with pytest
         run: |
+          export PYTHONPATH="${PYTHONPATH}:${{ github.workspace }}"
           pytest tests/ --cov=src --cov-report=xml
 
       - name: Upload coverage to Codecov

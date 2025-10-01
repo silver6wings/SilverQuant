@@ -1,8 +1,6 @@
 import pandas as pd
 import datetime
 
-from credentials import TDX_FOLDER
-
 
 class MootdxClientInstance:
     _instance = None
@@ -17,8 +15,12 @@ class MootdxClientInstance:
     def __init__(self):
         if self.client is None:
             from mootdx.quotes import Quotes
-            self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
             pd.set_option('future.no_silent_downcasting', True)
+            try:
+                from credentials import TDX_FOLDER
+                self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
+            except:
+                self.client = Quotes.factory(market='std')
 
 
 def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
