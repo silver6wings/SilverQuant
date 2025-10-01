@@ -148,8 +148,6 @@ class XtSubscriber(BaseSubscriber):
                     self.record_tick_to_memory(self.cache_quotes)
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
-
-    @
     
     
     def callback_run_no_quotes(self) -> None:
