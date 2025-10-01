@@ -62,9 +62,6 @@ class BuyConf:
 
 def before_trade_day():
     # held_increase() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
     update_position_held(disk_lock, my_delegate, PATH_HELD)
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
