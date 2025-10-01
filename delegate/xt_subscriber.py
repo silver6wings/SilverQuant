@@ -158,10 +158,8 @@ class XtSubscriber(BaseSubscriber):
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
+    @check_open_day
     def callback_run_no_quotes(self) -> None:
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         now = datetime.datetime.now()
         self.last_callback_time = now
 
@@ -187,18 +185,14 @@ class XtSubscriber(BaseSubscriber):
                     {},
                 )
 
+    @check_open_day
     def callback_open_no_quotes(self) -> None:
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启')
         print('[启动策略]', end='')
 
+    @check_open_day
     def callback_close_no_quotes(self) -> None:
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         print('\n[关闭策略]')
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:结束')
@@ -206,11 +200,9 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     # 监测主策略执行
     # -----------------------
+    @check_open_day
     def callback_monitor(self):
         now = datetime.datetime.now()
-
-        if not check_is_open_day(now.strftime('%Y-%m-%d')):
-            return
 
         if now - self.last_callback_time > datetime.timedelta(minutes=1):
             if self.messager is not None:
@@ -226,10 +218,8 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     # 订阅tick相关
     # -----------------------
+    @check_open_day
     def subscribe_tick(self, resume: bool = False):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                           f'{"恢复" if resume else "开启"} {len(self.code_list)}支')
@@ -237,10 +227,8 @@ class XtSubscriber(BaseSubscriber):
         xtdata.enable_hello = False
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
 
+    @check_open_day
     def unsubscribe_tick(self, pause: bool = False):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
             print('\n[结束行情订阅]')
@@ -248,10 +236,8 @@ class XtSubscriber(BaseSubscriber):
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                               f'{"暂停" if pause else "关闭"}')
 
+    @check_open_day
     def resubscribe_tick(self, notice: bool = False):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
         self.cache_limits['sub_seq'] = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
@@ -261,7 +247,7 @@ class XtSubscriber(BaseSubscriber):
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                           f'重启 {len(self.code_list)}支')
         print('\n[重启行情订阅]', end='')
-    
+
     def update_code_list(self, code_list: list[str]):
         # 加上证指数防止没数据不打点
         self.code_list = ['000001.SH'] + code_list
@@ -306,18 +292,15 @@ class XtSubscriber(BaseSubscriber):
                     [round(p, 3) if isinstance(p, (int, float)) else p for p in quote['bidPrice']],  # 买价
                     [int(v) if isinstance(v, (int, float)) else v for v in quote['bidVol']],         # 买量
                 ])
-
+    
+    @check_open_day
     def clean_ticks_history(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
         self.today_ticks.clear()
         self.today_ticks = {}
         print(f"已清除tick缓存")
 
+    @check_open_day
     def save_tick_history(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
         if self.is_ticks_df:
             pickle_file = f'./_cache/debug/tick_history_{self.strategy_name}.pkl'
             with open(pickle_file, 'wb') as f:
@@ -424,10 +407,9 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     # 盘后报告总结
     # -----------------------
+    @check_open_day
     def daily_summary(self):
         curr_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        if not check_is_open_day(curr_date):
-            return
 
         try:
             if self.open_today_deal_report:
