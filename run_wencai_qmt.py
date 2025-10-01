@@ -8,17 +8,16 @@ from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes
 
-from delegate.xt_delegate import xt_get_ticks
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
 
-from trader.pools import StocksPoolWhiteIndexes as Pool
 from trader.buyer import BaseBuyer as Buyer
+from trader.pools import StocksPoolBlackWencai as Pool
 from trader.seller_groups import ClassicGroupSeller as Seller
 
 from selector.select_wencai import get_prompt
 
 
-STRATEGY_NAME = '问财选股'
+STRATEGY_NAME = '问财QMT'
 SELECT_PROMPT = get_prompt()
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
@@ -28,11 +27,13 @@ PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
 PATH_DEAL = PATH_BASE + '/deal_hist.csv'        # 记录历史成交
-PATH_HELD = PATH_BASE + '/held_days.json'       # 记录持仓日期
+PATH_HELD = PATH_BASE + '/positions.json'       # 记录持仓信息
 PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
-PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
+PATH_LOGS = PATH_BASE + '/logs.txt'             # 用来存储选股和委托操作
+
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
+
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 cache_history: Dict[str, pd.DataFrame] = {}     # 记录历史日线行情的信息 { code: DataFrame }
 
@@ -43,12 +44,12 @@ def debug(*args, **kwargs):
 
 
 class PoolConf:
-    white_indexes = [IndexSymbol.INDEX_ZZ_ALL]
+    # white_indexes = []
     black_prompts = ['ST', '退市']
 
 
 class BuyConf:
-    time_ranges = [['14:47', '14:57']]
+    time_ranges = [['09:30', '10:30']]
 
     # wencai 尽可能时间长些，不然会被封IP
     interval = 30           # 扫描买入间隔，60的约数：1-6, 10, 12, 15, 20, 30
@@ -57,7 +58,9 @@ class BuyConf:
     slot_count = 10         # 持股数量上限
     slot_capacity = 10000   # 每个仓的资金上限
     once_buy_limit = 10     # 单次选股最多买入股票数量（若单次未买进当日不会再买这只
-    inc_limit = 1.20        # 相对于昨日收盘的涨幅限制
+
+    inc_limit = 1.07        # 相对于昨日收盘的涨幅限制
+    min_price = 3.00        # 限制最低可买入股票的现价
 
 
 class SellConf:
@@ -67,13 +70,17 @@ class SellConf:
 
     hard_time_range = ['09:31', '14:57']
     earn_limit = 9.999              # 硬性止盈率
-    risk_limit = 1 - 0.03           # 硬性止损率
+    risk_limit = 1 - 0.04           # 硬性止损率
     risk_tight = 0.002              # 硬性止损率每日上移
+
+    switch_time_range = ['09:35', '14:57']
+    switch_hold_days = 1            # 持仓天数
+    switch_demand_daily_up = 0.01   # 换仓上限乘数
 
     # 利润从最高点回落卖出
     fall_time_range = ['09:31', '14:57']
     fall_from_top = [
-        (1.08, 9.99, 0.02),
+        (1.08, 9.99, 0.03),
         (1.02, 1.08, 0.05),
     ]
 
@@ -81,11 +88,11 @@ class SellConf:
     # (A, B, C)
     return_time_range = ['09:31', '14:57']
     return_of_profit = [
-        (1.20, 9.99, 0.100),
-        (1.08, 1.20, 0.200),
-        (1.05, 1.08, 0.300),
-        (1.03, 1.05, 0.500),
-        (1.02, 1.03, 0.800),
+        (1.20, 9.99, 0.300),
+        (1.08, 1.20, 0.400),
+        (1.05, 1.08, 0.500),
+        (1.03, 1.05, 0.600),
+        (1.02, 1.03, 0.700),
     ]
 
 
@@ -114,7 +121,7 @@ def pull_stock_codes() -> List[str]:
     codes_top = []
 
     for code in codes_wencai:
-        if (code in my_pool.cache_whitelist) and (code not in my_pool.cache_blacklist):
+        if code not in my_pool.cache_blacklist:
             codes_top.append(code)
 
     return codes_top
@@ -130,15 +137,21 @@ def check_stock_codes(selected_codes: list[str], quotes: Dict) -> List[Dict[str,
 
         quote = quotes[code]
         curr_price = quote['lastPrice']
+        curr_open = quote['open']
+        prev_close = quote['lastClose']
 
-        last_close = quote['lastClose']
-        if curr_price > last_close * BuyConf.inc_limit:
+        if not curr_price > BuyConf.min_price:
+            debug(code, f'价格小于{BuyConf.min_price}')
+            continue
+
+        if not curr_open * 0.97 <= curr_price <= prev_close * BuyConf.inc_limit:
+            debug(code, f'涨幅不符合区间 {curr_open} <= {curr_price} <= {prev_close * BuyConf.inc_limit}')
             continue
 
         selection = {
             'code': code,
             'price': round(max(quote['askPrice'] + [curr_price]), 2),
-            'lastClose': round(last_close, 2),
+            'lastClose': round(quote['lastClose'], 2),
         }
         selections.append(selection)
 
@@ -147,6 +160,7 @@ def check_stock_codes(selected_codes: list[str], quotes: Dict) -> List[Dict[str,
 
 def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
     selected_codes = pull_stock_codes()
+    print(f'[{len(selected_codes)}]', end='')
 
     selections = []
     # 选出一个以上的股票
@@ -202,8 +216,8 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 
 
 def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_days = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
-    my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_days, max_prices, my_suber.cache_history)
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+    my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
@@ -248,7 +262,6 @@ if __name__ == '__main__':
             account_id=QMT_ACCOUNT_ID,
             client_path=QMT_CLIENT_PATH,
             callback=my_callback,
-            ding_messager=DING_MESSAGER,
         )
     else:
         from delegate.gm_callback import GmCallback
