@@ -4,6 +4,7 @@ import json
 import pickle
 import threading
 import datetime
+import functools
 from typing import List, Dict, Set, Optional
 
 import numpy as np
@@ -533,3 +534,13 @@ def get_stock_codes_and_circulation_mv() -> Dict[str, int]:
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     df = df[['代码', '流通市值']].dropna()
     return dict(zip(df['代码'], df['流通市值']))
+
+
+# 装饰器：检查是否是交易日，非交易日不执行函数
+def check_open_day(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return None                 # 非开放日直接 return，不执行函数
+        return func(*args, **kwargs)    # 开放日正常执行
+    return wrapper
