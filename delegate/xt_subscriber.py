@@ -15,19 +15,10 @@ from delegate.xt_delegate import XtDelegate
 from delegate.daily_history import DailyHistoryCache
 from delegate.daily_reporter import DailyReporter
 
-from tools.utils_cache import StockNames, check_is_open_day
+from tools.utils_cache import StockNames, check_is_open_day, check_open_day
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
-
-
-def check_open_day(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None                 # 非开放日直接 return，不执行函数
-        return func(*args, **kwargs)    # 开放日正常执行
-    return wrapper
 
 
 class BaseSubscriber:
