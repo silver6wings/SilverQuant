@@ -373,12 +373,21 @@ def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool
     except ValueError:
         trading_index = np.searchsorted(trading_day_list, today) - 1
 
-    if basic_format:
-        return trading_day_list[trading_index - count].replace('-', '')
+    if trading_index + count >= 0:
+        if basic_format:
+            return trading_day_list[trading_index - count].replace('-', '')
+        else:
+            return trading_day_list[trading_index - count]
     else:
-        return trading_day_list[trading_index - count]
+        print('[CACHE] 找不到目标，默认返回已知最早的交易日')
+        if basic_format:
+            return trading_day_list[0].replace('-', '')
+        else:
+            return trading_day_list[0]
 
 
+# 获取后n个交易日，返回格式 基本格式：%Y%m%d，扩展格式：%Y-%m-%d
+# 如果为非交易日，则取下一个交易日为后0天
 def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
     today = now.strftime('%Y-%m-%d')
@@ -393,8 +402,11 @@ def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool
         else:
             return trading_day_list[trading_index + count]
     else:
-        print('找不到目标，默认返回已知最晚的交易日')
-        return trading_day_list[-1]
+        print('[CACHE] 找不到目标，默认返回已知最晚的交易日')
+        if basic_format:
+            return trading_day_list[-1].replace('-', '')
+        else:
+            return trading_day_list[-1]
 
 
 # 检查当日是否是交易日，使用sina数据源
