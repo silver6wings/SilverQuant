@@ -11,7 +11,7 @@ from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
 from credentials import *
 from tools.utils_basic import get_code_exchange, is_stock
-from tools.utils_cache import StockNames
+from tools.utils_cache import StockNames, check_open_day
 from tools.utils_ding import BaseMessager
 
 from delegate.base_delegate import BaseDelegate

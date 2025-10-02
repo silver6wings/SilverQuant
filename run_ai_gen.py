@@ -18,7 +18,7 @@ from selector.selector_deepseek import select
 
 data_source = DataSource.AKSHARE
 
-STRATEGY_NAME = 'AI智选'
+STRATEGY_NAME = 'AI智选'  # DEEPSEEK 生成的策略，仅做展示使用，不保证收益
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
