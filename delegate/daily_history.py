@@ -95,7 +95,7 @@ class DailyHistory:
             return []
 
     # ==============
-    #  全量更新逻辑
+    #  内部下载代码
     # ==============
 
     def _download_codes(self, code_list: list[str], day_count: int) -> None:
@@ -132,23 +132,42 @@ class DailyHistory:
         # 有可能是当天新股没有数据，下载失败也正常
         print(f'[HISTORY] Download finished with {len(download_failure)} fails: {download_failure}')
 
+    # 自动补全本地缺失股票代码
+    def _download_local_missed(self):
+        code_list = self.get_code_list()
+        print(f'[HISTORY] Checking local missed codes from {len(code_list)}...')
+        missing_codes = []
+        for code in code_list:
+            path = f'{self.root_path}/{code}.csv'
+            if not os.path.exists(path):
+                missing_codes.append(code)
+
+        print(f'[HISTORY] Downloading missing {len(missing_codes)} codes...')
+        self._download_codes(missing_codes, self.init_day_count)
+
+    # 下载本地缺失的股票代码数据
+    def _download_remote_missed(self) -> None:
+        print('[HISTORY] Searching local missed code...')
+        prev_code_list = self.get_code_list()
+        curr_code_list = self.get_code_list(force_download=True)
+        gap_codes = []
+        for code in curr_code_list:
+            if code not in prev_code_list:
+                gap_codes.append(code)
+        print(f'[HISTORY] Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
+        self._download_codes(gap_codes, self.init_day_count)
+
+    # ==============
+    #  全量更新逻辑
+    # ==============
+
     def load_history_from_disk_to_memory(self, auto_update: bool = True) -> None:
         code_list = self.get_code_list()
         if len(code_list) == 0:
             self.download_all_to_disk()
 
-        # 自动补全本地缺失股票代码
         if auto_update:
-            code_list = self.get_code_list()
-            print(f'[HISTORY] Checking local missed codes from {len(code_list)}...', end='')
-            missing_codes = []
-            for code in code_list:
-                path = f'{self.root_path}/{code}.csv'
-                if not os.path.exists(path):
-                    missing_codes.append(code)
-
-            print(f'[HISTORY] Downloading missing {len(missing_codes)} codes...')
-            self._download_codes(missing_codes, self.init_day_count)
+            self._download_local_missed()
 
         print(f'[HISTORY] Loading {len(code_list)} codes...', end='')
         error_count = 0
@@ -174,18 +193,6 @@ class DailyHistory:
     # ==============
     #  部分更新逻辑
     # ==============
-
-    # 下载本地缺失的股票代码数据
-    def _download_local_missed(self) -> None:
-        print('[HISTORY] Searching local missed code...')
-        prev_code_list = self.get_code_list()
-        curr_code_list = self.get_code_list(force_download=True)
-        gap_codes = []
-        for code in curr_code_list:
-            if code not in prev_code_list:
-                gap_codes.append(code)
-        print(f'[HISTORY] Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
-        self._download_codes(gap_codes, self.init_day_count)
 
     # 下载具体某天的数据 TUSHARE
     def _update_codes_by_tushare(self, target_date: str, code_list: list[str]) -> set[str]:
@@ -268,13 +275,10 @@ class DailyHistory:
         print(f' {updated_count} codes updated!')
         return updated_codes
 
-    # # 平时手动操作补单日数据使用
+    # 平时手动操作补单日数据使用
     def download_single_daily(self, target_date: str) -> None:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
-
-        # self._download_gap_to_disk()  这里就先注释掉
-
         code_list = self.get_code_list()
         updated_codes = self._update_codes_by_tushare(target_date, code_list)
         print('[HISTORY] Sort and Save all history data ', end='')
@@ -292,7 +296,7 @@ class DailyHistory:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
 
-        self._download_local_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
+        self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
         code_list = self.get_code_list()
 
         # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍
@@ -317,25 +321,22 @@ class DailyHistory:
             self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
 
-
     # ==============
     #  除权更新逻辑
     # ==============
+
     def remove_single_history(self, code: str) -> bool:
         file_path = f'{self.root_path}/{code}.csv'
         try:
             if not os.path.isfile(file_path):
                 return False
-
             os.remove(file_path)
-            # del self.cache_history[code]
             return True
-
         except PermissionError:
             print(f'[HISTORY] No Permission deleting {file_path}')
             return False
         except OSError as e:
-            print('[HISTORY] Error when deleting: {e}')
+            print(f'[HISTORY] Error when deleting: {e}')
             return False
 
     def get_recent_exit_right_codes(self, days: int) -> list[str]:
@@ -347,17 +348,14 @@ class DailyHistory:
             df = ak.news_trade_notify_dividend_baidu(date=date_str)
             if df is not None and len(df) > 0 and '股票代码' in df.columns:
                 codes = [symbol_to_code(symbol) for symbol in df['股票代码'].values if len(symbol) == 6]
-                # print(codes)
                 ans += codes
         return ans
 
     def remove_recent_exit_right_histories(self, days: int) -> None:
         codes = self.get_recent_exit_right_codes(days)
-
         removed_count = 0
         for code in codes:
-            # print(code)
             if self.remove_single_history(code):
                 removed_count += 1
-
         print(f'[HISTORY] Removed {removed_count} histories with Exit Right announced')
+        self._download_local_missed()

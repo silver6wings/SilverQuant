@@ -4,7 +4,6 @@ import json
 import pickle
 import random
 import threading
-import functools
 import traceback
 from typing import Dict, Callable, Optional
 
@@ -306,7 +305,7 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     # 盘前下载数据缓存
     # -----------------------
-    def download_from_remote(
+    def _download_from_remote(
         self,
         target_codes: list,
         start: str,
@@ -369,7 +368,7 @@ class XtSubscriber(BaseSubscriber):
                 # 如果没缓存就刷新白名单
                 self.cache_history.clear()
                 self.cache_history = {}
-                self.download_from_remote(code_list, start, end, adjust, columns, data_source)
+                self._download_from_remote(code_list, start, end, adjust, columns, data_source)
                 save_pickle(cache_path, self.cache_history)
                 print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
                 if self.messager is not None:
@@ -378,7 +377,6 @@ class XtSubscriber(BaseSubscriber):
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
-            hc.daily_history.remove_recent_exit_right_histories(20)
             hc.daily_history.download_recent_daily(20)  # 一个月数据
 
             # 计算两个日期之间的差值
@@ -394,6 +392,12 @@ class XtSubscriber(BaseSubscriber):
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                               f'无法识别数据源')
+
+    @check_open_day
+    def remove_exit_right(self):
+        hc = DailyHistoryCache()
+        if hc.daily_history is not None:
+            hc.daily_history.remove_recent_exit_right_histories(5)
 
     # -----------------------
     # 盘后报告总结
@@ -495,6 +499,7 @@ class XtSubscriber(BaseSubscriber):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
+            ['08:00', self.remove_exit_right, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],
