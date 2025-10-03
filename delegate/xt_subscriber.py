@@ -35,6 +35,7 @@ class XtSubscriber(BaseSubscriber):
         execute_strategy: Callable,         # 策略回调函数
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
+        near_trade_begin: Callable = None,  # 盘后函数
         finish_trade_day: Callable = None,  # 盘后函数
         use_outside_data: bool = False,     # 默认使用原版 QMT data （定期 call 数据但不传入quotes）
         use_ap_scheduler: bool = False,     # 默认使用旧版 schedule
@@ -56,6 +57,7 @@ class XtSubscriber(BaseSubscriber):
         self.execute_strategy = execute_strategy
         self.execute_interval = execute_interval
         self.before_trade_day = before_trade_day
+        self.near_trade_begin = near_trade_begin
         self.finish_trade_day = finish_trade_day
         self.messager = ding_messager
 
@@ -378,25 +380,25 @@ class XtSubscriber(BaseSubscriber):
             hc.set_data_source(data_source=data_source)
             hc.daily_history.download_recent_daily(20)  # 一个月数据
 
-            # 计算两个日期之间的差值
-            start_date = datetime.datetime.strptime(start, '%Y%m%d')
-            end_date = datetime.datetime.strptime(end, '%Y%m%d')
-            delta = abs(end_date - start_date)
-
-            self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
-            if self.messager is not None:
-                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'日线{len(self.cache_history)}支')
         else:
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                               f'无法识别数据源')
 
     @check_open_day
-    def remove_exit_right(self):
+    def refresh_memory_history(self, code_list: list[str], start: str, end: str):
         hc = DailyHistoryCache()
         if hc.daily_history is not None:
             hc.daily_history.remove_recent_exit_right_histories(5)
+
+            # 计算两个日期之间的差值
+            start_date = datetime.datetime.strptime(start, '%Y%m%d')
+            end_date = datetime.datetime.strptime(end, '%Y%m%d')
+            delta = abs(end_date - start_date)
+            self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
+            if self.messager is not None:
+                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
+                                              f'日线{len(self.cache_history)}支')
 
     # -----------------------
     # 盘后报告总结
@@ -498,7 +500,7 @@ class XtSubscriber(BaseSubscriber):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
-            ['08:00', self.remove_exit_right, None],
+            ['08:00', self.near_trade_begin, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],

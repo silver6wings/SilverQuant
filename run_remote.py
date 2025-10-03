@@ -1,14 +1,12 @@
-import time
 import math
 import logging
-import schedule
 
 from credentials import *
 
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
-from tools.utils_remote import DataSource
+from tools.utils_remote import DataSource, ExitRight
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
 
@@ -45,8 +43,8 @@ def debug(*args, **kwargs):
 
 
 class PoolConf:
-    day_count = 100         # 100个自然日里有 > 60个交易日
-    price_adjust = 'qfq'    # 历史价格复权
+    day_count = 100                 # 100个自然日里有 > 60个交易日
+    price_adjust = ExitRight.QFQ    # 历史价格复权
     columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
 
@@ -100,30 +98,20 @@ class SellConf:
 # ======== 盘前 ========
 
 
-def held_increase() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
+def before_trade_day() -> None:
+    # held_increase() -> None:
     update_position_held(disk_lock, my_delegate, PATH_HELD)
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'All held stock day +1!')
 
-
-def refresh_code_list() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
+    # refresh_code_list() -> None:
     my_pool.refresh()
     positions = my_delegate.check_positions()
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
     my_suber.update_code_list(my_pool.get_code_list() + hold_list)
 
-
-def prepare_history() -> None:
-    if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-        return
-
+    # prepare_history() -> None:
     now = datetime.datetime.now()
     for i in range(15, 30):
         delete_file(PATH_INFO.format((now - datetime.timedelta(days=i)).strftime('%Y_%m_%d')))
@@ -145,6 +133,18 @@ def prepare_history() -> None:
         columns=PoolConf.columns,
         data_source=data_source
     )
+
+
+def near_trade_begin():
+    now = datetime.datetime.now()
+    start = get_prev_trading_date(now, PoolConf.day_count)
+    end = get_prev_trading_date(now, 1)
+
+    positions = my_delegate.check_positions()
+    history_list = my_pool.get_code_list()
+    history_list += [position.stock_code for position in positions if is_symbol(position.stock_code)]
+
+    my_suber.refresh_memory_history(code_list=history_list, start=start, end=end)
 
 
 # ======== 买点 ========
@@ -341,46 +341,12 @@ if __name__ == '__main__':
         path_deal=PATH_DEAL,
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
+        before_trade_day=before_trade_day,
+        near_trade_begin=near_trade_begin,
+        use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_tick_memory_cache=True,
         open_today_deal_report=True,
         open_today_hold_report=True,
     )
     my_suber.start_scheduler()
-
-    temp_now = datetime.datetime.now()
-    temp_date = temp_now.strftime('%Y-%m-%d')
-    temp_time = temp_now.strftime('%H:%M')
-
-    # 定时任务启动
-    schedule.every().day.at('08:05').do(held_increase)
-    schedule.every().day.at('08:10').do(refresh_code_list)
-    schedule.every().day.at('08:15').do(prepare_history)    # 必须先 refresh code list
-
-    if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
-        held_increase()
-
-        if '08:10' < temp_time < '14:57':
-            refresh_code_list()
-
-        if '08:15' < temp_time < '14:57':
-            prepare_history()  # 重启时防止没有数据在这先加载历史数据
-
-        if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
-            my_suber.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
-
-    try:
-        print('[定时器已启动]')
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print('[手动结束进程]')
-    finally:
-        schedule.clear()
-        my_delegate.shutdown()
-        try:
-            import sys
-            sys.exit(0)
-        except SystemExit:
-            os._exit(0)

@@ -8,7 +8,7 @@ from xtquant import xtconstant
 from xtquant.xttrader import XtQuantTraderCallback
 from xtquant.xttype import XtOrder, XtTrade, XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
 
-from tools.utils_cache import record_deal, new_held, del_key, StockNames
+from tools.utils_cache import record_deal, new_held, del_key, del_held_day, StockNames
 from tools.utils_ding import BaseMessager
 
 
@@ -116,7 +116,7 @@ class XtCustomCallback(XtBaseCallback):
         name = self.stock_names.get_name(stock_code)
 
         if trade.order_type == xtconstant.STOCK_SELL:
-            del_key(self.disk_lock, self.path_held, stock_code)
+            del_held_day(self.disk_lock, self.path_held, stock_code)
             del_key(self.disk_lock, self.path_max_prices, stock_code)
             del_key(self.disk_lock, self.path_min_prices, stock_code)
 
