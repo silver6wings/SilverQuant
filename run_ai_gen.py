@@ -6,7 +6,7 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
-from tools.utils_remote import concat_ak_quote_dict, DataSource
+from tools.utils_remote import concat_ak_quote_dict, DataSource, ExitRight
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
@@ -43,7 +43,7 @@ def debug(*args, **kwargs):
 
 class PoolConf:
     white_prefixes = {'00', '60', '30'}
-    white_index_symbol = '000985'
+    white_index_symbol = IndexSymbol.INDEX_ZZ_ALL
     white_ma_above_period = 10
 
     black_prompts = [
@@ -51,8 +51,8 @@ class PoolConf:
         '退市',
         '近一周大股东减持',
     ]
-    day_count = 200         # 200个足够算出周期为120的均线数据
-    price_adjust = 'qfq'    # 历史价格复权
+    day_count = 200                 # 200个足够算出周期为120的均线数据
+    price_adjust = ExitRight.QFQ    # 历史价格复权
     columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
 
@@ -135,6 +135,18 @@ def before_trade_day() -> None:
         columns=PoolConf.columns,
         data_source=data_source
     )
+
+
+def near_trade_begin():
+    now = datetime.datetime.now()
+    start = get_prev_trading_date(now, PoolConf.day_count)
+    end = get_prev_trading_date(now, 1)
+
+    positions = my_delegate.check_positions()
+    history_list = my_pool.get_code_list()
+    history_list += [position.stock_code for position in positions if is_symbol(position.stock_code)]
+
+    my_suber.refresh_memory_history(code_list=history_list, start=start, end=end)
 
 
 # ======== 买点 ========
@@ -347,6 +359,7 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
         before_trade_day=before_trade_day,
+        near_trade_begin=near_trade_begin,
         use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_tick_memory_cache=True,

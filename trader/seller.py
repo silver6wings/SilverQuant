@@ -73,22 +73,33 @@ class BaseSeller:
         for position in positions:
             code = position.stock_code
 
+            if code not in held_info:
+                continue
+
+            if InfoItem.DayCount not in held_info[code]:
+                continue
+
+            if held_info[code][InfoItem.DayCount] is None:
+                continue
+
+            if code not in quotes:
+                continue
+
             # 如果有数据且有持仓时间记录
-            if (code in quotes) and (code in held_info):
-                quote = quotes[code]
-                if quote['open'] > 0 and quote['volume'] > 0:  # 确认当前股票没有停牌
-                    self.check_sell(
-                        code=code,
-                        quote=quote,
-                        curr_date=curr_date,
-                        curr_time=curr_time,
-                        position=position,
-                        held_day=held_info[code][InfoItem.DayCount],
-                        max_price=max_prices[code] if code in max_prices else None,
-                        history=cache_history[code] if code in cache_history else None,
-                        ticks=today_ticks[code] if code in today_ticks else None,
-                        extra=extra_datas[code] if code in extra_datas else None,
-                    )
+            quote = quotes[code]
+            if quote['open'] > 0 and quote['volume'] > 0:  # 确认当前股票没有停牌
+                self.check_sell(
+                    code=code,
+                    quote=quote,
+                    curr_date=curr_date,
+                    curr_time=curr_time,
+                    position=position,
+                    held_day=held_info[code][InfoItem.DayCount],
+                    max_price=max_prices[code] if code in max_prices else None,
+                    history=cache_history[code] if code in cache_history else None,
+                    ticks=today_ticks[code] if code in today_ticks else None,
+                    extra=extra_datas[code] if code in extra_datas else None,
+                )
 
     def check_sell(
         self, code: str, quote: Dict, curr_date: str, curr_time: str,

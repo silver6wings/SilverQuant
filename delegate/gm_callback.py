@@ -6,7 +6,7 @@ from gmtrade.api import *
 from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
 from tools.utils_basic import gmsymbol_to_code
-from tools.utils_cache import record_deal, new_held, del_key, StockNames
+from tools.utils_cache import record_deal, new_held, del_key, del_held_day, StockNames
 from tools.utils_ding import BaseMessager
 
 
@@ -143,7 +143,7 @@ class GmCallback:
             traded_price = order.price
 
             if order.side == OrderSide_Sell:
-                del_key(self.disk_lock, self.path_held, stock_code)
+                del_held_day(self.disk_lock, self.path_held, stock_code)
                 del_key(self.disk_lock, self.path_max_prices, stock_code)
                 del_key(self.disk_lock, self.path_min_prices, stock_code)
 

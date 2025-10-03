@@ -170,6 +170,7 @@ class DailyHistory:
             self._download_local_missed()
 
         print(f'[HISTORY] Loading {len(code_list)} codes...', end='')
+        self.cache_history.clear()
         error_count = 0
         i = 0
         for code in code_list:
@@ -358,4 +359,3 @@ class DailyHistory:
             if self.remove_single_history(code):
                 removed_count += 1
         print(f'[HISTORY] Removed {removed_count} histories with Exit Right announced')
-        self._download_local_missed()

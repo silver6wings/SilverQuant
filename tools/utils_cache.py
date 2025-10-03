@@ -20,7 +20,6 @@ TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
 
-
 # 指数常量
 class IndexSymbol:
     INDEX_SH_ZS = '000001'      # 上证指数
@@ -219,25 +218,16 @@ def del_keys(lock: threading.Lock, path: str, keys: List[str]) -> None:
         save_json(path, temp_json)
 
 
-# 所有缓存持仓天数+1，_inc_date为单日判重标记位
-def all_held_inc(held_operation_lock: threading.Lock, path: str) -> bool:
-    with held_operation_lock:
-        held_info = load_json(path)
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
-
+# 清除held持仓，将标记持仓天数为null
+def del_held_day(lock: threading.Lock, path: str, key: str):
+    with lock:
         try:
-            if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
-                held_info[InfoItem.IncDate] = today
-                for code in held_info.keys():
-                    if code != InfoItem.IncDate:
-                        held_info[code][InfoItem] += 1
-
-                save_json(path, held_info)
-                return True
-            else:
-                return False
+            held_info = load_json(path)
+            held_info[key][InfoItem.IncDate] = None
+            save_json(path, held_info)
+            return True
         except Exception as e:
-            print('held days +1 failed! ', e)
+            print('del held day failed! ', e)
             return False
 
 
@@ -248,6 +238,27 @@ def new_held(held_operation_lock: threading.Lock, path: str, codes: List[str]) -
         for code in codes:
             held_info[code][InfoItem.DayCount] = 0
         save_json(path, held_info)
+
+
+# 所有缓存持仓天数+1，_inc_date为单日判重标记位
+def all_held_inc(lock: threading.Lock, path: str) -> bool:
+    with lock:
+        try:
+            held_info = load_json(path)
+            today = datetime.datetime.now().strftime('%Y-%m-%d')
+            if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
+                held_info[InfoItem.IncDate] = today
+                for code in held_info.keys():
+                    if code != InfoItem.IncDate:
+                        held_info[code][InfoItem.IncDate] += 1
+
+                save_json(path, held_info)
+                return True
+            else:
+                return False
+        except Exception as e:
+            print('held days +1 failed! ', e)
+            return False
 
 
 # 更新持仓股买入开始最高价格
@@ -482,7 +493,7 @@ def get_index_constituent_symbols(index_symbol: str) -> list[str]:
                 else:
                     # 实在不行用一些会出现重复不全问题的接口作为 fallback
                     df = ak.index_stock_cons(symbol=index_symbol)
-                    print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
+                    print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！', e)
         else:
             df = pd.read_pickle(index_file)
     else:
