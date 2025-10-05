@@ -32,11 +32,6 @@ disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 
 
-def debug(*args, **kwargs):
-    if IS_DEBUG:
-        print(*args, **kwargs)
-
-
 class PoolConf:
     white_indexes = []
     black_prompts = []

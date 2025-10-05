@@ -4,6 +4,14 @@ import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 
+IS_DEBUG = False
+
+
+def debug(*args, **kwargs):
+    if IS_DEBUG:
+        print(*args, **kwargs)
+
+
 # pandas dataframe 显示配置优化
 def pd_show_all() -> None:
     import pandas as pd
