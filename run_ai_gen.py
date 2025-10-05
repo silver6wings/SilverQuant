@@ -5,17 +5,17 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol, debug
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
-from tools.utils_remote import concat_ak_quote_dict, DataSource, ExitRight
+from tools.utils_remote import DataSource, ExitRight, concat_ak_quote_dict
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolWhitePrefixesMA as Pool
+from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import DeepseekGroupSeller as Seller
 
 from selector.selector_deepseek import select
 
-data_source = DataSource.AKSHARE
+data_source = DataSource.MOOTDX     # DataSource.AKSHARE 数据源也可以 TUSHARE 需要配置 token
 
 STRATEGY_NAME = 'AI智选'  # DEEPSEEK 生成的策略，仅做展示使用，不保证收益
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
@@ -140,7 +140,7 @@ def near_trade_begin():
     positions = my_delegate.check_positions()
     history_list = my_pool.get_code_list()
     history_list += [position.stock_code for position in positions if is_symbol(position.stock_code)]
-
+    # 使用 AKSHARE 数据源这些代码其实没作用
     my_suber.refresh_memory_history(code_list=history_list, start=start, end=end)
 
 
