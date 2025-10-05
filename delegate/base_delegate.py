@@ -75,3 +75,11 @@ class BaseDelegate(ABC):
     @abstractmethod
     def order_cancel_sell(self, code: str, strategy_name: str = DEFAULT_STRATEGY_NAME):
         pass
+
+    @staticmethod
+    def is_position_holding(position: any) -> bool:
+        return False
+
+    @abstractmethod
+    def get_holding_position_count(self, positions: List, only_stock: bool = False) -> int:
+        return 0

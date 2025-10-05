@@ -1,9 +1,8 @@
-import math
 import logging
 
 from credentials import *
 
-from tools.utils_basic import logging_init, is_symbol
+from tools.utils_basic import logging_init, is_symbol, debug
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import concat_ak_quote_dict, DataSource, ExitRight
@@ -36,11 +35,6 @@ disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
 
 
-def debug(*args, **kwargs):
-    if IS_DEBUG:
-        print(*args, **kwargs)
-
-
 class PoolConf:
     white_prefixes = {'00', '60', '30'}
     white_index_symbol = IndexSymbol.INDEX_ZZ_ALL
@@ -63,6 +57,7 @@ class BuyConf:
 
     slot_count = 30         # 持股数量上限
     slot_capacity = 10000   # 每个仓的资金上限
+    daily_buy_max = 10      # 单日买入股票上限
     once_buy_limit = 30     # 单次选股最多买入股票数量（若单次未买进当日不会再买这只
 
     inc_limit = 1.20        # 相对于昨日收盘的涨幅限制
@@ -152,17 +147,17 @@ def near_trade_begin():
 # ======== 买点 ========
 
 
-def check_stock(code: str, quote: Dict, curr_date: str) -> (bool, Dict):
+def check_stock(code: str, quote: Dict, curr_date: str) -> bool:
     df = concat_ak_quote_dict(my_suber.cache_history[code], quote, curr_date)
 
     result_df = select(df, code, quote)
     buy = result_df['PASS'].values[-1]
 
-    return buy, {'reason': ''}
+    return buy
 
 
-def select_stocks(quotes: Dict, curr_date: str) -> List[Dict[str, any]]:
-    selections = []
+def select_stocks(quotes: dict, curr_date: str) -> dict[str, dict]:
+    selections = {}
 
     for code in quotes:
         if code not in my_suber.cache_history:
@@ -179,7 +174,7 @@ def select_stocks(quotes: Dict, curr_date: str) -> List[Dict[str, any]]:
 
         quote = quotes[code]
 
-        passed, info = check_stock(code, quote, curr_date)
+        passed = check_stock(code, quote, curr_date)
         if not passed:
             # debug(f'{code} {info}')
             continue
@@ -202,13 +197,10 @@ def select_stocks(quotes: Dict, curr_date: str) -> List[Dict[str, any]]:
         #         debug(code, f'现价小于当日成交均价')
         #         continue
 
-        selection = {
-            'code': code,
-            'price': round(max(quote['askPrice'] + [curr_price]), 2),
-            'lastClose': round(quote['lastClose'], 2),
+        selections[code] = {
+            'price': max(quote['askPrice'] + [quote['lastPrice']]),
+            'lastClose': quote['lastClose'],
         }
-        selection.update(info)
-        selections.append(selection)
 
     return selections
 
@@ -217,49 +209,8 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
     selections = select_stocks(quotes, curr_date)
     debug(len(quotes), selections)
 
-    # 选出一个以上的股票
-    if len(selections) > 0:
-        position_codes = [position.stock_code for position in positions]
-        position_count = get_holding_position_count(positions)
-        available_cash = my_delegate.check_asset().cash
-        available_slot = available_cash // BuyConf.slot_capacity
-
-        buy_count = max(0, BuyConf.slot_count - position_count)   # 确认剩余的仓位
-        buy_count = min(buy_count, available_slot)                # 确认现金够用
-        buy_count = min(buy_count, len(selections))               # 确认选出的股票够用
-        buy_count = min(buy_count, BuyConf.once_buy_limit)        # 限制一秒内下单数量
-        buy_count = int(buy_count)
-
-        for i in range(len(selections)):  # 依次买入
-            # logging.info(f'买数相关：持仓{position_count} 现金{available_cash} 已选{len(selections)}')
-            if buy_count > 0:
-                code = selections[i]['code']
-                price = selections[i]['price']
-                last_close = selections[i]['lastClose']
-                buy_volume = math.floor(BuyConf.slot_capacity / price / 100) * 100
-
-                if buy_volume <= 0:
-                    debug(f'{code} 不够一手')
-                elif code in position_codes:
-                    debug(f'{code} 正在持仓')
-                elif curr_date in cache_selected and code in cache_selected[curr_date]:
-                    debug(f'{code} 今日已选')
-                else:
-                    buy_count = buy_count - 1
-                    # 如果今天未被选股过 and 目前没有持仓则记录（意味着不会加仓
-                    my_buyer.order_buy(code=code, price=price, last_close=last_close,
-                                       volume=buy_volume, remark='市价买入')
-            else:
-                break
-
-    # 记录选股历史
-    if curr_date not in cache_selected:
-        cache_selected[curr_date] = set()
-
-    for selection in selections:
-        if selection['code'] not in cache_selected[curr_date]:
-            cache_selected[curr_date].add(selection['code'])
-            logging.warning(f"记录选股 {selection['code']}\t现价: {selection['price']:.2f}")
+    global cache_selected
+    cache_selected = my_buyer.buy_selections(selections, cache_selected, curr_date, positions)
 
 
 # ======== 卖点 ========
@@ -296,7 +247,7 @@ if __name__ == '__main__':
     print(f'正在启动 {STRATEGY_NAME}...')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
-        from delegate.xt_delegate import XtDelegate, get_holding_position_count
+        from delegate.xt_delegate import XtDelegate
 
         my_callback = XtCustomCallback(
             account_id=QMT_ACCOUNT_ID,
@@ -316,7 +267,7 @@ if __name__ == '__main__':
         )
     else:
         from delegate.gm_callback import GmCallback
-        from delegate.gm_delegate import GmDelegate, get_holding_position_count
+        from delegate.gm_delegate import GmDelegate
 
         my_callback = GmCallback(
             account_id=QMT_ACCOUNT_ID,

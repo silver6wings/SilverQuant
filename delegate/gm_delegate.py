@@ -293,10 +293,10 @@ class GmDelegate(BaseDelegate):
                 f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤卖 {code}\n'
                 '[CS]')
 
+    @staticmethod
+    def is_position_holding(position: GmPosition) -> bool:
+        return position.volume > 0
 
-def is_position_holding(position: GmPosition) -> bool:
-    return position.volume > 0
 
-
-def get_holding_position_count(positions: List[GmPosition]) -> int:
-    return sum(1 for position in positions if is_position_holding(position))
+    def get_holding_position_count(self, positions: List[GmPosition]) -> int:
+        return sum(1 for position in positions if self.is_position_holding(position))

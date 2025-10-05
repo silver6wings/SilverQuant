@@ -4,7 +4,7 @@ import logging
 
 from delegate.base_delegate import BaseDelegate
 
-from tools.utils_basic import get_limit_up_price
+from tools.utils_basic import get_limit_up_price, debug
 
 
 class BaseBuyer:
@@ -13,8 +13,7 @@ class BaseBuyer:
         account_id: str,
         strategy_name: str,
         delegate: BaseDelegate,
-        parameters,
-        risk_control: bool = False,  # 打开意味着策略每次下单有最大额度限制
+        parameters,     # Buy Configuration
     ):
         self.account_id = account_id
         self.strategy_name = strategy_name
@@ -22,8 +21,72 @@ class BaseBuyer:
 
         self.order_premium = parameters.order_premium
         self.slot_capacity = parameters.slot_capacity
+        self.slot_count = parameters.slot_count
+        self.daily_buy_max = parameters.daily_buy_max
+        self.once_buy_limit = parameters.once_buy_limit
 
-        self.risk_control = risk_control
+        self.risk_control = parameters.risk_control if hasattr(parameters, 'risk_control') else False
+
+
+    def buy_selections(
+        self,
+        selections: dict[str, dict],    # { code: quote } 注意 Python 3.7 之前的dict不按照插入序遍历
+        today_buy: dict[str, set],      # 当日已买入记录
+        curr_date: str,
+        positions: list,
+        all_in_buy: bool = False,   # 最后一点零头不够也要尝试买入
+        all_market: bool = True,    # 全部都是市价单
+    ) -> dict[str, set]:
+        if len(selections) > 0:
+            final_capacity = self.slot_capacity
+
+            position_codes = [position.stock_code for position in positions]
+            position_count = self.delegate.get_holding_position_count(positions)
+            available_cash = self.delegate.check_asset().cash
+            available_slot = available_cash // final_capacity
+
+            # 不足一手把剩下的钱尽可能买一手
+            if available_slot == 0 and all_in_buy:
+                final_capacity = available_cash - 1.00
+                available_slot = 1
+
+            # 每日最多买入限制要有
+            if curr_date not in today_buy:
+                today_buy[curr_date] = set()
+            available_slot = min(available_slot, self.daily_buy_max - len(today_buy[curr_date]))
+
+            buy_count = max(0, self.slot_count - position_count)    # 确认剩余的仓位
+            buy_count = min(buy_count, available_slot)              # 确认现金够用
+            buy_count = min(buy_count, len(selections))             # 确认选出的股票够用
+            buy_count = min(buy_count, self.once_buy_limit)         # 限制一秒内下单数量
+            buy_count = int(buy_count)
+
+            for code in selections:  # 依次买入
+                if buy_count > 0:
+                    if code in today_buy[curr_date]:
+                        continue
+
+                    price = round(selections[code]['price'], 2)
+                    last_close = round(selections[code]['lastClose'], 2)
+                    buy_volume = math.floor(final_capacity / price / 100) * 100
+
+                    if buy_volume <= 0:
+                        debug(f'[{code} 不够一手]')
+                    elif code in position_codes:
+                        debug(f'[{code} 正在持仓]')
+                    else:
+                        buy_count = buy_count - 1
+                        # 如果今天未被选股过 and 目前没有持仓则记录（意味着不会加仓
+                        self.order_buy(
+                            code=code, price=price, last_close=last_close,
+                            volume=buy_volume, remark='买入委托', market=all_market)
+                        # 记录买入历史
+                        if code not in today_buy[curr_date]:
+                            today_buy[curr_date].add(code)
+                            logging.warning(f"记录选股 {code}\t现价: {price:.2f}")
+                else:
+                    break
+        return today_buy
 
     def order_buy(
         self,
