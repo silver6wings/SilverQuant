@@ -49,16 +49,17 @@ class XtSubscriber(BaseSubscriber):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
         self.delegate = delegate
-        self.delegate.subscriber = self
+        if self.delegate is not None:
+            self.delegate.subscriber = self
 
         self.path_deal = path_deal
         self.path_assets = path_assets
 
         self.execute_strategy = execute_strategy
         self.execute_interval = execute_interval
-        self.before_trade_day = before_trade_day
-        self.near_trade_begin = near_trade_begin
-        self.finish_trade_day = finish_trade_day
+        self.before_trade_day = before_trade_day    # 提前准备某些耗时长的任务
+        self.near_trade_begin = near_trade_begin    # 有些数据临近开盘才更新，这里保证内存里的数据正确
+        self.finish_trade_day = finish_trade_day    # 盘后及时做一些总结汇报入库类的整理工作
         self.messager = ding_messager
 
         self.lock_quotes_update = threading.Lock()  # 聚合实时打点缓存的锁
@@ -433,6 +434,11 @@ class XtSubscriber(BaseSubscriber):
             self.before_trade_day()
 
     @check_open_day
+    def near_trade_begin_wrapper(self):
+        if self.near_trade_begin is not None:
+            self.near_trade_begin()
+
+    @check_open_day
     def finish_trade_day_wrapper(self):
         if self.finish_trade_day is not None:
             self.finish_trade_day()
@@ -500,7 +506,7 @@ class XtSubscriber(BaseSubscriber):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
-            ['08:00', self.near_trade_begin, None],
+            ['08:30', self.near_trade_begin_wrapper, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],

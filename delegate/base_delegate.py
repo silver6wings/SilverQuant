@@ -81,5 +81,5 @@ class BaseDelegate(ABC):
         return False
 
     @abstractmethod
-    def get_holding_position_count(self, positions: List, only_stock: bool = False) -> int:
+    def get_holding_position_count(self, positions: list, only_stock: bool = False) -> int:
         return 0

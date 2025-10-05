@@ -8,8 +8,8 @@ from tools.utils_remote import get_wencai_codes
 
 from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
 
-from trader.buyer import BaseBuyer as Buyer
 from trader.pools import StocksPoolBlackWencai as Pool
+from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ClassicGroupSeller as Seller
 
 from selector.select_wencai import get_prompt
