@@ -33,9 +33,8 @@ class StockPool:
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name}:刷新{len(self.get_code_list())}支\n'
-                f'白名单: {len(self.cache_whitelist)} '
-                f'黑名单: {len(self.cache_blacklist)}')
+                f'{self.strategy_name}:股票池{len(self.get_code_list())}支\n'
+                f'白名单: {len(self.cache_whitelist)} 黑名单: {len(self.cache_blacklist)}')
 
     def refresh_black(self):
         self.cache_blacklist.clear()

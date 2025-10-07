@@ -6,7 +6,7 @@ from gmtrade.api import *
 from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
 from tools.utils_basic import gmsymbol_to_code
-from tools.utils_cache import record_deal, new_held, del_key, del_held_day, StockNames
+from tools.utils_cache import StockNames, record_deal, new_held, del_key, del_held_day
 from tools.utils_ding import BaseMessager
 
 
@@ -47,8 +47,8 @@ class GmCallback:
                 print(f'[掘金]:使用{file_name}订阅回调成功')
             else:
                 print(f'[掘金]:使用{file_name}订阅回调失败，状态码：{status}')
-        except Exception as e:
-            print(f'[掘金]:使用{file_name}订阅回调异常：{e}')
+        except Exception as e0:
+            print(f'[掘金]:使用{file_name}订阅回调异常：{e0}')
             try:
                 # 直接使用当前模块进行注册，不使用filename参数
                 status = start(filename='__main__')
@@ -107,31 +107,6 @@ class GmCallback:
             cost: 830.0000190734863
         """
         pass
-
-        # stock_code = gmsymbol_to_code(rpt.symbol)
-        # traded_volume = rpt.volume
-        # traded_price = float(rpt.price)
-        # traded_time = rpt.created_at.seconds
-
-        # if rpt.side == OrderSide_Buy:
-        #     self.record_order(
-        #         order_time=traded_time,
-        #         code=stock_code,
-        #         price=traded_price,
-        #         volume=traded_volume,
-        #         side='买入成交',
-        #         remark='',
-        #     )
-
-        # if rpt.side == OrderSide_Sell:
-        #     self.record_order(
-        #         order_time=traded_time,
-        #         code=stock_code,
-        #         price=traded_price,
-        #         volume=traded_volume,
-        #         side='卖出成交',
-        #         remark='',
-        #     )
 
     def on_order_status(self, order: Order):
         if order.status == OrderStatus_Rejected:

@@ -10,12 +10,10 @@ from tools.utils_basic import get_limit_up_price, debug
 class BaseBuyer:
     def __init__(
         self,
-        account_id: str,
         strategy_name: str,
         delegate: BaseDelegate,
         parameters,     # Buy Configuration
     ):
-        self.account_id = account_id
         self.strategy_name = strategy_name
         self.delegate = delegate
 
@@ -26,7 +24,6 @@ class BaseBuyer:
         self.once_buy_limit = parameters.once_buy_limit
 
         self.risk_control = parameters.risk_control if hasattr(parameters, 'risk_control') else False
-
 
     def buy_selections(
         self,
@@ -151,19 +148,15 @@ class BaseBuyer:
 class LimitedBuyer(BaseBuyer):
     def __init__(
         self,
-        account_id: str,
         strategy_name: str,
         delegate: BaseDelegate,
         parameters,
-        risk_control: bool = False,
         volume_ratio: float = 1.00,  # 每次下单的 volume 是 capacity 的百分比可以调整
     ):
         super().__init__(
-            account_id,
             strategy_name,
             delegate,
             parameters,
-            risk_control,
         )
         self.volume_ratio = volume_ratio
 

@@ -340,7 +340,8 @@ class DailyHistory:
             print(f'[HISTORY] Error when deleting: {e}')
             return False
 
-    def get_recent_exit_right_codes(self, days: int) -> list[str]:
+    @staticmethod
+    def get_recent_exit_right_codes(days: int) -> list[str]:
         import akshare as ak
         ans = []
         now = datetime.datetime.now()

@@ -244,7 +244,6 @@ if __name__ == '__main__':
         ding_messager=DING_MESSAGER,
     )
     my_buyer = Buyer(
-        account_id=QMT_ACCOUNT_ID,
         strategy_name=STRATEGY_NAME,
         delegate=my_delegate,
         parameters=BuyConf,

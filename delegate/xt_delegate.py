@@ -381,7 +381,7 @@ class XtDelegate(BaseDelegate):
             raise Exception('xt_trader为空')
 
     @check_open_day
-    def purchase_ipo_stocks(self, buy_type = 'ALL'):
+    def purchase_ipo_stocks(self, buy_type: str = 'ALL'):
         """
         申购新股，可自行定时运行
         :param buy_type: 'ALL' 申购所有新股，'STOCK' 只申购新股不申购新债
@@ -405,15 +405,14 @@ class XtDelegate(BaseDelegate):
             if volume <= 0:
                 continue
             selection = {
-                            'code': code,
-                            'volume': volume,
-                            'name': ipodata[code]['name'],
-                            'type': ipodata[code]['type'],
-                            'issuePrice': issuePrice,
-                        }
+                'volume': volume,
+                'name': ipodata[code]['name'],
+                'type': ipodata[code]['type'],
+                'issuePrice': issuePrice,
+            }
             self.stock_names._data[code] = ipodata[code]['name']  # 临时加入股票名称缓存
             self.order_limit_open(code, issuePrice, volume, '新股申购')
-            selections.append(selection)
+            selections['code'] = selection
         return selections
     
     @staticmethod
@@ -422,9 +421,12 @@ class XtDelegate(BaseDelegate):
 
     def get_holding_position_count(self, positions: List[XtPosition], only_stock: bool = False) -> int:
         if only_stock:
-            return sum(1 for position in positions if is_stock(position.stock_code) and self.is_position_holding(position))
+
+            return sum(1 for position in positions
+                       if self.is_position_holding(position) and is_stock(position.stock_code))
         else:
-            return sum(1 for position in positions if self.is_position_holding(position))
+            return sum(1 for position in positions
+                       if self.is_position_holding(position))
 
 
 def xt_stop_exit():

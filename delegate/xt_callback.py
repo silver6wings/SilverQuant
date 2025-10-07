@@ -111,7 +111,6 @@ class XtCustomCallback(XtBaseCallback):
         stock_code = trade.stock_code
         traded_volume = trade.traded_volume
         traded_price = trade.traded_price
-        # traded_time = trade.traded_time
         order_remark = trade.order_remark
         name = self.stock_names.get_name(stock_code)
 
@@ -120,6 +119,7 @@ class XtCustomCallback(XtBaseCallback):
             del_key(self.disk_lock, self.path_max_prices, stock_code)
             del_key(self.disk_lock, self.path_min_prices, stock_code)
 
+            # traded_time = trade.traded_time
             # self.record_order(
             #     order_datetime=traded_time,
             #     code=stock_code,
@@ -139,6 +139,7 @@ class XtCustomCallback(XtBaseCallback):
         elif trade.order_type == xtconstant.STOCK_BUY:
             new_held(self.disk_lock, self.path_held, [stock_code])
 
+            # traded_time = trade.traded_time
             # self.record_order(
             #     order_datetime=traded_time,
             #     code=stock_code,
