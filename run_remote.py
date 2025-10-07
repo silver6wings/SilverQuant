@@ -8,10 +8,9 @@ from credentials import *
 from tools.utils_basic import logging_init, is_symbol
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
-from tools.utils_remote import DataSource
+from tools.utils_remote import DataSource, ExitRight
 
-from delegate.xt_delegate import xt_get_ticks
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
 
 from trader.pools import StocksPoolBlackEmpty as Pool
 from trader.buyer import BaseBuyer as Buyer
@@ -47,7 +46,7 @@ def debug(*args, **kwargs):
 
 class PoolConf:
     day_count = 100         # 100个自然日里有 > 60个交易日
-    price_adjust = 'qfq'    # 历史价格复权
+    price_adjust = ExitRight.QFQ
     columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
 
