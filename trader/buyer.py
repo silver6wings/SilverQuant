@@ -76,8 +76,8 @@ class BaseBuyer:
                     selection = selections[code]
                     price = round(selection[SelectionItem.BUY_PRICE], 2)
                     last_close = round(selection[SelectionItem.BUY_VOLUME], 2)
-                    if SelectionItem.LAST_CLOSE in selection:
-                        buy_volume = selection['']
+                    if SelectionItem.BUY_VOLUME in selection:
+                        buy_volume = selection[SelectionItem.BUY_VOLUME]
                     else:
                         buy_volume = math.floor(final_capacity / price / 100) * 100
 
