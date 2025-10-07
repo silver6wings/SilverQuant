@@ -8,6 +8,8 @@
 >
 > —— 沃伦·爱德华·巴菲特 Warren Edward Buffett
 
+---
+
 来跟我大声读三遍：先轻仓模拟。先轻仓模拟？先轻仓模拟！🤤
 
 提问前先看下我辛苦写的说明好不啦，蠢尚可救，懒无药医！🙄
@@ -55,6 +57,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 希望您也可以在修罗场里的磨砺中，能打造出属于自己合适的交易模式，共勉
 
+查看完整变更历史：[CHANGELOG.md](CHANGELOG.md)
 
 # 安装说明
 
