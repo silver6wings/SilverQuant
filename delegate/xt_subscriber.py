@@ -392,15 +392,13 @@ class XtSubscriber(BaseSubscriber):
         hc = DailyHistoryCache()
         if hc.daily_history is not None:
             hc.daily_history.remove_recent_exit_right_histories(5)
-
-            # 计算两个日期之间的差值
             start_date = datetime.datetime.strptime(start, '%Y%m%d')
             end_date = datetime.datetime.strptime(end, '%Y%m%d')
-            delta = abs(end_date - start_date)
+            delta = abs(end_date - start_date)  # 计算两个日期之间的差值
             self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'日线{len(self.cache_history)}支')
+                                              f'历史{len(self.cache_history)}支')
 
     # -----------------------
     # 盘后报告总结
