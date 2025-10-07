@@ -38,7 +38,7 @@ class XtSubscriber(BaseSubscriber):
         near_trade_begin: Callable = None,  # 盘后函数
         finish_trade_day: Callable = None,  # 盘后函数
         use_outside_data: bool = False,     # 默认使用原版 QMT data （定期 call 数据但不传入quotes）
-        use_ap_scheduler: bool = False,     # 默认使用旧版 schedule
+        use_ap_scheduler: bool = False,     # 默认使用旧版 schedule （尽可能向前兼容旧策略吧）
         ding_messager: BaseMessager = None,
         open_tick_memory_cache: bool = False,
         tick_memory_data_frame: bool = False,

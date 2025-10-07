@@ -239,7 +239,7 @@ def new_held(held_operation_lock: threading.Lock, path: str, codes: List[str]) -
             if code in held_info:
                 held_info[code][InfoItem.DayCount] = 0
             else:
-                held_info[code] = { InfoItem.DayCount: 0 }
+                held_info[code] = {InfoItem.DayCount: 0}
         save_json(path, held_info)
 
 
