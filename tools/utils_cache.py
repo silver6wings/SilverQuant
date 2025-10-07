@@ -44,8 +44,8 @@ class IndexSymbol:
 
 # 仓位项常量
 class InfoItem:
-    DayCount = 'day_count'
-    IncDate = '_inc_date'
+    IncDate = '_inc_date'   # 执行所有持仓日+1操作的日期flag:'%Y-%m-%d'
+    DayCount = 'day_count'  # 持仓时间（单位：天）
 
 
 # 查询股票名称
@@ -223,7 +223,7 @@ def del_held_day(lock: threading.Lock, path: str, key: str):
     with lock:
         try:
             held_info = load_json(path)
-            held_info[key][InfoItem.IncDate] = None
+            held_info[key][InfoItem.DayCount] = None
             save_json(path, held_info)
             return True
         except Exception as e:
@@ -250,7 +250,7 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
                 held_info[InfoItem.IncDate] = today
                 for code in held_info.keys():
                     if code != InfoItem.IncDate:
-                        held_info[code][InfoItem.IncDate] += 1
+                        held_info[code][InfoItem.DayCount] += 1
 
                 save_json(path, held_info)
                 return True
