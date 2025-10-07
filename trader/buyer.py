@@ -7,6 +7,15 @@ from delegate.base_delegate import BaseDelegate
 from tools.utils_basic import get_limit_up_price, debug
 
 
+DEFAULT_BUY_REMARK = '买入委托'
+
+
+class SelectionItem:
+    BUY_PRICE = 'price'
+    BUY_VOLUME = 'volume'
+    LAST_CLOSE = 'lastClose'    # 昨日收盘价主要用来判断涨跌停
+
+
 class BaseBuyer:
     def __init__(
         self,
@@ -31,6 +40,7 @@ class BaseBuyer:
         today_buy: dict[str, set],      # 当日已买入记录
         curr_date: str,
         positions: list,
+        remark: str = DEFAULT_BUY_REMARK,
         all_in_buy: bool = False,   # 最后一点零头不够也要尝试买入
         all_market: bool = True,    # 全部都是市价单
     ) -> dict[str, set]:
@@ -63,9 +73,13 @@ class BaseBuyer:
                     if code in today_buy[curr_date]:
                         continue
 
-                    price = round(selections[code]['price'], 2)
-                    last_close = round(selections[code]['lastClose'], 2)
-                    buy_volume = math.floor(final_capacity / price / 100) * 100
+                    selection = selections[code]
+                    price = round(selection[SelectionItem.BUY_PRICE], 2)
+                    last_close = round(selection[SelectionItem.BUY_VOLUME], 2)
+                    if SelectionItem.LAST_CLOSE in selection:
+                        buy_volume = selection['']
+                    else:
+                        buy_volume = math.floor(final_capacity / price / 100) * 100
 
                     if buy_volume <= 0:
                         debug(f'[{code} 不够一手]')
@@ -76,7 +90,7 @@ class BaseBuyer:
                         # 如果今天未被选股过 and 目前没有持仓则记录（意味着不会加仓
                         self.order_buy(
                             code=code, price=price, last_close=last_close,
-                            volume=buy_volume, remark='买入委托', market=all_market)
+                            volume=buy_volume, remark=remark, market=all_market)
                         # 记录买入历史
                         if code not in today_buy[curr_date]:
                             today_buy[curr_date].add(code)
