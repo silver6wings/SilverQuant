@@ -48,6 +48,8 @@ class BuyConf:
 
     slot_count = 10         # 持股数量上限
     slot_capacity = 10000   # 每个仓的资金上限
+    daily_buy_max = 10      # 单日买入股票上限
+    once_buy_limit = 5      # 单次选股最多买入股票数量
 
 
 class SellConf:

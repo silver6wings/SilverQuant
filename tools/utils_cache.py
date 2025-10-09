@@ -254,6 +254,12 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
             if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
                 held_info[InfoItem.IncDate] = today
                 for code in held_info.keys():
+                    if InfoItem.DayCount not in held_info[code]:
+                        continue
+
+                    if held_info[code][InfoItem.DayCount] is None:
+                        continue
+
                     if code != InfoItem.IncDate:
                         held_info[code][InfoItem.DayCount] += 1
 

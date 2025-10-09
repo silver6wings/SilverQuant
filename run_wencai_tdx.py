@@ -54,7 +54,7 @@ class BuyConf:
     slot_count = 50         # 持股数量上限
     slot_capacity = 10000   # 每个仓的资金上限
     daily_buy_max = 10      # 单日买入股票上限
-    once_buy_limit = 10     # 单次选股最多买入股票数量（若单次未买进当日不会再买这只
+    once_buy_limit = 10     # 单次选股最多买入股票数量
     inc_limit = 1.20        # 相对于昨日收盘的涨幅限制
 
 
