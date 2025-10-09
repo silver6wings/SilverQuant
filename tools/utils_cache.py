@@ -236,10 +236,12 @@ def new_held(held_operation_lock: threading.Lock, path: str, codes: List[str]) -
     with held_operation_lock:
         held_info = load_json(path)
         for code in codes:
-            if code in held_info:
-                held_info[code][InfoItem.DayCount] = 0
-            else:
-                held_info[code] = {InfoItem.DayCount: 0}
+            held_info.update({code: {InfoItem.DayCount: 0}})
+            # 等价于：
+            # if code in held_info:
+            #     held_info[code][InfoItem.DayCount] = 0
+            # else:
+            #     held_info[code] = {InfoItem.DayCount: 0}
         save_json(path, held_info)
 
 
@@ -287,8 +289,11 @@ def update_max_prices(
         code = position.stock_code
         if code in held_info:  # 只更新持仓超过一天的
             if ignore_open_day:  # 忽略开仓日的最高价
+                if InfoItem.DayCount not in held_info[code]:
+                    continue
+
                 held_day = held_info[code][InfoItem.DayCount]
-                if held_day <= 0:
+                if held_day is None or held_day <= 0:
                     continue
 
             if code in quotes:
