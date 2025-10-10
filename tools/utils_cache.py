@@ -223,6 +223,8 @@ def del_held_day(lock: threading.Lock, path: str, key: str):
     with lock:
         try:
             held_info = load_json(path)
+            if key not in held_info: # 一般都是逆回购
+                return False
             held_info[key][InfoItem.DayCount] = None
             save_json(path, held_info)
             return True
