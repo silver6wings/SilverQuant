@@ -83,7 +83,7 @@ class StockNames:
         return '[Unknown]'
 
 
-def cache_with_path_ttl(path: str, ttl: int) -> Callable:
+def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -91,7 +91,7 @@ def cache_with_path_ttl(path: str, ttl: int) -> Callable:
             try:
                 with open(path, 'rb') as f:
                     if datetime.datetime.now().timestamp() - os.fstat(f.fileno()).st_mtime < ttl:
-                        return pd.read_csv(f)
+                        return pd.read_csv(f, dtype=dtype)
             except FileNotFoundError:
                 os.makedirs(dir_name, exist_ok=True) if dir_name else None
             data = func(*args, **kwargs)
@@ -105,7 +105,7 @@ class AKCache:
     import akshare as _ak
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_code_names.csv', ttl=60*60*12)
+    @cache_with_path_ttl(path='./_cache/_stock_info.csv', ttl=60*60*12, dtype={'code': str})
     def stock_info_a_code_name(cls):
         return cls._ak.stock_info_a_code_name()
 
