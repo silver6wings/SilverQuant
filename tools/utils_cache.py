@@ -5,7 +5,7 @@ import pickle
 import threading
 import datetime
 import functools
-from typing import List, Dict, Set, Optional
+from typing import List, Dict, Set, Optional, Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -83,6 +83,33 @@ class StockNames:
         return '[Unknown]'
 
 
+def cache_with_path_ttl(path: str, ttl: int) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            dir_name = os.path.dirname(path)
+            try:
+                with open(path, 'rb') as f:
+                    if datetime.datetime.now().timestamp() - os.fstat(f.fileno()).st_mtime < ttl:
+                        return pd.read_csv(f)
+            except FileNotFoundError:
+                os.makedirs(dir_name, exist_ok=True) if dir_name else None
+            data = func(*args, **kwargs)
+            data.to_csv(path, index=False)
+            return data
+        return wrapper
+    return decorator
+
+
+class AKCache:
+    import akshare as _ak
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_code_names.csv', ttl=60*60*12)
+    def stock_info_a_code_name(cls):
+        return cls._ak.stock_info_a_code_name()
+
+
 # 获取股票的中文名称
 def load_stock_code_and_names(retention_day: int = 1):
     cache_available = False
@@ -100,7 +127,7 @@ def load_stock_code_and_names(retention_day: int = 1):
     # 过期就尝试下载并缓存新的覆盖旧版本
     if not cache_available:
         try:
-            df = ak.stock_info_a_code_name()
+            df = AKCache.stock_info_a_code_name()
             df = df.rename(columns={'code': '代码', 'name': '名称'})
 
             if len(df) == 0:
@@ -254,10 +281,14 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
             if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
                 held_info[InfoItem.IncDate] = today
                 for code in held_info.keys():
-                    if code == InfoItem.IncDate or held_info[code].get(InfoItem.DayCount) is None:
+                    if InfoItem.DayCount not in held_info[code]:
                         continue
 
-                    held_info[code][InfoItem.DayCount] += 1
+                    if held_info[code][InfoItem.DayCount] is None:
+                        continue
+
+                    if code != InfoItem.IncDate:
+                        held_info[code][InfoItem.DayCount] += 1
 
                 save_json(path, held_info)
                 return True
@@ -535,7 +566,7 @@ def get_market_value_limited_codes(code_prefixes: Set[str], min_value: int, max_
 
 # 获取当日可用的股票代码
 def get_available_stock_codes() -> list[str]:
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
 
@@ -552,7 +583,7 @@ def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[
     """
     prefixes: 六位数的两位数前缀
     """
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     if none_st:
         df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
@@ -560,7 +591,7 @@ def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[
 
 
 def get_none_st_codes() -> list[str]:
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))

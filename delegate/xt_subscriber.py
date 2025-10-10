@@ -561,6 +561,7 @@ class XtSubscriber(BaseSubscriber):
             # 盘中执行需要补齐
             if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
                 self.before_trade_day_wrapper()
+                self.near_trade_begin_wrapper()
                 if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
                     self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 
