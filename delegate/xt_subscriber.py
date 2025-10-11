@@ -147,7 +147,7 @@ class XtSubscriber(BaseSubscriber):
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(self.cache_quotes)
+                    self.record_tick_to_memory(quotes)
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
