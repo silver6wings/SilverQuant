@@ -105,22 +105,22 @@ class AKCache:
     import akshare as _ak
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_stock_info_a_code_name.csv', ttl=60*60*12, dtype={'code': str})
+    @cache_with_path_ttl(path='./_cache/_ak_stock_info_a_code_name.csv', ttl=60*60*12, dtype={'code': str})
     def stock_info_a_code_name(cls):
         return cls._ak.stock_info_a_code_name()
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_fund_etf_spot_em.csv', ttl=60*60*24, dtype={'代码': str})
+    @cache_with_path_ttl(path='./_cache/_ak_fund_etf_spot_em.csv', ttl=60*60*24, dtype={'代码': str})
     def fund_etf_spot_em(cls):
         return cls._ak.fund_etf_spot_em()
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_stock_zh_a_spot_em.csv', ttl=5, dtype={'代码': str})
+    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot_em.csv', ttl=5, dtype={'代码': str})
     def stock_zh_a_spot_em(cls):
         return cls._ak.stock_zh_a_spot_em()
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
+    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
     def stock_zh_a_spot(cls):
         return cls._ak.stock_zh_a_spot()
 
@@ -264,7 +264,11 @@ def del_held_day(lock: threading.Lock, path: str, key: str):
     with lock:
         try:
             held_info = load_json(path)
-            held_info[key][InfoItem.DayCount] = None
+            if key in held_info:
+                held_info[key][InfoItem.DayCount] = None
+            else:
+                held_info[key] = {InfoItem.DayCount: None}
+            save_json(path, held_info)
             save_json(path, held_info)
             return True
         except Exception as e:
