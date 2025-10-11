@@ -105,9 +105,24 @@ class AKCache:
     import akshare as _ak
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_stock_info.csv', ttl=60*60*12, dtype={'code': str})
+    @cache_with_path_ttl(path='./_cache/_stock_info_a_code_name.csv', ttl=60*60*12, dtype={'code': str})
     def stock_info_a_code_name(cls):
         return cls._ak.stock_info_a_code_name()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_fund_etf_spot_em.csv', ttl=60*60*24, dtype={'代码': str})
+    def fund_etf_spot_em(cls):
+        return cls._ak.fund_etf_spot_em()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_stock_zh_a_spot_em.csv', ttl=5, dtype={'代码': str})
+    def stock_zh_a_spot_em(cls):
+        return cls._ak.stock_zh_a_spot_em()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
+    def stock_zh_a_spot(cls):
+        return cls._ak.stock_zh_a_spot()
 
 
 # 获取股票的中文名称
@@ -131,13 +146,13 @@ def load_stock_code_and_names(retention_day: int = 1):
             df = df.rename(columns={'code': '代码', 'name': '名称'})
 
             if len(df) == 0:
-                df = ak.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
+                df = AKCache.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
                 df['代码'] = df['代码'].str[2:]
 
             df = df[['代码', '名称']]
 
             try:
-                etf_df = ak.fund_etf_spot_em()
+                etf_df = AKCache.fund_etf_spot_em()
                 etf_df = etf_df[['代码', '名称']]
                 df = pd.concat([df, etf_df])
             except Exception as e:
@@ -169,7 +184,6 @@ def get_stock_codes_and_names() -> Dict[str, str]:
             arr = json.loads(line)
             ans[arr['code']] = arr['name']
 
-    # df = ak.stock_zh_a_spot_em()
     df = load_stock_code_and_names()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     ans.update(dict(zip(df['代码'], df['名称'])))
@@ -556,12 +570,12 @@ def get_index_constituent_codes(index_symbol: str) -> list:
 
 # 获取市值符合范围的code列表
 def get_market_value_limited_codes(code_prefixes: Set[str], min_value: int, max_value: int) -> list[str]:
-    df = ak.stock_zh_a_spot_em()
+    df = AKCache.stock_zh_a_spot_em()
     df = df.sort_values('代码')
     df = df[['代码', '名称', '总市值', '流通市值']]
     df = df[(min_value < df['总市值']) & (df['总市值'] < max_value)]
     df = df[df['代码'].str.startswith(tuple(code_prefixes))]
-    return [symbol_to_code(symbol) for symbol in list(df['代码'].values)]
+    return [symbol_to_code(symbol) for symbol in df['代码'].to_list()]
 
 
 # 获取当日可用的股票代码
@@ -599,7 +613,7 @@ def get_none_st_codes() -> list[str]:
 
 # 获取流通市值，单位（元）
 def get_stock_codes_and_circulation_mv() -> Dict[str, int]:
-    df = ak.stock_zh_a_spot_em()
+    df = AKCache.stock_zh_a_spot_em()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     df = df[['代码', '流通市值']].dropna()
     return dict(zip(df['代码'], df['流通市值']))
