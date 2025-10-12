@@ -106,6 +106,13 @@ class XtSubscriber(BaseSubscriber):
             from apscheduler.schedulers.blocking import BlockingScheduler
             self.scheduler = BlockingScheduler()
 
+        if self.is_ticks_df:
+            self.tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
+                + [f'askPrice{i}' for i in range(1, 6)] \
+                + [f'askVol{i}' for i in range(1, 6)] \
+                + [f'bidPrice{i}' for i in range(1, 6)] \
+                + [f'bidVol{i}' for i in range(1, 6)]
+
     # -----------------------
     # 策略触发主函数
     # -----------------------
@@ -147,7 +154,7 @@ class XtSubscriber(BaseSubscriber):
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(self.cache_quotes)
+                    self.record_tick_to_memory(quotes)
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
@@ -254,14 +261,9 @@ class XtSubscriber(BaseSubscriber):
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史
         if self.is_ticks_df:
-            tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
-                + [f'askPrice{i}' for i in range(1, 6)] \
-                + [f'askVol{i}' for i in range(1, 6)] \
-                + [f'bidPrice{i}' for i in range(1, 6)] \
-                + [f'bidVol{i}' for i in range(1, 6)]
             for code in quotes:
                 if code not in self.today_ticks:
-                    self.today_ticks[code] = pd.DataFrame(columns=tick_df_cols)
+                    self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
                 quote = quotes[code]
                 tick = qmt_quote_to_tick(quote)
                 df = self.today_ticks[code]
@@ -380,25 +382,36 @@ class XtSubscriber(BaseSubscriber):
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
-            hc.daily_history.download_recent_daily(20)  # 一个月数据
-
+            if hc.daily_history is not None:
+                hc.daily_history.download_recent_daily(20)  # 一个月数据
+                # 下载后加载进内存
+                start_date = datetime.datetime.strptime(start, '%Y%m%d')
+                end_date = datetime.datetime.strptime(end, '%Y%m%d')
+                delta = abs(end_date - start_date)
+                self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
         else:
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                               f'无法识别数据源')
 
     @check_open_day
-    def refresh_memory_history(self, code_list: list[str], start: str, end: str):
+    def refresh_memory_history(
+        self,
+        code_list: list[str],
+        start: str,
+        end: str,
+        data_source: DataSource,
+    ):
         hc = DailyHistoryCache()
+        hc.set_data_source(data_source=data_source)
         if hc.daily_history is not None:
-            hc.daily_history.remove_recent_exit_right_histories(5)
+            hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
+            # 重新加载进内存
             start_date = datetime.datetime.strptime(start, '%Y%m%d')
             end_date = datetime.datetime.strptime(end, '%Y%m%d')
-            delta = abs(end_date - start_date)  # 计算两个日期之间的差值
+            delta = abs(end_date - start_date)
             self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
-            if self.messager is not None:
-                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'历史{len(self.cache_history)}支')
+
 
     # -----------------------
     # 盘后报告总结
@@ -561,6 +574,7 @@ class XtSubscriber(BaseSubscriber):
             # 盘中执行需要补齐
             if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
                 self.before_trade_day_wrapper()
+                self.near_trade_begin_wrapper()
                 if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
                     self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 

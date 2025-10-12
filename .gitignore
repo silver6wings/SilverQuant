@@ -162,6 +162,13 @@ cython_debug/
 .idea/
 *.dmp
 
+# cache
+_cache/_daily*
+_cache/_sector_*
+_cache/_tmp_*
+_cache/_index_*
+_cache/_ak_*
+
 _cache/debug/
 _cache/prod_pwc/
 _cache/staging_pwc/

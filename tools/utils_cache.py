@@ -5,7 +5,7 @@ import pickle
 import threading
 import datetime
 import functools
-from typing import List, Dict, Set, Optional
+from typing import List, Dict, Set, Optional, Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -83,6 +83,48 @@ class StockNames:
         return '[Unknown]'
 
 
+def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            dir_name = os.path.dirname(path)
+            try:
+                with open(path, 'rb') as f:
+                    if datetime.datetime.now().timestamp() - os.fstat(f.fileno()).st_mtime < ttl:
+                        return pd.read_csv(f, dtype=dtype)
+            except FileNotFoundError:
+                os.makedirs(dir_name, exist_ok=True) if dir_name else None
+            data = func(*args, **kwargs)
+            data.to_csv(path, index=False)
+            return data
+        return wrapper
+    return decorator
+
+
+class AKCache:
+    import akshare as _ak
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_ak_stock_info_a_code_name.csv', ttl=60*60*12, dtype={'code': str})
+    def stock_info_a_code_name(cls):
+        return cls._ak.stock_info_a_code_name()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_ak_fund_etf_spot_em.csv', ttl=60*60*24, dtype={'代码': str})
+    def fund_etf_spot_em(cls):
+        return cls._ak.fund_etf_spot_em()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot_em.csv', ttl=5, dtype={'代码': str})
+    def stock_zh_a_spot_em(cls):
+        return cls._ak.stock_zh_a_spot_em()
+
+    @classmethod
+    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
+    def stock_zh_a_spot(cls):
+        return cls._ak.stock_zh_a_spot()
+
+
 # 获取股票的中文名称
 def load_stock_code_and_names(retention_day: int = 1):
     cache_available = False
@@ -100,17 +142,17 @@ def load_stock_code_and_names(retention_day: int = 1):
     # 过期就尝试下载并缓存新的覆盖旧版本
     if not cache_available:
         try:
-            df = ak.stock_info_a_code_name()
+            df = AKCache.stock_info_a_code_name()
             df = df.rename(columns={'code': '代码', 'name': '名称'})
 
             if len(df) == 0:
-                df = ak.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
+                df = AKCache.stock_zh_a_spot()  # 这个接口容易封IP，留作备用
                 df['代码'] = df['代码'].str[2:]
 
             df = df[['代码', '名称']]
 
             try:
-                etf_df = ak.fund_etf_spot_em()
+                etf_df = AKCache.fund_etf_spot_em()
                 etf_df = etf_df[['代码', '名称']]
                 df = pd.concat([df, etf_df])
             except Exception as e:
@@ -142,7 +184,6 @@ def get_stock_codes_and_names() -> Dict[str, str]:
             arr = json.loads(line)
             ans[arr['code']] = arr['name']
 
-    # df = ak.stock_zh_a_spot_em()
     df = load_stock_code_and_names()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     ans.update(dict(zip(df['代码'], df['名称'])))
@@ -223,9 +264,13 @@ def del_held_day(lock: threading.Lock, path: str, key: str):
     with lock:
         try:
             held_info = load_json(path)
-            if key not in held_info: # 一般都是逆回购
-                return False
-            held_info[key][InfoItem.DayCount] = None
+
+            if key in held_info:
+                held_info[key][InfoItem.DayCount] = None
+            else:
+                # 逆回购或者未记录持仓卖出的场景
+                held_info[key] = {InfoItem.DayCount: None}
+
             save_json(path, held_info)
             return True
         except Exception as e:
@@ -256,10 +301,14 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
             if (InfoItem.IncDate not in held_info) or (held_info[InfoItem.IncDate] != today):
                 held_info[InfoItem.IncDate] = today
                 for code in held_info.keys():
-                    if code == InfoItem.IncDate or held_info[code].get(InfoItem.DayCount) is None:
+                    if InfoItem.DayCount not in held_info[code]:
                         continue
 
-                    held_info[code][InfoItem.DayCount] += 1
+                    if held_info[code][InfoItem.DayCount] is None:
+                        continue
+
+                    if code != InfoItem.IncDate:
+                        held_info[code][InfoItem.DayCount] += 1
 
                 save_json(path, held_info)
                 return True
@@ -527,17 +576,17 @@ def get_index_constituent_codes(index_symbol: str) -> list:
 
 # 获取市值符合范围的code列表
 def get_market_value_limited_codes(code_prefixes: Set[str], min_value: int, max_value: int) -> list[str]:
-    df = ak.stock_zh_a_spot_em()
+    df = AKCache.stock_zh_a_spot_em()
     df = df.sort_values('代码')
     df = df[['代码', '名称', '总市值', '流通市值']]
     df = df[(min_value < df['总市值']) & (df['总市值'] < max_value)]
     df = df[df['代码'].str.startswith(tuple(code_prefixes))]
-    return [symbol_to_code(symbol) for symbol in list(df['代码'].values)]
+    return [symbol_to_code(symbol) for symbol in df['代码'].to_list()]
 
 
 # 获取当日可用的股票代码
 def get_available_stock_codes() -> list[str]:
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
 
@@ -554,7 +603,7 @@ def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[
     """
     prefixes: 六位数的两位数前缀
     """
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     if none_st:
         df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
@@ -562,7 +611,7 @@ def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[
 
 
 def get_none_st_codes() -> list[str]:
-    df = ak.stock_info_a_code_name()
+    df = AKCache.stock_info_a_code_name()
     df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
@@ -570,7 +619,7 @@ def get_none_st_codes() -> list[str]:
 
 # 获取流通市值，单位（元）
 def get_stock_codes_and_circulation_mv() -> Dict[str, int]:
-    df = ak.stock_zh_a_spot_em()
+    df = AKCache.stock_zh_a_spot_em()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     df = df[['代码', '流通市值']].dropna()
     return dict(zip(df['代码'], df['流通市值']))

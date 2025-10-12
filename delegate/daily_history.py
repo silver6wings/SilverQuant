@@ -5,7 +5,7 @@ import time
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
-from tools.utils_cache import get_prev_trading_date
+from tools.utils_cache import AKCache, get_prev_trading_date
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
@@ -78,7 +78,7 @@ class DailyHistory:
         if force_download:
             import akshare as ak
             try:
-                df = ak.stock_info_a_code_name()
+                df = AKCache.stock_info_a_code_name()
                 df.to_csv(code_list_path, index=False)
             except Exception as e:
                 print('[HISTORY] Download code list failed! ', e)

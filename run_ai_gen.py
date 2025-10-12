@@ -140,7 +140,7 @@ def near_trade_begin():
     history_list = my_pool.get_code_list()
     history_list += [position.stock_code for position in positions if is_symbol(position.stock_code)]
     # 使用 AKSHARE 数据源这些代码其实没作用
-    my_suber.refresh_memory_history(code_list=history_list, start=start, end=end)
+    my_suber.refresh_memory_history(code_list=history_list, start=start, end=end, data_source=data_source)
 
 
 # ======== 买点 ========

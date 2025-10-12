@@ -1,8 +1,7 @@
 '''
-需要 pip install gm
+https://www.myquant.cn/docs2/sdk/python/%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B.html
 需要另建一个虚拟环境，pandas改为1.5.3版本
-
-转换逻辑：dfcf_symbol <-> symbol <-> code
+需要在新环境安装 pip install gm
 '''
 import logging
 import pandas as pd
@@ -11,6 +10,9 @@ from gm.api import *
 from tools.utils_basic import symbol_to_code, code_to_symbol
 
 
+# ========================================
+# 转换逻辑：dfcf_symbol <-> symbol <-> code
+# ========================================
 def symbol_to_dfcf_symbol(symbol: str) -> str:
     if symbol[:2] in ['00', '30']:
         return f'SZSE.{symbol}'
@@ -33,10 +35,10 @@ def code_to_dfcf_symbol(code: str) -> str:
 def dfcf_symbol_to_code(dfcf_symbol: str) -> str:
     return symbol_to_code(dfcf_symbol_to_symbol(dfcf_symbol))
 
+
 # ===========
 # 回测买卖函数
 # ===========
-
 def order_sell(code, price, volume, remark):
     logging.warning(f' {remark} {code}, {price}, {volume}')
     order_volume(
@@ -60,10 +62,10 @@ def order_buy(code: str, price: float, volume: int):
         price=price,
     )
 
+
 # ===========
 # 回测框架函数
 # ===========
-
 def get_history_data(context, code: str, days: int, fields: list[str], frequency='1d') -> pd.DataFrame:
     return context.data(
         symbol=code_to_dfcf_symbol(code),
@@ -123,3 +125,14 @@ def update_cache_quote(quotes: dict[str, dict], bars: list[dict], curr_time: str
             quotes[code]['amount'] = 0
 
     return quotes
+
+
+# ===========
+# 回测Delegate
+# ===========
+class EmDelegate:
+    """
+    主要用东方财富内置的掘金系统做回测，因为可用的数据更多一些
+    为了跟GmDelegate作区分，起名EasyMoneyDelegate
+    """
+    pass
