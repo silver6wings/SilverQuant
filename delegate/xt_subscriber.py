@@ -106,6 +106,13 @@ class XtSubscriber(BaseSubscriber):
             from apscheduler.schedulers.blocking import BlockingScheduler
             self.scheduler = BlockingScheduler()
 
+        if self.is_ticks_df:
+            self.tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
+                + [f'askPrice{i}' for i in range(1, 6)] \
+                + [f'askVol{i}' for i in range(1, 6)] \
+                + [f'bidPrice{i}' for i in range(1, 6)] \
+                + [f'bidVol{i}' for i in range(1, 6)]
+
     # -----------------------
     # 策略触发主函数
     # -----------------------
@@ -254,14 +261,9 @@ class XtSubscriber(BaseSubscriber):
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史
         if self.is_ticks_df:
-            tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
-                + [f'askPrice{i}' for i in range(1, 6)] \
-                + [f'askVol{i}' for i in range(1, 6)] \
-                + [f'bidPrice{i}' for i in range(1, 6)] \
-                + [f'bidVol{i}' for i in range(1, 6)]
             for code in quotes:
                 if code not in self.today_ticks:
-                    self.today_ticks[code] = pd.DataFrame(columns=tick_df_cols)
+                    self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
                 quote = quotes[code]
                 tick = qmt_quote_to_tick(quote)
                 df = self.today_ticks[code]
