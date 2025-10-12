@@ -264,11 +264,13 @@ def del_held_day(lock: threading.Lock, path: str, key: str):
     with lock:
         try:
             held_info = load_json(path)
+
             if key in held_info:
                 held_info[key][InfoItem.DayCount] = None
             else:
+                # 逆回购或者未记录持仓卖出的场景
                 held_info[key] = {InfoItem.DayCount: None}
-            save_json(path, held_info)
+
             save_json(path, held_info)
             return True
         except Exception as e:
