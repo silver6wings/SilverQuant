@@ -443,6 +443,7 @@ def get_disk_trade_day_list_and_update_max_year() -> list:
 
 # 获取前n个交易日，返回格式 基本格式：%Y%m%d，扩展格式：%Y-%m-%d
 # 如果为非交易日，则取上一个交易日为前0天
+@functools.cache
 def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
     today = now.strftime('%Y-%m-%d')
@@ -466,6 +467,7 @@ def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool
 
 # 获取后n个交易日，返回格式 基本格式：%Y%m%d，扩展格式：%Y-%m-%d
 # 如果为非交易日，则取下一个交易日为后0天
+@functools.cache
 def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
     today = now.strftime('%Y-%m-%d')
@@ -524,7 +526,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
     print(f'[DO NOT KNOW {curr_date}, default to True trade day]')
     return True
 
-
+@functools.cache
 def check_is_open_day(curr_date: str) -> bool:
     """
     curr_date example: '2024-12-31'
