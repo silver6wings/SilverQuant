@@ -226,7 +226,7 @@ Sell Conf 卖点相关的参数
 
 以下为架构示意图，帮助二次开发的朋友们更好地理解和快速上手
 
-![image](https://github.com/silver6wings/SilverQuant/blob/main/imgs/architecture.png)
+![image](_imgs/architecture.png)
 
 ---
 
