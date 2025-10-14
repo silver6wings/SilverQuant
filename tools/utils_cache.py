@@ -526,7 +526,6 @@ def check_is_open_day_sina(curr_date: str) -> bool:
     print(f'[DO NOT KNOW {curr_date}, default to True trade day]')
     return True
 
-@functools.cache
 def check_is_open_day(curr_date: str) -> bool:
     """
     curr_date example: '2024-12-31'
