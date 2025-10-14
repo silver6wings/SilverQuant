@@ -262,12 +262,13 @@ class XtSubscriber(BaseSubscriber):
         # 记录 tick 历史
         if self.is_ticks_df:
             for code in quotes:
-                if code not in self.today_ticks:
-                    self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
                 quote = quotes[code]
                 tick = qmt_quote_to_tick(quote)
-                df = self.today_ticks[code]
-                df.loc[len(df)] = tick.values()     # 加入最后一行
+                new_tick_df = pd.DataFrame([tick], columns=self.tick_df_cols)
+                if code not in self.today_ticks:
+                    self.today_ticks[code] = new_tick_df
+                else:
+                    self.today_ticks[code] = pd.concat([self.today_ticks[code], new_tick_df], ignore_index=True)
         else:
             for code in quotes:
                 if code not in self.today_ticks:
