@@ -41,17 +41,6 @@ class PoolConf:
     ]
 
 
-class BuyConf:
-    time_ranges = []
-    interval = 15           # 扫描买入间隔，60的约数：1-6, 10, 12, 15, 20, 30
-    order_premium = 0.02    # 保证市价单成交的溢价，单位（元）
-
-    slot_count = 10         # 持股数量上限
-    slot_capacity = 10000   # 每个仓的资金上限
-    daily_buy_max = 10      # 单日买入股票上限
-    once_buy_limit = 5      # 单次选股最多买入股票数量
-
-
 class SellConf:
     time_ranges = [['09:31', '11:30'], ['13:00', '14:57']]
     interval = 1                    # 扫描卖出间隔，60的约数：1-6, 10, 12, 15, 20, 30
@@ -161,11 +150,6 @@ if __name__ == '__main__':
         strategy_name=STRATEGY_NAME,
         parameters=PoolConf,
         ding_messager=DING_MESSAGER,
-    )
-    my_buyer = Buyer(
-        strategy_name=STRATEGY_NAME,
-        delegate=my_delegate,
-        parameters=BuyConf,
     )
     my_seller = Seller(
         strategy_name=STRATEGY_NAME,
