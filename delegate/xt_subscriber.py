@@ -141,20 +141,22 @@ class XtSubscriber(BaseSubscriber):
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
                 if self.open_tick and (not self.quick_ticks):
-                    self.record_tick_to_memory(quotes)
+                    self.record_tick_to_memory(self.cache_quotes)
 
-                if self.execute_strategy(
+                is_clear = self.execute_strategy(
                     curr_date,      # str(%Y-%m-%d)
                     curr_time,      # str(%H:%M)
                     curr_seconds,   # str(%S)
                     self.cache_quotes,
-                ):
-                    with self.lock_quotes_update:
-                        self.cache_quotes.clear()  # execute_strategy() return True means need clear
+                )
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(quotes)
+                    self.record_tick_to_memory(self.cache_quotes)
+
+                if is_clear:
+                    with self.lock_quotes_update:
+                        self.cache_quotes.clear()  # execute_strategy() return True means need clear
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
