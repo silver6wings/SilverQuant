@@ -7,7 +7,7 @@ from typing import Optional
 
 from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
 from tools.utils_cache import TRADE_DAY_CACHE_PATH
-from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq
+from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq, get_xdxr
 
 
 class DataSource:
@@ -385,7 +385,7 @@ def get_mootdx_daily_history(
 
     if adjust != ExitRight.BFQ:
         try:
-            xdxr = client.xdxr(symbol=symbol)
+            xdxr = get_xdxr(symbol=symbol)
             if xdxr is not None and len(xdxr) > 0:
                 xdxr['date_str'] = xdxr['year'].astype(str) + \
                     '-' + xdxr['month'].astype(str).str.zfill(2) + \

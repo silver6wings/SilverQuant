@@ -1,5 +1,10 @@
-import pandas as pd
+import os
+import time
 import datetime
+import pandas as pd
+
+
+DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
 
 
 class MootdxClientInstance:
@@ -19,8 +24,30 @@ class MootdxClientInstance:
             try:
                 from credentials import TDX_FOLDER
                 self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
-            except:
+            except Exception as e:
+                print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
                 self.client = Quotes.factory(market='std')
+
+
+def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12):
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, f"{symbol}.csv")  # 缓存文件名：股票代码.csv
+    expire_seconds = expire_hours * 3600
+
+    if os.path.exists(cache_file):
+        file_mtime = os.path.getmtime(cache_file)
+        time_diff = time.time() - file_mtime
+
+        if time_diff <= expire_seconds:
+            return pd.read_csv(cache_file)
+
+    client = MootdxClientInstance().client
+    xdxr_data = client.xdxr(symbol=symbol)
+
+    if xdxr_data is not None:  # 简单判断数据有效性
+        xdxr_data.to_csv(cache_file, index=False)  # index=False不保存索引列
+
+    return xdxr_data
 
 
 def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
