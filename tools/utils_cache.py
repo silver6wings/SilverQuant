@@ -187,6 +187,15 @@ def get_stock_codes_and_names() -> Dict[str, str]:
     df = load_stock_code_and_names()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     ans.update(dict(zip(df['代码'], df['名称'])))
+    
+    repurchase_codes = ['131810.SZ', '131811.SZ', '131800.SZ', '131809.SZ', '131801.SZ',\
+                            '131802.SZ', '131803.SZ', '131805.SZ', '131806.SZ',\
+                            '204001.SH', '204002.SH', '204003.SH', '204004.SH', '204007.SH',\
+                            '204014.SH', '204028.SH', '204091.SH', '204182.SH']
+    for code in repurchase_codes:
+        ans[code] ='逆回购'
+    ans['888880.SH'] = '标准券'
+    ans['131990.SZ'] = '标准券'
     return ans
 
 
