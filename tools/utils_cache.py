@@ -460,6 +460,9 @@ def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool
 @functools.cache
 def get_prev_trading_date_str(today: str, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
     try:
         trading_index = list(trading_day_list).index(today)
     except ValueError:
@@ -488,6 +491,10 @@ def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool
 @functools.cache
 def get_next_trading_date_str(today: str, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
+
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
     try:
         trading_index = list(trading_day_list).index(today)
     except ValueError:
@@ -505,6 +512,50 @@ def get_next_trading_date_str(today: str, count: int, basic_format: bool = True)
         else:
             return trading_day_list[-1]
 
+# 获取前n个交易日列表，返回格式 %Y-%m-%d
+@functools.cache
+def get_prev_trading_date_list(today: str, count: int) -> list:
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
+    trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    try:
+        trading_index = list(trading_day_list).index(today)
+    except ValueError:
+        trading_index = np.searchsorted(trading_day_list, today) - 1
+    
+    return trading_day_list[trading_index - count : trading_index]
+
+
+#获取从start_day到end_day的交易日列表，返回列表，其中日期格式 %Y-%m-%d
+@functools.cache
+def get_trading_date_list(start_date: str, end_date: str) -> list:
+    if start_date == end_date:
+        return [start_date]
+    if len(start_date) == 8:
+        start_date = f'{start_date[0:4]}-{start_date[4:6]}-{start_date[6:8]}'
+    if len(end_date) == 8:
+        end_date = f'{end_date[0:4]}-{end_date[4:6]}-{end_date[6:8]}'
+        
+    trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    try:
+        start_trading_index = list(trading_day_list).index(start_date)
+    except ValueError:
+        start_trading_index = np.searchsorted(trading_day_list, start_date)
+    
+    if start_date > end_date:
+        return trading_day_list[start_trading_index : start_trading_index+1]
+    
+    try:
+        end_trading_index = list(trading_day_list).index(end_date)
+    except ValueError:
+        end_trading_index = np.searchsorted(trading_day_list, end_date) - 1
+    
+    if end_trading_index < len(trading_day_list):
+        return trading_day_list[start_trading_index : end_trading_index + 1]
+    else:
+        print('[CACHE] 找不到目标，默认返回已知最晚的交易日')
+        return trading_day_list[start_trading_index : -1]
 
 # 检查当日是否是交易日，使用sina数据源
 def check_is_open_day_sina(curr_date: str) -> bool:

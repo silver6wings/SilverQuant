@@ -14,10 +14,10 @@ from delegate.xt_delegate import XtDelegate
 from delegate.daily_history import DailyHistoryCache
 from delegate.daily_reporter import DailyReporter
 
-from tools.utils_cache import StockNames, InfoItem, check_is_open_day, check_open_day
+from tools.utils_cache import StockNames, InfoItem, check_is_open_day, check_open_day, get_trading_date_list
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
-from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
+from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick, get_tdxzip_history
 
 
 class BaseSubscriber:
@@ -82,7 +82,9 @@ class XtSubscriber(BaseSubscriber):
 
         self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
-        self.last_callback_time = datetime.datetime.now()
+        self.last_callback_time = datetime.datetime.now()       # 上次返回quotes 时间
+        self.history_day_klines : Dict[str, pd.DataFrame] = {} # 保存全部股票的日线数据550天，cache_history只包含code_list中指定天数数据
+        
         self.__extend_codes = ['399001.SZ', '510230.SH', '512680.SH', '159915.SZ', '510500.SH',
                                '588000.SH', '159101.SZ', '399006.SZ', '159315.SZ']
 
@@ -351,6 +353,25 @@ class XtSubscriber(BaseSubscriber):
         t1 = datetime.datetime.now()
         print(f'Prepared TIME COST: {t1 - t0}')
 
+    def _download_from_tdx(self, target_codes: list, start: str, end: str, adjust: str, columns: list[str]):
+        print(f'Prepared time range: {start} - {end}')
+        t0 = datetime.datetime.now()
+
+        full_history = get_tdxzip_history(adjust=adjust)
+        self.history_day_klines = full_history
+
+        days = len(get_trading_date_list(start, end))
+
+        i = 0
+        for code in target_codes:
+            if code in full_history:
+                i += 1
+                self.cache_history[code] = full_history[code][columns].tail(days).copy()
+        print(f'[HISTORY] Find {i}/{len(target_codes)} codes returned.')
+
+        t1 = datetime.datetime.now()
+        print(f'Prepared TIME COST: {t1 - t0}')
+
     def download_cache_history(
         self,
         cache_path: str,  # DATA SOURCE 是tushare的时候不需要
@@ -361,7 +382,7 @@ class XtSubscriber(BaseSubscriber):
         columns: list[str],
         data_source: DataSource,
     ):
-        if data_source == DataSource.AKSHARE:
+        if data_source == DataSource.AKSHARE or data_source == DataSource.TDXZIP:
             temp_indicators = load_pickle(cache_path)
             if temp_indicators is not None and len(temp_indicators) > 0:
                 # 如果有缓存就读缓存
@@ -376,12 +397,22 @@ class XtSubscriber(BaseSubscriber):
                 # 如果没缓存就刷新白名单
                 self.cache_history.clear()
                 self.cache_history = {}
-                self._download_from_remote(code_list, start, end, adjust, columns, data_source)
+                if data_source == DataSource.AKSHARE:
+                    self._download_from_remote(code_list, start, end, adjust, columns, data_source)
+                else:
+                    print('[提醒] 使用TDX ZIP文件作为数据源，请在RUN代码中添加调度任务check_xdxr_cache更新除权除息数据，建议运行时段在05:30之后。')
+                    print('[提醒] 使用TDX ZIP文件作为数据源，请在RUN代码中建议在near_trade_begin中执行download_cache_history获取历史数据，避免before_trade_day执行时间太早未更新除权信息。')
+                    self._download_from_tdx(code_list, start, end, adjust, columns)
+                    
                 save_pickle(cache_path, self.cache_history)
                 print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
                 if self.messager is not None:
                     self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                   f'历史{len(self.cache_history)}支')
+
+            if data_source == DataSource.TDXZIP and self.history_day_klines is None:
+                self.history_day_klines = get_tdxzip_history(adjust=adjust)
+
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
