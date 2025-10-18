@@ -1,12 +1,14 @@
 import csv
 import datetime
 import io
+import json
 import logging
 import os
 import sys
 import time
 import traceback
 import zipfile
+import pycurl
 
 import requests
 import numpy as np
@@ -397,6 +399,38 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
     except Exception as e: #异常不要紧，不要因为异常影响实际运行
         logging.error(f'处理除权除息数据出现问题：{str(e)}')
 
+def _pycurl_request(url, headers=None):
+        try:
+            buffer = io.BytesIO()
+            c = pycurl.Curl()
+            c.setopt(c.URL, url)
+            c.setopt(pycurl.TIMEOUT, 30)
+            c.setopt(pycurl.FOLLOWLOCATION, 1)
+            c.setopt(pycurl.MAXREDIRS, 5)
+            if headers is not None and len(headers)>0:
+                if isinstance(headers, dict):
+                    headers = [f'{key}: {value}' for key, value in headers.items()]
+                c.setopt(pycurl.HTTPHEADER, headers)
+            #c.setopt(c.VERBOSE, True)
+            c.setopt(pycurl.SSL_VERIFYPEER, 0)
+            c.setopt(pycurl.SSL_VERIFYHOST, 0)
+
+            c.setopt(c.WRITEDATA, buffer)
+            c.perform()
+            response_code = c.getinfo(c.RESPONSE_CODE)
+            c.close()
+            if response_code != 200:  #返回状态不对，或者返回文件太小
+                print(f'下载文件{url}失败')
+                buffer.close()
+                del buffer
+                return False, None
+            response_context = buffer.getvalue()
+            buffer.close()
+            return response_code, response_context
+        except Exception as e:
+            print(f'下载文件失败 {str(e)}')
+            return False, None
+
 def _get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame, int):
     """
     #该接口返回的df中code实际上是symbol，注意转换
@@ -408,28 +442,19 @@ def _get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame
     :return: 交易提醒-分红派息
     :rtype: pandas.DataFrame, int
     """
+
     def _get_stock_dividend(start_date: str, page=0) -> pd.DataFrame:
         divi_df, divi_count, has_more = pd.DataFrame(), 0, False
         if len(start_date) == 8:  # 20241107 -> 2024-11-07
             start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
         try:
-            
             url = f"https://finance.pae.baidu.com/sapi/v1/financecalendar?start_date={start_date}&end_date={start_date}&market=ab&pn={page}&rn=100&cate=notify_divide&finClientType=pc"
-            
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-                'Referer': 'https://gushitong.baidu.com/',
-                'Accept': 'application/vnd.finance-web.v1+json',
-                'Origin': 'https://gushitong.baidu.com',
-                'Priority': 'u=1, i',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-            }
-            resp = requests.get(url, headers=headers)
-            if resp.status_code != 200:
-                raise Exception(f'百度股市通接口异常，返回HTTP 状态码为{resp.status_code}')
+            headers.update({'Accept': 'application/vnd.finance-web.v1+json'})
+            status_code, content = _pycurl_request(url, headers=headers)
+            if status_code != 200:
+                raise Exception(f'百度股市通接口异常，返回HTTP 状态码为{status_code}')
                 return divi_df, divi_count, has_more
-            data_json = resp.json()
+            data_json = json.loads(content)
             if data_json.get('status', 0)!=0 or data_json.get('ResultCode', -1) != 0: #出错了
                 raise Exception(f'百度股市通接口异常，返回HTTP 状态码为{data_json.get('status', 0)} {data_json.get('ResultCode', -1)}')
                 return divi_df, divi_count, has_more
@@ -445,7 +470,15 @@ def _get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame
         except Exception as e:
             raise Exception(f'百度股市通接口异常：{str(e)}')
             return divi_df, divi_count, has_more
-    
+
+    #  函数主体
+    headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0',
+                'Referer': 'https://gushitong.baidu.com/',
+                'Origin': 'https://gushitong.baidu.com',
+            }
+    url = 'https://gushitong.baidu.com/calendar'
+    status_code, content = _pycurl_request(url, headers=headers)
     page = 0
     resdf = []
     while True:
