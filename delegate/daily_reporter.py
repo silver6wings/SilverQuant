@@ -93,6 +93,9 @@ class DailyReporter:
         for position in positions:
             if position.volume > 0:
                 code = position.stock_code
+                if code in ['888880.SH', '131990.SZ']: # 逆回购 标准券 # 逆回购不需计算 盈亏
+                    continue
+
                 if self.use_outside_data:
                     from tools.utils_remote import get_mootdx_quotes
                     quotes = get_mootdx_quotes([code])
