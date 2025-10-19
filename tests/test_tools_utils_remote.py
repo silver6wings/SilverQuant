@@ -28,7 +28,7 @@ def test_get_mootdx_daily_history():
     assert df1_test['low'].values[0] - df2_test['low'].values[0] > 0.01
 
 '''
- 下载时间较长，可仅在本地测试验证
+下载时间较长，可仅在本地测试验证
 def test_get_tdxzip_history():
     buffer = download_tdx_hsjday()
     assert buffer != False
@@ -66,6 +66,9 @@ def test_get_tdxzip_history():
     assert len(cache_history['000555.SZ']) == day_count
 '''
 
+
+'''
+远程Github服务器访问接口会有问题，也只跑本地测试即可
 def test_check_xdxr_cache():
     if os.path.isfile(PATH_TDX_XDXR):
         cache_xdxr_orig = load_pickle(PATH_TDX_XDXR)
@@ -97,4 +100,4 @@ def test_check_xdxr_cache():
     if xdxr_count > 0:
         assert len(cache_xdxr_new) == xdxr_count
     assert len(cache_xdxr_new[test_code]) > 0
-    
+'''
