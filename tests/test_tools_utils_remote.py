@@ -5,8 +5,8 @@ import datetime
 
 from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prev_trading_date_str, load_pickle
-from tools.utils_mootdx import check_xdxr_cache, _get_dividend_code_from_baidu
-from tools.utils_remote import PATH_TDX_XDXR, get_mootdx_daily_history, ExitRight
+from tools.utils_mootdx import PATH_TDX_XDXR, check_xdxr_cache, _get_dividend_code_from_baidu
+from tools.utils_remote import ExitRight, get_mootdx_daily_history
 
 
 def test_get_mootdx_daily_history():
