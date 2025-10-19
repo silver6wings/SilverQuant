@@ -2,12 +2,14 @@ import logging
 import io
 import os
 import sys
-import time
 import datetime
+import json
+import pycurl
+import time
+import traceback
 import zipfile
 import numpy as np
 import pandas as pd
-import pycurl
 
 from mootdx.utils import factor
 from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
@@ -15,8 +17,16 @@ from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
 from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
+from tools.utils_basic import symbol_to_code
+from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, load_pickle, save_pickle
+if 'tools.utils_remote' not in sys.modules:
+    from tools.utils_remote import ExitRight
+
 
 DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
+
+PATH_TDX_HISTORY = f'./_cache/_daily_tdxzip/history_tdxhsj.pkl'
+PATH_TDX_XDXR = f'./_cache/_daily_tdxzip/xdxr.pkl'
 
 
 class MootdxClientInstance:
@@ -389,10 +399,9 @@ def _get_stock_market(symbol='', string=False):
     elif symbol.startswith(('20', '4', '82', '83', '87', '92')):
         market = 'bj'
 
-
     # logger.debug(f"market => {market}")
 
-    if string is False:
+    if not string:
         if market == 'sh':
             market = MARKET_SH
 
@@ -431,19 +440,19 @@ def get_xdxr_sina(symbol, adjust, factor_name=None) -> pd.DataFrame:
         xdxr = xdxr.join(fq[1:], how='outer')
     return xdxr
 
-def factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, factor: pd.DataFrame = None) -> pd.DataFrame:
-    if factor is not None  and not factor.empty:
+def factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor: pd.DataFrame = None) -> pd.DataFrame:
+    if adj_factor is not None and not adj_factor.empty:
         raw.index = pd.to_datetime(raw.index)
-        factor.index = pd.to_datetime(factor.index)
+        adj_factor.index = pd.to_datetime(adj_factor.index)
 
         # 按日期升序排列复权因子
-        factor = factor.sort_index(ascending=True)
+        adj_factor = adj_factor.sort_index(ascending=True)
         raw = raw.sort_index(ascending=True)
         # 获取原始数据期间的复权因子
         # 使用最近的可用的复权因子（向后填充）
-        factor = factor.reindex(raw.index, method='ffill')
+        adj_factor = adj_factor.reindex(raw.index, method='ffill')
 
-        data = pd.concat([raw, factor.loc[raw.index[0]: raw.index[-1], ['factor']]], axis=1)
+        data = pd.concat([raw, adj_factor.loc[raw.index[0]: raw.index[-1], ['factor']]], axis=1)
         data.factor = data.factor.fillna(1.0, axis=0)
         data.factor = data.factor.astype(float)
         if method == 'qfq':
@@ -501,20 +510,20 @@ def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
         buffer = download_tdx_hsjday()
         end = datetime.datetime.now().timestamp()
         
-        if buffer == False:
+        if not buffer:
             return False
         
         buffer.seek(0, io.SEEK_END)
         response_length = buffer.tell()
-        filesize = response_length /1024 /1024
-        print(f'下载耗时{end-start:.2f}秒, 速度：{filesize/(end-start):.2f} MB/s。')
-        if isExtract == True:
+        file_size = response_length / 1024 / 1024
+        print(f'下载耗时{end-start:.2f}秒, 速度：{file_size/(end-start):.2f} MB/s。')
+        if isExtract:
             vipdocdir = os.path.join(TDXDIR, 'vipdoc')
             os.makedirs(vipdocdir, exist_ok=True)
             end = datetime.datetime.now().timestamp()
 
             filenum = 0
-            print(f"已下载，文件大小：{filesize:.2f}MB。开始解压文件到: {TDXDIR} 。")
+            print(f"已下载，文件大小：{file_size:.2f}MB。开始解压文件到: {TDXDIR} 。")
             with zipfile.ZipFile(buffer, 'r') as zip_ref:
                 zip_ref.extractall(vipdocdir)
                 filenum = len(zip_ref.infolist())
@@ -542,3 +551,294 @@ def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
         error_msg = f"未知错误: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
         return False
+
+
+# ================================================
+# TDX_ZIP
+# ================================================
+
+
+def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust):
+    """处理tdx zip文件，未来需改造多线程"""
+    now = datetime.datetime.now()
+    curr_date = now.strftime("%Y-%m-%d")
+    result = {}
+    factor_name = f'{adjust}_factor'
+    default_columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'adj']
+    barreader = MootdxDailyBarReaderInstance().reader
+
+    for code in groupcodes:
+        arr = code.split('.')
+        assert len(arr) == 2, 'code不符合格式'
+        symbol = arr[0]
+        market = arr[1].lower()
+        filename = f'{market}/lday/{market}{symbol}.day'
+
+        try:
+            member = zip_ref.getinfo(filename)
+        except KeyError:
+            # 文件不存在
+            result[code] = None, code, 'maybe is new stock'
+            continue
+        df = None
+        try:
+            with zip_ref.open(member) as source:
+                # 以下代码来自 TdxDailyBarReader.get_df_by_file()
+                security_type = barreader.get_security_type(filename)
+
+                if security_type not in barreader.SECURITY_TYPE:
+                    result[code] = None, code, 'security_type'
+                    continue
+
+                coefficient = barreader.SECURITY_COEFFICIENT[security_type]
+                content = barreader.unpack_records("<IIIIIfII", source.read())
+                data = [barreader._df_convert(row_, coefficient) for row_ in content]
+
+                df = pd.DataFrame(data=data[-day_count:], columns=["datetime", "open", "high", "low", "close", "amount", "volume"])
+                df.index = pd.to_datetime(df['datetime'], errors="coerce")
+        except Exception as e:
+            print('x', end='')
+            result[code] = None, code, f'extract zip error: str{e}'
+            continue
+
+        try:
+            xdxr = cache_xdxr.get(code, None)
+            if xdxr is None:
+                xdxr = get_xdxr_sina(symbol, adjust, factor_name)
+                if xdxr is not None and len(xdxr) > 0:
+                    cache_xdxr[code] = xdxr
+
+            if xdxr is not None and len(xdxr) > 0 and adjust and adjust in [ExitRight.QFQ, ExitRight.HFQ] :
+                try:
+                    if symbol == '689009':
+                        raise Exception('CDR公司')
+                    if factor_name not in xdxr.columns: # 没有复权因子数据需要更新
+                        fq = _fetch_xdxr_factor(symbol, adjust, factor_name)
+                        xdxr = xdxr.join(fq[1:], how='outer')
+                        cache_xdxr[code] = xdxr
+                    else:
+                        fq = xdxr.loc[xdxr['category'] == 1, [factor_name]]
+                        fq.index.name = 'date'
+                        fq.rename(columns={factor_name:'factor'}, inplace=True)
+                    xdxr_info = xdxr.loc[xdxr['category'] == 1]
+                    if not xdxr_info.empty and xdxr_info.index[-1].date() == now.date():
+                        if fq.index[-1].date() != now.date() or pd.isna(xdxr_info.iloc[-1][factor_name]) == True:
+                            raise Exception('缺少今日除权因子数据')
+                    df = factor_reversion(adjust, df, fq)
+                    df.rename(columns={'factor': 'adj'}, inplace=True)
+                except Exception as e:
+                    is_append = False
+                    xdxr_info = xdxr.loc[xdxr['category'] == 1]
+                    if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
+                        last_row = df.iloc[-1].copy()
+                        last_row['datetime'] = curr_date
+                        df.loc[len(df)] = last_row
+                        df.index = pd.to_datetime(df['datetime'].astype(str), errors="coerce")
+                        is_append = True
+
+                    if adjust == ExitRight.QFQ:
+                        df = make_qfq(df, xdxr)
+                    elif adjust == ExitRight.HFQ:
+                        df = make_hfq(df, xdxr)
+                    if is_append == True:
+                        df = df[:-1]
+        except Exception as e:
+            result[code] = df, code, f'xdxr error: {e}'
+            continue
+
+        if df is not None and len(df) > 0 and type(df) == pd.DataFrame and 'datetime' in df.columns:
+            try:
+                df.replace([np.inf, -np.inf], np.nan, inplace=True)
+                df.dropna(inplace=True)  # 然后删除所有包含 NaN 的行
+                df['volume'] = df['volume'].astype(int)
+                df['datetime'] = df['datetime'].str.replace('-', '').astype(int)
+                df = df.reset_index(drop=True)
+                if 'adj' not in df.columns:
+                    df['adj'] = 1.0
+                result[code] = df[default_columns], code, None
+            except Exception as e:
+                print('x', end='')
+                result[code] = None, code, 'format error: str{e}'
+                continue
+        else:
+            result[code] = None, code, 'no data'
+            continue
+    return result
+
+
+# 检查xdxr缓存，建议定时调度运行
+def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
+    """
+    检查缓存的通达信除权除息数据，cache_xdxr数据格式为stockcode:pd.DataFrame，以及updatedtime: Datetime
+    如果发现有除权除息日大于updatetime 且小于当前日期，就删除cache条目
+    """
+    now = datetime.datetime.now()
+    curr_date = now.strftime("%Y-%m-%d")
+    try:
+        cache_xdxr = load_pickle(PATH_TDX_XDXR)
+        if cache_xdxr is None or not isinstance(cache_xdxr, dict):
+            logging.warning('未能加载除权除息缓存文件')
+            print('未能加载除权除息缓存文件')
+            return
+
+        if cache_xdxr.get('updatedtime', None) is None or not isinstance(cache_xdxr['updatedtime'], datetime.datetime):
+            date_list = get_prev_trading_date_list(curr_date, 20)
+        else:
+            updated_date = cache_xdxr['updatedtime'].strftime('%Y-%m-%d')
+            date_list = get_trading_date_list(updated_date, curr_date)[1:]
+
+        factor_name = f'{adjust}_factor'
+        removed_xdxr_codes = set()
+
+        for cdate in date_list:
+            try:
+                xcdf, divicount = _get_dividend_code_from_baidu(cdate)  #该接口返回的df中code实际上是symbol，注意转换
+            except Exception as e:
+                logging.warning(f'从百度获取 {cdate} 除权股票列表数据出现问题：{str(e)}')
+                print(f'从百度获取 {cdate} 除权股票列表数据出现问题：{str(e)}')
+                continue
+            if divicount != len(xcdf):
+                logging.warning(f'从百度获取 {cdate} 除权股票列表数据不完整。期望获得{divicount}，实际获得{len(xcdf)}')
+                print(f'从百度获取 {cdate} 除权股票列表数据不完整。期望获得{divicount}，实际获得{len(xcdf)}')
+
+            for row in xcdf.itertuples():
+                symbol = row.code
+                code = symbol_to_code(symbol)
+                xdxr = cache_xdxr.get(code, None)
+                if xdxr is None: # 没有该股票的除权除息信息，需重新获取
+                    removed_xdxr_codes.add(symbol)
+                    continue
+
+                curr_xc = xdxr.loc[xdxr['category'] == 1]
+                if (
+                        not curr_xc.empty
+                        and factor_name in curr_xc.columns
+                        and curr_xc.iloc[-1]["date_str"] == cdate
+                        and (
+                        pd.isna(curr_xc.iloc[-1][factor_name])
+                        or abs(float(curr_xc.iloc[-1][factor_name]) - 1.0) <= 0.001
+                )
+                ):
+                    continue
+                removed_xdxr_codes.add(symbol)
+
+        if len(removed_xdxr_codes) > 0:
+            print(f'{len(removed_xdxr_codes)}只股票需要更新复权因子。')
+            success_count = 0
+            for symbol in removed_xdxr_codes:
+                code = symbol_to_code(symbol)
+                try:
+                    xdxr = get_xdxr_sina(symbol, adjust, factor_name)
+                    if xdxr is not None and not xdxr.empty:
+                        curr_xc = xdxr.loc[xdxr['category'] == 1]
+                        if not curr_xc.empty and factor_name in curr_xc.columns and float(curr_xc.iloc[-1][factor_name]) == 1.0 :
+                            cache_xdxr[code] = xdxr
+                            success_count += 1
+                            continue
+                    logging.error(f'更新{code}除权除息数据有异常，无有效数据。')
+                    print(f'更新{code}除权除息数据有异常，无有效数据。')
+                except Exception as e:
+                    logging.error(f'更新{code}除权除息数据失败，错误:{str(e)}')
+                    print(f'更新{code}除权除息数据失败，错误:{str(e)}')
+            if len(removed_xdxr_codes) == success_count: # 成功更新才更新时间，让第二天再次更新
+                cache_xdxr['updatedtime'] = datetime.datetime.now()
+            save_pickle(PATH_TDX_XDXR, cache_xdxr)
+            print(f'成功更新{success_count}只股票复权因子。')
+    except Exception as e: #异常不要紧，不要因为异常影响实际运行
+        logging.error(f'处理除权除息数据出现问题：{str(e)}')
+
+def _pycurl_request(url, headers=None):
+    try:
+        buffer = io.BytesIO()
+        c = pycurl.Curl()
+        c.setopt(c.URL, url)
+        c.setopt(pycurl.TIMEOUT, 30)
+        c.setopt(pycurl.FOLLOWLOCATION, 1)
+        c.setopt(pycurl.MAXREDIRS, 5)
+        if headers is not None and len(headers)>0:
+            if isinstance(headers, dict):
+                headers = [f'{key}: {value}' for key, value in headers.items()]
+            c.setopt(pycurl.HTTPHEADER, headers)
+        #c.setopt(c.VERBOSE, True)
+        c.setopt(pycurl.SSL_VERIFYPEER, 0)
+        c.setopt(pycurl.SSL_VERIFYHOST, 0)
+
+        c.setopt(c.WRITEDATA, buffer)
+        c.perform()
+        response_code = c.getinfo(c.RESPONSE_CODE)
+        c.close()
+        if response_code != 200:  #返回状态不对，或者返回文件太小
+            print(f'下载文件{url}失败')
+            buffer.close()
+            del buffer
+            return False, None
+        response_context = buffer.getvalue()
+        buffer.close()
+        return response_code, response_context
+    except Exception as e:
+        print(f'下载文件失败 {str(e)}')
+        return False, None
+
+def _get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame, int):
+    """
+    #该接口返回的df中code实际上是symbol，注意转换
+    from AKShare
+    百度股市通-交易提醒-分红派息
+    https://gushitong.baidu.com/calendar
+    :param date: 查询日期
+    :type date: str
+    :return: 交易提醒-分红派息
+    :rtype: pandas.DataFrame, int
+    """
+
+    def _get_stock_dividend(start_date: str, page=0) -> pd.DataFrame:
+        divi_df, divi_count, has_more = pd.DataFrame(), 0, False
+        if len(start_date) == 8:  # 20241107 -> 2024-11-07
+            start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
+        try:
+            url = f"https://finance.pae.baidu.com/sapi/v1/financecalendar?start_date={start_date}&end_date={start_date}&market=ab&pn={page}&rn=100&cate=notify_divide&finClientType=pc"
+            headers.update({'Accept': 'application/vnd.finance-web.v1+json'})
+            status_code, content = _pycurl_request(url, headers=headers)
+            if status_code != 200:
+                raise Exception(f'百度股市通接口异常，返回HTTP 状态码为{status_code}')
+                # return divi_df, divi_count, has_more
+            data_json = json.loads(content)
+            if data_json.get('status', 0)!=0 or data_json.get('ResultCode', -1) != 0: #出错了
+                raise Exception(f'百度股市通接口异常，返回HTTP 状态码为{data_json.get("status", 0)} {data_json.get("ResultCode", -1)}')
+                # return divi_df, divi_count, has_more
+
+            for item in data_json['Result']['calendarInfo']:
+                divi_data = item["list"]
+                divi_count += item['total']
+                has_more = bool(item['hasMore'])
+                if len(divi_data) > 0:
+                    divi_df = pd.concat([divi_df, pd.DataFrame(divi_data)], ignore_index=True)
+
+            return divi_df[["code","name","date"]], divi_count, has_more #
+        except Exception as e:
+            raise Exception(f'百度股市通接口异常：{str(e)}')
+            # return divi_df, divi_count, has_more
+
+    #  函数主体
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0',
+        'Referer': 'https://gushitong.baidu.com/',
+        'Origin': 'https://gushitong.baidu.com',
+    }
+    url = 'https://gushitong.baidu.com/calendar'
+
+    status_code, content = _pycurl_request(url, headers=headers)
+
+    page = 0
+    res_df = []
+    while True:
+        df, divi_count, has_more = _get_stock_dividend(start_date, page)
+        if len(res_df) == 0 and has_more == False:  # 第一次调用的时候如果没有更多分页直接返回
+            return df, divi_count
+        if not df.empty:
+            res_df.append(df)
+
+        if not has_more:
+            return pd.concat(res_df, ignore_index=True), divi_count
+        page += 1
+        time.sleep(0.5)
