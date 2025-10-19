@@ -395,7 +395,9 @@ def get_ts_daily_history(
 
     # from reader.tushare_agent import get_tushare_pro
     import tushare as ts
-    pd.set_option('future.no_silent_downcasting', True)
+    import warnings
+    warnings.filterwarnings('ignore', category=FutureWarning,
+        message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
 
     try_times = 0
     df = None
