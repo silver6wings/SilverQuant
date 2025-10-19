@@ -1,7 +1,7 @@
 import os
 import datetime
 import time
-
+import random
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
@@ -47,6 +47,7 @@ class DailyHistory:
         self.root_path = f'{root_path}_{data_source}'
         self.data_source = data_source
         self.init_day_count = init_day_count
+        self.last_update_time = f'{self.root_path}/_last_update_time.txt'
 
         os.makedirs(self.root_path, exist_ok=True)
         self.cache_history: dict[str, pd.DataFrame] = {}
@@ -120,7 +121,7 @@ class DailyHistory:
                     adjust=ExitRight.QFQ,
                     data_source=self.data_source,
                 )
-                time.sleep(0.5)
+                time.sleep(random.uniform(1, 5))
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue
@@ -217,6 +218,7 @@ class DailyHistory:
                 start_date=target_date,
                 end_date=target_date,
                 columns=self.default_columns,
+                adjust=ExitRight.QFQ,
             )
 
             # 填补缺失的日期
@@ -298,6 +300,11 @@ class DailyHistory:
             self.load_history_from_disk_to_memory()
 
         self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
+
+        ttl = self.since_last_update_datetime()
+        if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+            return
+
         code_list = self.get_code_list()
 
         # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍
@@ -321,6 +328,25 @@ class DailyHistory:
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
+
+        self.write_last_update_datetime()
+
+    def write_last_update_datetime(self):
+        current_utc_time = datetime.datetime.utcnow()
+        with open(self.last_update_time, 'w', encoding='utf-8') as f:
+            f.write(current_utc_time.isoformat())
+
+    def since_last_update_datetime(self):
+        try:
+            with open(self.last_update_time, 'r', encoding='utf-8') as f:
+                last_time_str = f.read().strip()
+            last_time = datetime.datetime.fromisoformat(last_time_str)
+            current_time = datetime.datetime.utcnow()
+            time_delta = current_time - last_time
+            return time_delta.total_seconds()
+        except Exception as e:
+            print(f"Get local history update TTL failed: {str(e)}")
+            return None
 
     # ==============
     #  除权更新逻辑
