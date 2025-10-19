@@ -17,10 +17,9 @@ from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
 from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
+from tools.constants import ExitRight
 from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, load_pickle, save_pickle
-if 'tools.utils_remote' not in sys.modules:
-    from tools.utils_remote import ExitRight
 
 
 DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'

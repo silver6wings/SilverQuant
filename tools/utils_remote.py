@@ -1,5 +1,4 @@
 import os
-import sys
 import csv
 import time
 import datetime
@@ -11,24 +10,12 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
+from tools.constants import DataSource, ExitRight
 from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
 from tools.utils_cache import TRADE_DAY_CACHE_PATH, get_available_stock_codes, load_pickle, save_pickle
-if 'tools.utils_mootdx' not in sys.modules:
-    from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq, get_xdxr, \
+
+from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq, get_xdxr, \
         download_tdx_hsjday, _process_tdx_zip_to_datas, PATH_TDX_HISTORY, PATH_TDX_XDXR
-
-
-class DataSource:
-    AKSHARE = 'akshare'
-    TUSHARE = 'tushare'
-    MOOTDX = 'mootdx'
-    TDXZIP = 'tdxzip'
-
-
-class ExitRight:
-    BFQ = ''     # 不复权
-    QFQ = 'qfq'  # 前复权
-    HFQ = 'hfq'  # 后复权
 
 
 def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
