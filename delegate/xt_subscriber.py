@@ -83,7 +83,9 @@ class XtSubscriber(BaseSubscriber):
         self.code_list = ['000001.SH']  # 默认只有上证指数
         self.stock_names = StockNames()
         self.last_callback_time = datetime.datetime.now()       # 上次返回quotes 时间
-        self.history_day_klines : Dict[str, pd.DataFrame] = {} # 保存全部股票的日线数据550天，cache_history只包含code_list中指定天数数据
+
+        # 这个成员变量区别于cache_history，保存全部股票的日线数据550天，cache_history只包含code_list中指定天数数据
+        self.history_day_klines : Dict[str, pd.DataFrame] = {}
         
         self.__extend_codes = ['399001.SZ', '510230.SH', '512680.SH', '159915.SZ', '510500.SH',
                                '588000.SH', '159101.SZ', '399006.SZ', '159315.SZ']
@@ -145,12 +147,8 @@ class XtSubscriber(BaseSubscriber):
                 if self.open_tick and (not self.quick_ticks):
                     self.record_tick_to_memory(self.cache_quotes)
 
-                is_clear = self.execute_strategy(
-                    curr_date,      # str(%Y-%m-%d)
-                    curr_time,      # str(%H:%M)
-                    curr_seconds,   # str(%S)
-                    self.cache_quotes,
-                )
+                # str(%Y-%m-%d) str(%H:%M) str(%S) dict(code: quotes)
+                is_clear = self.execute_strategy(curr_date, curr_time, curr_seconds, self.cache_quotes)
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
@@ -182,12 +180,8 @@ class XtSubscriber(BaseSubscriber):
             if int(curr_seconds) % self.execute_interval == 0:
                 print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
 
-                self.execute_strategy(
-                    curr_date,  # str(%Y-%m-%d)
-                    curr_time,  # str(%H:%M)
-                    curr_seconds,  # str(%S)
-                    {},
-                )
+                # str(%Y-%m-%d), str(%H:%M), str(%S)
+                self.execute_strategy(curr_date, curr_time, curr_seconds, {})
 
     @check_open_day
     def callback_open_no_quotes(self) -> None:
