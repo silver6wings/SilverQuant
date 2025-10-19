@@ -381,6 +381,7 @@ def xt_time_to_hms(timestamp: int) -> tuple[int, int, int]:
         timestamp = timestamp // 1000
         dt = datetime.datetime.fromtimestamp(timestamp)
         return dt.hour, dt.minute, dt.second
+    return 0, 0, 0
 
 
 def xt_time_to_past_seconds(timestamp: int) -> int:
