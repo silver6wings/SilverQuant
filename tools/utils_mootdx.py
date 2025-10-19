@@ -1,7 +1,7 @@
-import logging
-import io
 import os
 import sys
+import logging
+import io
 import datetime
 import json
 import pycurl

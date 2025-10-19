@@ -1,11 +1,11 @@
-import pytest
-
 import datetime
+import io
 import os
+import pytest
 from tools.utils_basic import symbol_to_code
-from tools.utils_cache import get_prev_trading_date_str, load_pickle
-from tools.utils_mootdx import _get_dividend_code_from_baidu, check_xdxr_cache
-from tools.utils_remote import PATH_TDX_XDXR, get_mootdx_daily_history, ExitRight
+from tools.utils_cache import get_prev_trading_date_list, get_prev_trading_date_str, get_trading_date_list, load_pickle
+from tools.utils_mootdx import download_tdx_hsjday
+from tools.utils_remote import PATH_TDX_XDXR, _get_dividend_code_from_baidu, check_xdxr_cache, get_mootdx_daily_history, ExitRight, get_tdxzip_history
 
 
 def test_get_mootdx_daily_history():
@@ -65,21 +65,17 @@ def test_get_tdxzip_history():
     assert len(cache_history['000555.SZ']) == day_count
 '''
 
-
 def test_check_xdxr_cache():
     if os.path.isfile(PATH_TDX_XDXR):
         cache_xdxr_orig = load_pickle(PATH_TDX_XDXR)
-        updated_time = cache_xdxr_orig.get('updatedtime', None)
-        updated_date = updated_time.strftime('%Y-%m-%d') # 文件存在的话
-        assert updated_time is not None
+        updatedtime = cache_xdxr_orig.get('updatedtime', None)
+        updated_date = updatedtime.strftime('%Y-%m-%d') # 文件存在的话
+        assert updatedtime is not None
     else:
-        cache_xdxr_orig = {}
         updated_date = get_prev_trading_date_str(datetime.datetime.now().strftime('%Y-%m-%d'), 0)
-
     xcdf, divicount = _get_dividend_code_from_baidu(updated_date)
     assert len(xcdf) > 0 # 百度除权信息接口正常
     assert len(xcdf) == divicount # 百度除权信息接口正常
-
     xdxr_count = len(cache_xdxr_orig)
     test_code = symbol_to_code(xcdf.iloc[-1]['code'])
     print(test_code)
@@ -97,3 +93,4 @@ def test_check_xdxr_cache():
     if xdxr_count > 0:
         assert len(cache_xdxr_new) == xdxr_count
     assert len(cache_xdxr_new[test_code]) > 0
+    
