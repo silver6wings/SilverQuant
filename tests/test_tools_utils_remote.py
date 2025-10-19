@@ -1,14 +1,11 @@
 import pytest
 
-import os
-import datetime
-
-from tools.utils_basic import symbol_to_code
-from tools.utils_cache import get_prev_trading_date_str, load_pickle
-from tools.utils_mootdx import PATH_TDX_XDXR, check_xdxr_cache, _get_dividend_code_from_baidu
-from tools.utils_remote import ExitRight, get_mootdx_daily_history
+from tools.utils_cache import get_prev_trading_date_str
+from tools.utils_mootdx import *
+from tools.utils_remote import ExitRight, get_mootdx_daily_history, get_tdxzip_history
 
 
+@pytest.mark.local_only
 def test_get_mootdx_daily_history():
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     code = '603929.SH' #20250922 每股除权除息 10派10
@@ -27,8 +24,8 @@ def test_get_mootdx_daily_history():
     assert df1_test['high'].values[0] - df2_test['high'].values[0] > 0.01
     assert df1_test['low'].values[0] - df2_test['low'].values[0] > 0.01
 
-'''
-下载时间较长，可仅在本地测试验证
+
+@pytest.mark.local_only
 def test_get_tdxzip_history():
     buffer = download_tdx_hsjday()
     assert buffer != False
@@ -64,11 +61,10 @@ def test_get_tdxzip_history():
             cache_history[code] = full_history[code][default_columns].tail(days).copy()
     assert len(cache_history) == len(target_codes)
     assert len(cache_history['000555.SZ']) == day_count
-'''
 
 
-'''
-远程Github服务器访问接口会有问题，也只跑本地测试即可
+# 远程Github服务器访问接口会有问题，也只跑本地测试即可
+@pytest.mark.local_only
 def test_check_xdxr_cache():
     if os.path.isfile(PATH_TDX_XDXR):
         cache_xdxr_orig = load_pickle(PATH_TDX_XDXR)
@@ -79,7 +75,7 @@ def test_check_xdxr_cache():
         cache_xdxr_orig = {}
         updated_date = get_prev_trading_date_str(datetime.datetime.now().strftime('%Y-%m-%d'), 0)
 
-    xcdf, divicount = _get_dividend_code_from_baidu(updated_date)
+    xcdf, divicount = get_dividend_code_from_baidu(updated_date)
     assert len(xcdf) > 0 # 百度除权信息接口正常
     assert len(xcdf) == divicount # 百度除权信息接口正常
 
@@ -100,4 +96,3 @@ def test_check_xdxr_cache():
     if xdxr_count > 0:
         assert len(cache_xdxr_new) == xdxr_count
     assert len(cache_xdxr_new[test_code]) > 0
-'''

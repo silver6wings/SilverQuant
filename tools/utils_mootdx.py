@@ -1,5 +1,4 @@
 import os
-import sys
 import logging
 import io
 import datetime
@@ -366,6 +365,7 @@ def make_hfq(bfq_data, xdxr_data):
     return data.query('if_trade==1 and open != 0').drop(
         ['fenhong', 'peigu', 'peigujia', 'songzhuangu', 'if_trade', 'category'], axis=1)
 
+
 def _get_stock_market(symbol='', string=False):
     """ 本函数从mootdx而来，增加北交所判断，mootdx修复后需改为另外调用
     判断股票ID对应的证券市场匹配规则
@@ -414,6 +414,7 @@ def _get_stock_market(symbol='', string=False):
 
     return market
 
+
 def _fetch_xdxr_factor(symbol, adjust, factor_name=None) -> pd.DataFrame:
     if factor_name is None:
         factor_name = f'{adjust}_factor'
@@ -425,7 +426,8 @@ def _fetch_xdxr_factor(symbol, adjust, factor_name=None) -> pd.DataFrame:
     fq.rename(columns={'factor': factor_name}, inplace=True)
     fq.sort_index(ascending=True, inplace=True)
     return fq
-        
+
+
 def get_xdxr_sina(symbol, adjust, factor_name=None) -> pd.DataFrame:
     xdxr = MootdxClientInstance().client.xdxr(symbol=symbol)
     if xdxr is not None and len(xdxr) > 0:
@@ -438,6 +440,7 @@ def get_xdxr_sina(symbol, adjust, factor_name=None) -> pd.DataFrame:
         fq = _fetch_xdxr_factor(symbol, adjust, factor_name)
         xdxr = xdxr.join(fq[1:], how='outer')
     return xdxr
+
 
 def factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor: pd.DataFrame = None) -> pd.DataFrame:
     if adj_factor is not None and not adj_factor.empty:
@@ -463,6 +466,7 @@ def factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor: 
         return data
     raw['factor'] = 1.0
     return raw
+
 
 # 从通达信网站下载日线文件，每日盘前或盘后16:00之后下载，建议盘前
 def download_tdx_hsjday() -> io.BytesIO|bool:
@@ -691,7 +695,7 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
 
         for cdate in date_list:
             try:
-                xcdf, divicount = _get_dividend_code_from_baidu(cdate)  #该接口返回的df中code实际上是symbol，注意转换
+                xcdf, divicount = get_dividend_code_from_baidu(cdate)  #该接口返回的df中code实际上是symbol，注意转换
             except Exception as e:
                 logging.warning(f'从百度获取 {cdate} 除权股票列表数据出现问题：{str(e)}')
                 print(f'从百度获取 {cdate} 除权股票列表数据出现问题：{str(e)}')
@@ -746,6 +750,7 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
     except Exception as e: #异常不要紧，不要因为异常影响实际运行
         logging.error(f'处理除权除息数据出现问题：{str(e)}')
 
+
 def _pycurl_request(url, headers=None):
     try:
         buffer = io.BytesIO()
@@ -778,7 +783,8 @@ def _pycurl_request(url, headers=None):
         print(f'下载文件失败 {str(e)}')
         return False, None
 
-def _get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame, int):
+
+def get_dividend_code_from_baidu(start_date: str = "20241107") -> (pd.DataFrame, int):
     """
     #该接口返回的df中code实际上是symbol，注意转换
     from AKShare
