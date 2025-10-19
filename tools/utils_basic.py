@@ -16,8 +16,8 @@ def debug(*args, **kwargs):
 def pd_show_all() -> None:
     import pandas as pd
     pd.set_option('display.width', None)
-    pd.set_option('display.min_rows', 1000)
-    pd.set_option('display.max_rows', 5000)
+    pd.set_option('display.min_rows', 9999)
+    pd.set_option('display.max_rows', 9999)
     pd.set_option('display.max_columns', 200)
     pd.set_option('display.unicode.ambiguous_as_wide', True)
     pd.set_option('display.unicode.east_asian_width', True)

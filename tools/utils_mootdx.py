@@ -1,5 +1,5 @@
-import io
 import logging
+import io
 import os
 import sys
 import time
@@ -11,8 +11,10 @@ import pycurl
 
 from mootdx.utils import factor
 from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
+
 from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
+
 
 DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
 
@@ -53,6 +55,7 @@ class MootdxDailyBarReaderInstance:
         if self.reader is None:
             self.reader = MooTdxDailyBarReader()
             pd.set_option('future.no_silent_downcasting', True)
+
 
 class MooTdxDailyBarReader(TdxDailyBarReader):
     """本类从mootdx复制而来，增加北交所处理，mootdx更新后需改为mootdx调用"""
@@ -140,7 +143,6 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         raise NotImplementedError
 
 
-
 def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12):
     os.makedirs(cache_dir, exist_ok=True)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")  # 缓存文件名：股票代码.csv
@@ -153,13 +155,17 @@ def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours
         if time_diff <= expire_seconds:
             return pd.read_csv(cache_file)
 
-    client = MootdxClientInstance().client
-    xdxr_data = client.xdxr(symbol=symbol)
+    try:
+        client = MootdxClientInstance().client
+        xdxr_data = client.xdxr(symbol=symbol)
 
-    if xdxr_data is not None:  # 简单判断数据有效性
-        xdxr_data.to_csv(cache_file, index=False)  # index=False不保存索引列
+        if xdxr_data is not None:  # 简单判断数据有效性
+            xdxr_data.to_csv(cache_file, index=False)  # index=False不保存索引列
 
-    return xdxr_data
+        return xdxr_data
+    except Exception as e:
+        print(f' mootdx get xdxr {symbol} error: ', e)
+        return None
 
 
 def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
