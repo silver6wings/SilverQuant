@@ -332,17 +332,18 @@ class DailyHistory:
         self.write_last_update_datetime()
 
     def write_last_update_datetime(self):
-        current_utc_time = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         with open(self.last_update_time, 'w', encoding='utf-8') as f:
-            f.write(current_utc_time.isoformat())
+            f.write(now.isoformat())
 
     def since_last_update_datetime(self):
         try:
             with open(self.last_update_time, 'r', encoding='utf-8') as f:
                 last_time_str = f.read().strip()
+
             last_time = datetime.datetime.fromisoformat(last_time_str)
-            current_time = datetime.datetime.utcnow()
-            time_delta = current_time - last_time
+            now = datetime.datetime.now()
+            time_delta = now - last_time
             return time_delta.total_seconds()
         except Exception as e:
             print(f"Get local history update TTL failed: {str(e)}")
