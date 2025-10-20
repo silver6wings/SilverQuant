@@ -119,7 +119,7 @@ def get_mootdx_quotes(code_list: list[str]) -> dict[str, any]:
 # 需要安装pycurl，pip install pycurl
 
 
-def get_tdxzip_history(adjust: ExitRight = ExitRight.QFQ, day_count: int = 550) -> dict|None:
+def get_tdxzip_history(adjust: ExitRight = ExitRight.QFQ, day_count: int = 550) -> dict:
     """
     直接从通达信网站下载日线文件加载到cache_history，且完成前复权计算
     TDX hsjday.zip 缓存在./_cache/_daily_tdxzip/ 目录下，除权除息缓存文件也在xdxr.pkl目录下
@@ -195,10 +195,10 @@ def get_tdxzip_history(adjust: ExitRight = ExitRight.QFQ, day_count: int = 550) 
             save_pickle(PATH_TDX_XDXR, cache_xdxr)
         del buffer
         save_pickle(PATH_TDX_HISTORY, cache_history)
-        return True
+        return cache_history
     except Exception as ex:
         print(f'[HISTORY] get tdx hsjday date error :', ex)
-        return False
+        return cache_history
 
 
 # ================
