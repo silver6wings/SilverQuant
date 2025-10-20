@@ -57,7 +57,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 希望您也可以在修罗场里的磨砺中，能打造出属于自己合适的交易模式，共勉
 
-查看完整变更历史：[CHANGELOG.md](CHANGELOG.md)
+查看完整变更历史：[_doc/CHANGELOG.md](_doc/CHANGELOG.md)
 
 # 安装说明
 
