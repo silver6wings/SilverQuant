@@ -495,8 +495,13 @@ class XtSubscriber(BaseSubscriber):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return None
 
+        self.cache_quotes.clear()
         self.cache_history.clear()
-        self.cache_history = {}
+        self.today_ticks.clear()
+        self.history_day_klines.clear()
+        self.code_list = ['000001.SH']  # 默认只有上证指数
+
+
         if self.before_trade_day is not None:
             self.before_trade_day()
             self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
