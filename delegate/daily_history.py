@@ -1,7 +1,6 @@
 import os
 import datetime
 import time
-import random
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
@@ -121,7 +120,7 @@ class DailyHistory:
                     adjust=ExitRight.QFQ,
                     data_source=self.data_source,
                 )
-                time.sleep(random.uniform(1, 5))
+                time.sleep(5)
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue

@@ -11,7 +11,7 @@ import pandas as pd
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight
-from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
+from tools.utils_basic import *
 from tools.utils_cache import TRADE_DAY_CACHE_PATH, get_available_stock_codes, load_pickle, save_pickle
 
 from tools.utils_mootdx import MootdxClientInstance, get_offset_start, execute_fq, get_xdxr, \
@@ -327,13 +327,37 @@ def get_ak_daily_history(
     import akshare as ak
     try:
         if is_stock(code):
-            df = ak.stock_zh_a_hist(
-                symbol=code_to_symbol(code),
+            # 东财容易封接口
+            # df = ak.stock_zh_a_hist(
+            #     symbol=code_to_symbol(code),
+            #     start_date=start_date,
+            #     end_date=end_date,
+            #     adjust=str(adjust),
+            #     period='daily',
+            # )
+            # if len(df) > 0:
+            #     df = df.rename(columns={
+            #         '日期': 'datetime',
+            #         '开盘': 'open',
+            #         '最高': 'high',
+            #         '最低': 'low',
+            #         '收盘': 'close',
+            #         '成交量': 'volume',
+            #         '成交额': 'amount',
+            #     })
+            #     df['datetime'] = pd.to_datetime(df['datetime']).dt.strftime('%Y%m%d')
+            #     df['datetime'] = df['datetime'].astype(int)
+
+            # 换成新浪的替代
+            df = ak.stock_zh_a_daily(
+                symbol=code_to_sina_symbol(code),
                 start_date=start_date,
                 end_date=end_date,
                 adjust=str(adjust),
-                period='daily',
             )
+            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            df = df.dropna(subset=['date']).copy()
+            df['datetime'] = df['date'].dt.strftime('%Y%m%d').astype(int)
         elif is_fund_etf(code):
             df = ak.fund_etf_hist_em(
                 symbol=code_to_symbol(code),
@@ -342,28 +366,27 @@ def get_ak_daily_history(
                 adjust=str(adjust),
                 period="daily",
             )
+            if len(df) > 0:
+                df = df.rename(columns={
+                    '日期': 'datetime',
+                    '开盘': 'open',
+                    '最高': 'high',
+                    '最低': 'low',
+                    '收盘': 'close',
+                    '成交量': 'volume',
+                    '成交额': 'amount',
+                })
+                df['datetime'] = pd.to_datetime(df['datetime']).dt.strftime('%Y%m%d')
+                df['datetime'] = df['datetime'].astype(int)
         else:
             return None
     except Exception as e:
         print(f' akshare get {code} error: ', e)
-        df = []
+        return None
 
-    if len(df) > 0:
-        df = df.rename(columns={
-            '日期': 'datetime',
-            '开盘': 'open',
-            '最高': 'high',
-            '最低': 'low',
-            '收盘': 'close',
-            '成交量': 'volume',
-            '成交额': 'amount',
-        })
-        df['datetime'] = pd.to_datetime(df['datetime']).dt.strftime('%Y%m%d')
-        df['datetime'] = df['datetime'].astype(int)
-        if columns is not None:
-            return df[columns]
-        return df
-    return None
+    if columns is not None:
+        return df[columns]
+    return df
 
 
 def _ts_to_standard(df: pd.DataFrame) -> pd.DataFrame:

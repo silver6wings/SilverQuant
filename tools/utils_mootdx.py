@@ -3,7 +3,6 @@ import logging
 import io
 import datetime
 import json
-import pycurl
 import time
 import traceback
 import zipfile
@@ -470,6 +469,7 @@ def factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor: 
 
 # 从通达信网站下载日线文件，每日盘前或盘后16:00之后下载，建议盘前
 def download_tdx_hsjday() -> io.BytesIO|bool:
+    import pycurl
     url = "https://data.tdx.com.cn/vipdoc/hsjday.zip"
     try:
         buffer = io.BytesIO()
@@ -785,6 +785,7 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
 
 
 def _pycurl_request(url, headers=None):
+    import pycurl
     try:
         buffer = io.BytesIO()
         c = pycurl.Curl()
