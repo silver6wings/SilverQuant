@@ -117,6 +117,8 @@ class XtSubscriber(BaseSubscriber):
                 + [f'bidPrice{i}' for i in range(1, 6)] \
                 + [f'bidVol{i}' for i in range(1, 6)]
 
+        self.curr_trade_date = '1990-12-19' #记录当前股票交易日期
+
     # -----------------------
     # 策略触发主函数
     # -----------------------
@@ -496,6 +498,7 @@ class XtSubscriber(BaseSubscriber):
 
         if self.before_trade_day is not None:
             self.before_trade_day()
+            self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
     def near_trade_begin_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -503,6 +506,7 @@ class XtSubscriber(BaseSubscriber):
 
         if self.near_trade_begin is not None:
             self.near_trade_begin()
+            print(f'今日盘前准备工作已完成。')
 
     def finish_trade_day_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -511,6 +515,17 @@ class XtSubscriber(BaseSubscriber):
         if self.finish_trade_day is not None:
             self.finish_trade_day()
 
+    # 检查是否完成盘前准备
+    #@check_open_day
+    def check_before_finished(self):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return None
+        if self.curr_trade_date != datetime.datetime.now().strftime('%Y-%m-%d') or len(self.cache_history) < 1:
+            print('[ERROR]盘前准备未完成，尝试重新执行盘前函数')
+            self.before_trade_day_wrapper()
+            self.near_trade_begin_wrapper()
+        print(f'当前交易日：[{self.curr_trade_date}]。')
+    
     def start_scheduler_without_qmt_data(self):
         run_time_ranges = [
             # 上午时间段: 09:15:00 到 11:29:59
@@ -550,6 +565,7 @@ class XtSubscriber(BaseSubscriber):
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
         self.scheduler.add_job(self.prev_check_open_day, 'cron', hour=1, minute=0, second=0)
+        self.scheduler.add_job(self.check_before_finished, 'cron', hour=8, minute=55) # 检查当天是否完成准备
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=9, minute=14, second=59)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=11, minute=30, second=0)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=12, minute=59, second=59)
@@ -575,6 +591,7 @@ class XtSubscriber(BaseSubscriber):
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
             ['08:30', self.near_trade_begin_wrapper, None],
+            ['08:55', self.check_before_finished, None],
             ['09:15', self.subscribe_tick, None],
             ['11:30', self.unsubscribe_tick, (True, )],
             ['13:00', self.subscribe_tick, (True, )],
