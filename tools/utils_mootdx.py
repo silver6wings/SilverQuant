@@ -669,6 +669,39 @@ def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust
     return result
 
 
+def execute_fq(df, xdxr, adjust):
+    if xdxr is not None and len(xdxr) > 0:
+        xdxr['date_str'] = xdxr['year'].astype(str) + \
+                           '-' + xdxr['month'].astype(str).str.zfill(2) + \
+                           '-' + xdxr['day'].astype(str).str.zfill(2)
+        xdxr['datetime'] = pd.to_datetime(xdxr['date_str'] + ' 15:00:00')
+        xdxr = xdxr.set_index('datetime')
+
+        is_appended = False
+        xdxr_info = xdxr.loc[xdxr['category'] == 1]
+
+        now = datetime.datetime.now()
+        curr_date = now.strftime("%Y-%m-%d")
+
+        # 默认除权日当天之前的数据一样进行处理
+        if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
+            last_row = df.iloc[-1].copy()
+            last_row['datetime'] = curr_date
+            df.loc[len(df)] = last_row
+            df.index = pd.to_datetime(df['datetime'].astype(str), errors="coerce")
+            is_appended  = True
+
+        if adjust == ExitRight.QFQ:
+            df = make_qfq(df, xdxr)
+        elif adjust == ExitRight.HFQ:
+            df = make_hfq(df, xdxr)
+
+        if is_appended:
+            df = df[:-1]
+
+    return df
+
+
 # 检查xdxr缓存，建议定时调度运行
 def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
     """

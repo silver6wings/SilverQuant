@@ -14,7 +14,7 @@ from tools.constants import DataSource, ExitRight
 from tools.utils_basic import is_stock, is_fund_etf, code_to_symbol, tdxsymbol_to_code, code_to_tdxsymbol
 from tools.utils_cache import TRADE_DAY_CACHE_PATH, get_available_stock_codes, load_pickle, save_pickle
 
-from tools.utils_mootdx import MootdxClientInstance, get_offset_start, make_qfq, make_hfq, get_xdxr, \
+from tools.utils_mootdx import MootdxClientInstance, get_offset_start, execute_fq, get_xdxr, \
         download_tdx_hsjday, _process_tdx_zip_to_datas, PATH_TDX_HISTORY, PATH_TDX_XDXR
 
 
@@ -429,7 +429,7 @@ def get_ts_daily_histories(
     for code in codes:
         if not is_stock(code):
             print(f'存在不符合格式要求的code: {code}')
-            return None
+            return {}
 
     # from reader.tushare_agent import get_tushare_pro
     import tushare as ts
@@ -442,6 +442,7 @@ def get_ts_daily_histories(
         # pro = get_tushare_pro()
         # df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
         df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
+        time.sleep(0.5)
 
     ans = {}
     if df is not None and len(df) > 0:
@@ -454,39 +455,6 @@ def get_ts_daily_histories(
             else:
                 ans[code] = temp_df[columns]
     return ans
-
-
-def execute_fq(df, xdxr, adjust):
-    if xdxr is not None and len(xdxr) > 0:
-        xdxr['date_str'] = xdxr['year'].astype(str) + \
-                           '-' + xdxr['month'].astype(str).str.zfill(2) + \
-                           '-' + xdxr['day'].astype(str).str.zfill(2)
-        xdxr['datetime'] = pd.to_datetime(xdxr['date_str'] + ' 15:00:00')
-        xdxr = xdxr.set_index('datetime')
-
-        is_appended = False
-        xdxr_info = xdxr.loc[xdxr['category'] == 1]
-
-        now = datetime.datetime.now()
-        curr_date = now.strftime("%Y-%m-%d")
-
-        # 默认除权日当天之前的数据一样进行处理
-        if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
-            last_row = df.iloc[-1].copy()
-            last_row['datetime'] = curr_date
-            df.loc[len(df)] = last_row
-            df.index = pd.to_datetime(df['datetime'].astype(str), errors="coerce")
-            is_appended  = True
-
-        if adjust == ExitRight.QFQ:
-            df = make_qfq(df, xdxr)
-        elif adjust == ExitRight.HFQ:
-            df = make_hfq(df, xdxr)
-
-        if is_appended:
-            df = df[:-1]
-
-    return df
 
 
 def get_bars_with_offset(client, symbol, total_offset, start=0):
