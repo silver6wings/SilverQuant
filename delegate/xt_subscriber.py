@@ -86,7 +86,7 @@ class XtSubscriber(BaseSubscriber):
 
         # 这个成员变量区别于cache_history，保存全部股票的日线数据550天，cache_history只包含code_list中指定天数数据
         self.history_day_klines : Dict[str, pd.DataFrame] = {}
-        
+
         self.__extend_codes = ['399001.SZ', '510230.SH', '512680.SH', '159915.SZ', '510500.SH',
                                '588000.SH', '159101.SZ', '399006.SZ', '159315.SZ']
 
@@ -417,7 +417,7 @@ class XtSubscriber(BaseSubscriber):
                     print('[提醒] 使用TDX ZIP文件作为数据源，请在RUN代码中添加调度任务check_xdxr_cache更新除权除息数据，建议运行时段在05:30之后。')
                     print('[提醒] 使用TDX ZIP文件作为数据源，请在RUN代码中建议在near_trade_begin中执行download_cache_history获取历史数据，避免before_trade_day执行时间太早未更新除权信息。')
                     self._download_from_tdx(code_list, start, end, adjust, columns)
-                    
+
                 save_pickle(cache_path, self.cache_history)
                 print(f'{len(self.cache_history)} of {len(code_list)} histories saved to {cache_path}')
                 if self.messager is not None:
@@ -462,7 +462,6 @@ class XtSubscriber(BaseSubscriber):
             delta = abs(end_date - start_date)
             self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
 
-
     # -----------------------
     # 盘后报告总结
     # -----------------------
@@ -496,6 +495,8 @@ class XtSubscriber(BaseSubscriber):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return None
 
+        self.cache_history.clear()
+        self.cache_history = {}
         if self.before_trade_day is not None:
             self.before_trade_day()
             self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -506,6 +507,8 @@ class XtSubscriber(BaseSubscriber):
 
         if self.near_trade_begin is not None:
             self.near_trade_begin()
+            if self.before_trade_day is None: #没有设置before_trade_day 情况
+                self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
             print(f'今日盘前准备工作已完成。')
 
     def finish_trade_day_wrapper(self):
@@ -516,16 +519,21 @@ class XtSubscriber(BaseSubscriber):
             self.finish_trade_day()
 
     # 检查是否完成盘前准备
-    #@check_open_day
+    # @check_open_day
     def check_before_finished(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return None
-        if self.curr_trade_date != datetime.datetime.now().strftime('%Y-%m-%d') or len(self.cache_history) < 1:
+        if (
+            self.before_trade_day is not None or self.near_trade_begin is not None
+        ) and (
+            self.curr_trade_date != datetime.datetime.now().strftime("%Y-%m-%d")
+            or len(self.cache_history) < 1
+        ):
             print('[ERROR]盘前准备未完成，尝试重新执行盘前函数')
             self.before_trade_day_wrapper()
             self.near_trade_begin_wrapper()
         print(f'当前交易日：[{self.curr_trade_date}]。')
-    
+
     def start_scheduler_without_qmt_data(self):
         run_time_ranges = [
             # 上午时间段: 09:15:00 到 11:29:59
