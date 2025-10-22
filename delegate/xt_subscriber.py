@@ -17,7 +17,8 @@ from delegate.daily_reporter import DailyReporter
 from tools.utils_cache import StockNames, InfoItem, check_is_open_day, get_trading_date_list
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
-from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick, get_tdxzip_history
+from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
+from tools.utils_mootdx import get_tdxzip_history
 
 
 class BaseSubscriber:
