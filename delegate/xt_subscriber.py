@@ -575,11 +575,11 @@ class XtSubscriber(BaseSubscriber):
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
             ['08:30', self.near_trade_begin_wrapper, None],
-            ['09:15', self.subscribe_tick, None],
-            ['11:30', self.unsubscribe_tick, (True, )],
-            ['13:00', self.subscribe_tick, (True, )],
-            ['15:00', self.unsubscribe_tick, None],
-            ['15:01', self.daily_summary, None],
+            ['09:14', self.subscribe_tick, None],
+            ['11:31', self.unsubscribe_tick, (True, )],
+            ['12:59', self.subscribe_tick, (True, )],
+            ['15:01', self.unsubscribe_tick, None],
+            ['15:02', self.daily_summary, None],
         ]
         if self.open_tick:
             cron_jobs.append(['09:10', self.clean_ticks_history, None])
