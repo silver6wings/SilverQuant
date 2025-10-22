@@ -429,6 +429,7 @@ class XtSubscriber(BaseSubscriber):
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
             if hc.daily_history is not None:
+                hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
                 hc.daily_history.download_recent_daily(20)  # 一个月数据
                 # 下载后加载进内存
                 start_date = datetime.datetime.strptime(start, '%Y%m%d')
@@ -453,7 +454,6 @@ class XtSubscriber(BaseSubscriber):
         hc = DailyHistoryCache()
         hc.set_data_source(data_source=data_source)
         if hc.daily_history is not None:
-            hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
             # 重新加载进内存
             start_date = datetime.datetime.strptime(start, '%Y%m%d')
             end_date = datetime.datetime.strptime(end, '%Y%m%d')

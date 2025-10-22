@@ -76,13 +76,13 @@ class DailyReporter:
             if len(df) > 0:
                 for index, row in df.iterrows():
                     # ['日期', '时间', '代码', '名称', '类型', '注释', '成交价', '成交量']
-                    text += '\n\n> '
+                    text += '\n '
                     text += f'{row["时间"]} {row["注释"]} {code_to_symbol(row["代码"])} '
-                    text += '\n>\n> '
+                    text += '\n '
                     text += f'{row["名称"]} {row["成交量"]}股 {row["成交价"]}元 '
 
         if self.messager is not None:
-            self.messager.send_markdown(title, text)
+            self.messager.send_text_as_md(text)
 
     def today_hold_report(self, today: str, positions):
         text = ''
@@ -124,19 +124,18 @@ class DailyReporter:
             total_change = colour_text(f"{total_change * vol:.2f}", total_change > 0, total_change < 0)
             ratio_change = colour_text(f'{ratio_change * 100:.2f}%', ratio_change > 0, ratio_change < 0)
 
-            text += '\n\n>'
-            text += f'' \
-                    f'{code_to_symbol(code)} ' \
+            text += '\n '
+            text += f'{code_to_symbol(code)} ' \
                     f'{self.stock_names.get_name(code)} ' \
                     f'{curr_price * vol:.2f}元'
-            text += '\n>\n>'
+            text += '\n '
             text += f'盈亏比: {ratio_change} 盈亏额: {total_change}'
 
         title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'
 
         if self.messager is not None:
-            self.messager.send_markdown(title, text)
+            self.messager.send_text_as_md(text)
 
     def check_asset(self, today: str, asset):
         title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
@@ -144,7 +143,7 @@ class DailyReporter:
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
-            text += '\n>\n> '
+            text += '\n '
 
             total_change = colour_text(
                 f'{"+" if increase > 0 else ""}{round(increase, 2)}',
@@ -184,17 +183,17 @@ class DailyReporter:
                         cash_change > 0,
                         cash_change < 0,
                         )
-                    text += '\n>\n> '
+                    text += '\n'
                     text += f'银证转账: {cash_change}元'
 
-        text += '\n>\n> '
+        text += '\n '
         text += f'持仓市值: {round(asset.market_value, 2)}元'
 
-        text += '\n>\n> '
+        text += '\n '
         text += f'剩余现金: {round(asset.cash, 2)}元'
 
-        text += f'\n>\n>'
+        text += '\n '
         text += f'资产总计: {round(asset.total_asset, 2)}元'
 
         if self.messager is not None:
-            self.messager.send_markdown(title, text)
+            self.messager.send_text_as_md(text)
