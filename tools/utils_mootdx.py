@@ -9,6 +9,8 @@ import zipfile
 import numpy as np
 import pandas as pd
 
+from typing import Optional
+
 from mootdx.utils import factor
 from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
 
@@ -16,8 +18,8 @@ from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
 from tools.constants import ExitRight
-from tools.utils_basic import symbol_to_code
-from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, load_pickle, save_pickle
+from tools.utils_basic import symbol_to_code, code_to_symbol
+from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, load_pickle, save_pickle, TRADE_DAY_CACHE_PATH
 
 
 DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
@@ -40,11 +42,14 @@ class MootdxClientInstance:
         if self.client is None:
             from mootdx.quotes import Quotes
             pd.set_option('future.no_silent_downcasting', True)
-            try:
-                from credentials import TDX_FOLDER
-                self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
-            except Exception as e:
-                print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
+            from credentials import TDX_FOLDER
+            if TDX_FOLDER is not None and len(TDX_FOLDER) > 0:
+                try:
+                    self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
+                except Exception as e:
+                    print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
+                    self.client = Quotes.factory(market='std')
+            else:
                 self.client = Quotes.factory(market='std')
 
 
@@ -150,6 +155,57 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         raise NotImplementedError
 
 
+def _get_bars_with_offset(client, symbol, total_offset, start=0):
+    all_dfs = []
+    remaining = total_offset
+    current_start = start
+    batch_size = 800  # 每次最大获取数量
+    datetime_col = 'datetime'  # 假设时间列名为'datetime'，根据实际情况调整
+
+    while remaining > 0:
+        fetch_count = min(remaining, batch_size)
+
+        try:
+            df = client.bars(
+                symbol=symbol,
+                frequency='day',
+                offset=fetch_count,
+                start=current_start,
+            )
+
+            if df is None or df.empty:
+                break  # 没有更多数据
+
+            # 检查是否存在时间列，避免后续排序出错
+            if datetime_col not in df.columns:
+                print(f"Error: 数据中缺少'{datetime_col}'列，无法排序")
+                return None
+
+            all_dfs.append(df)
+            remaining -= fetch_count
+            current_start += fetch_count  # 移动到下一批的起始位置
+
+        except Exception as e:
+            print(f'mootdx get daily {symbol} error: ', e)
+            if all_dfs:
+                combined = pd.concat(all_dfs, ignore_index=True).iloc[:total_offset]
+                return combined.sort_values(by=datetime_col, ascending=True).reset_index(drop=True)
+            return None
+
+    if not all_dfs:
+        return None
+
+    # 合并所有数据并截取总数量
+    combined_df = pd.concat(all_dfs, ignore_index=True).iloc[:total_offset]
+
+    # 按datetime列从大到小排序（最新时间在前）
+    # 若时间列已转为datetime类型，排序会更准确
+    combined_df[datetime_col] = pd.to_datetime(combined_df[datetime_col])  # 确保是datetime类型
+    combined_df = combined_df.sort_values(by=datetime_col, ascending=True).reset_index(drop=True)
+
+    return combined_df
+
+
 def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12):
     os.makedirs(cache_dir, exist_ok=True)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")  # 缓存文件名：股票代码.csv
@@ -173,6 +229,54 @@ def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours
     except Exception as e:
         print(f' mootdx get xdxr {symbol} error: ', e)
         return None
+
+
+# 获取 mootdx 的历史日线
+# 使用 mootdx 数据源记得 pip install mootdx
+def get_mootdx_daily_history(
+        code: str,
+        start_date: str,  # format: 20240101
+        end_date: str,
+        columns: list[str] = None,
+        adjust: ExitRight = ExitRight.BFQ,
+) -> Optional[pd.DataFrame]:
+    offset, start = get_offset_start(TRADE_DAY_CACHE_PATH, start_date, end_date)
+    symbol = code_to_symbol(code)
+
+    client = MootdxClientInstance().client
+    try:
+        df = _get_bars_with_offset(client, symbol, offset, start)
+        # TODO_List: 对于有些期间停牌过的票，发现时间对不上这里要校正，优先级不高因为只会多不会少
+    except Exception as e:
+        print(f' mootdx get daily {code} error: ', e)
+        return None
+
+    if adjust != ExitRight.BFQ:
+        xdxr = get_xdxr(symbol=symbol)
+        df = execute_fq(df, xdxr, adjust)
+
+    if df is not None and len(df) > 0 and type(df) == pd.DataFrame and 'datetime' in df.columns:
+        try:
+            df = df.replace([np.inf, -np.inf], np.nan).dropna()  # 然后删除所有包含 NaN 的行
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            df['datetime'] = df['datetime'].dt.date.astype(str).str.replace('-', '').astype(int)
+            df = pd.concat([df['datetime'], df.drop('datetime', axis=1)], axis=1)
+
+            df = df.drop(columns='volume')
+            df = df.rename(columns={'vol': 'volume'})
+            df['volume'] = df['volume'].astype(int)
+            df = df.reset_index(drop=True)
+
+            if columns is not None:
+                return df[columns]
+            return df
+        except Exception as e:
+            print(f' handle format {code} error: ', e)
+            return None
+    return None
+
+
+# ====== TDXZIP ======
 
 
 def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:

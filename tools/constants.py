@@ -5,6 +5,7 @@ class DataSource:
     TUSHARE = 'tushare'
     MOOTDX = 'mootdx'
     TDXZIP = 'tdxzip'
+    MINIQMT = 'miniqmt'
 
 
 # 复权常量

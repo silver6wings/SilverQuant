@@ -1,20 +1,18 @@
 import os
 import csv
 import time
-import datetime
 import io
 import zipfile
 
 import requests
-import numpy as np
 import pandas as pd
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight
 from tools.utils_basic import *
-from tools.utils_cache import TRADE_DAY_CACHE_PATH, get_available_stock_codes, load_pickle, save_pickle
-
-from tools.utils_mootdx import MootdxClientInstance, get_offset_start, execute_fq, get_xdxr, \
+from tools.utils_cache import get_available_stock_codes, load_pickle, save_pickle
+from tools.utils_miniqmt import get_qmt_daily_history
+from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history, \
         download_tdx_hsjday, _process_tdx_zip_to_datas, PATH_TDX_HISTORY, PATH_TDX_XDXR
 
 
@@ -416,7 +414,10 @@ def get_ts_daily_history(
     if not is_stock(code):
         return None
 
-    # from reader.tushare_agent import get_tushare_pro
+    # 还是要注册一下
+    from reader.tushare_agent import get_tushare_pro
+    get_tushare_pro()
+
     import tushare as ts
     import warnings
     warnings.filterwarnings('ignore', category=FutureWarning,
@@ -426,11 +427,9 @@ def get_ts_daily_history(
     df = None
     while (df is None or len(df) <= 0) and try_times < 3:
         try_times += 1
-        # 奇怪丫又不收费了，复权数据也给了，还不用注册
-        # pro = get_tushare_pro()
         # df = pro.daily(ts_code=code, start_date=start_date, end_date=end_date)
         df = ts.pro_bar(ts_code=code, start_date=start_date, end_date=end_date, adj=adjust)
-        time.sleep(0.5)
+        time.sleep(1)
 
     if df is not None and len(df) > 0:
         df = _ts_to_standard(df)
@@ -454,8 +453,13 @@ def get_ts_daily_histories(
             print(f'存在不符合格式要求的code: {code}')
             return {}
 
-    # from reader.tushare_agent import get_tushare_pro
+    from reader.tushare_agent import get_tushare_pro
+    get_tushare_pro()
+
     import tushare as ts
+    import warnings
+    warnings.filterwarnings('ignore', category=FutureWarning,
+        message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
 
     try_times = 0
     df = None
@@ -465,7 +469,7 @@ def get_ts_daily_histories(
         # pro = get_tushare_pro()
         # df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
         df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
-        time.sleep(0.5)
+        time.sleep(1)
 
     ans = {}
     if df is not None and len(df) > 0:
@@ -480,136 +484,29 @@ def get_ts_daily_histories(
     return ans
 
 
-def get_bars_with_offset(client, symbol, total_offset, start=0):
-    """
-    分批获取K线数据，处理offset超过800的限制，并确保时间降序排列
-
-    参数:
-        client: 客户端实例
-        symbol: 标的代码
-        frequency: 频率，默认为'day'
-        total_offset: 总共需要获取的K线数量
-        start: 起始偏移量
-
-    返回:
-        合并并排序后的DataFrame或None
-    """
-    all_dfs = []
-    remaining = total_offset
-    current_start = start
-    batch_size = 800  # 每次最大获取数量
-    datetime_col = 'datetime'  # 假设时间列名为'datetime'，根据实际情况调整
-
-    while remaining > 0:
-        fetch_count = min(remaining, batch_size)
-
-        try:
-            df = client.bars(
-                symbol=symbol,
-                frequency='day',
-                offset=fetch_count,
-                start=current_start,
-            )
-
-            if df is None or df.empty:
-                break  # 没有更多数据
-
-            # 检查是否存在时间列，避免后续排序出错
-            if datetime_col not in df.columns:
-                print(f"Error: 数据中缺少'{datetime_col}'列，无法排序")
-                return None
-
-            all_dfs.append(df)
-            remaining -= fetch_count
-            current_start += fetch_count  # 移动到下一批的起始位置
-
-        except Exception as e:
-            print(f'mootdx get daily {symbol} error: ', e)
-            if all_dfs:
-                combined = pd.concat(all_dfs, ignore_index=True).iloc[:total_offset]
-                return combined.sort_values(by=datetime_col, ascending=True).reset_index(drop=True)
-            return None
-
-    if not all_dfs:
-        return None
-
-    # 合并所有数据并截取总数量
-    combined_df = pd.concat(all_dfs, ignore_index=True).iloc[:total_offset]
-
-    # 按datetime列从大到小排序（最新时间在前）
-    # 若时间列已转为datetime类型，排序会更准确
-    combined_df[datetime_col] = pd.to_datetime(combined_df[datetime_col])  # 确保是datetime类型
-    combined_df = combined_df.sort_values(by=datetime_col, ascending=True).reset_index(drop=True)
-
-    return combined_df
-
-
-# 获取 mootdx 的历史日线
-# 使用 mootdx 数据源记得 pip install mootdx
-def get_mootdx_daily_history(
-    code: str,
-    start_date: str,  # format: 20240101
-    end_date: str,
-    columns: list[str] = None,
-    adjust: ExitRight = ExitRight.BFQ,
-) -> Optional[pd.DataFrame]:
-    offset, start = get_offset_start(TRADE_DAY_CACHE_PATH, start_date, end_date)
-    symbol = code_to_symbol(code)
-
-    client = MootdxClientInstance().client
-    try:
-        df = get_bars_with_offset(client, symbol, offset, start)
-        # TODO_List: 对于有些期间停牌过的票，发现时间对不上这里要校正，优先级不高因为只会多不会少
-    except Exception as e:
-        print(f' mootdx get daily {code} error: ', e)
-        return None
-
-    if adjust != ExitRight.BFQ:
-        xdxr = get_xdxr(symbol=symbol)
-        df = execute_fq(df, xdxr, adjust)
-
-    if df is not None and len(df) > 0 and type(df) == pd.DataFrame and 'datetime' in df.columns:
-        try:
-            df = df.replace([np.inf, -np.inf], np.nan).dropna()  # 然后删除所有包含 NaN 的行
-            df['datetime'] = pd.to_datetime(df['datetime'])
-            df['datetime'] = df['datetime'].dt.date.astype(str).str.replace('-', '').astype(int)
-            df = pd.concat([df['datetime'], df.drop('datetime', axis=1)], axis=1)
-
-            df = df.drop(columns='volume')
-            df = df.rename(columns={'vol': 'volume'})
-            df['volume'] = df['volume'].astype(int)
-            df = df.reset_index(drop=True)
-
-            if columns is not None:
-                return df[columns]
-            return df
-        except Exception as e:
-            print(f' handle format {code} error: ', e)
-            return None
-    return None
-
-
 def get_daily_history(
     code: str,
     start_date: str,  # format: 20240101
     end_date: str,
     columns: list[str] = None,
     adjust: ExitRight = ExitRight.BFQ,
-    data_source=DataSource.AKSHARE,
+    data_source=DataSource.TUSHARE,
 ) -> Optional[pd.DataFrame]:
-    if data_source == DataSource.TUSHARE:
-        # TuShare 的数据免费的暂时不支持复权
-        # TuShare 不支持 etf，其他两个支持
-        return get_ts_daily_history(code, start_date, end_date, columns, adjust)
+    if data_source == DataSource.MINIQMT:
+        return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
     elif data_source == DataSource.MOOTDX:
         # Mootdx 的复权是先截断数据然后复权，取三位小数
         # 暂时不支持 920xxx 的北交所股票数据
         # 其它北交所股票小部分有发行脏数据情况
         return get_mootdx_daily_history(code, start_date, end_date, columns, adjust)
-    else:
+    elif data_source == DataSource.AKSHARE:
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
         # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)
+    else:
+        # TuShare 的数据免费的暂时不支持复权
+        # TuShare 不支持 etf，其他两个支持
+        return get_ts_daily_history(code, start_date, end_date, columns, adjust)
 
 
 # =======================

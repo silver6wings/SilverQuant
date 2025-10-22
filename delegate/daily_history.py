@@ -32,6 +32,7 @@ class DailyHistoryCache:
 class DailyHistory:
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     default_root_path: str = '_cache/_daily'
+    default_kline_folder: str = 'kline'
     default_data_source: DataSource = DataSource.MOOTDX
     # TUSHARE 数据源 不要超过8000，7000为安全
     # MOOTDX 数据源 不要超过800，700为安全
@@ -49,6 +50,7 @@ class DailyHistory:
         self.last_update_time = f'{self.root_path}/_last_update_time.txt'
 
         os.makedirs(self.root_path, exist_ok=True)
+        os.makedirs(f'{self.root_path}/{self.default_kline_folder}', exist_ok=True)
         self.cache_history: dict[str, pd.DataFrame] = {}
 
     def __getitem__(self, item: str) -> pd.DataFrame:
@@ -125,7 +127,7 @@ class DailyHistory:
                     download_failure.append(code)
                     continue
                 else:
-                    df.to_csv(f'{self.root_path}/{code}.csv', index=False)
+                    df.to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
                     downloaded_count += 1
 
             print(f'[HISTORY] [{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
@@ -138,7 +140,7 @@ class DailyHistory:
         print(f'[HISTORY] Checking local missed codes from {len(code_list)}...')
         missing_codes = []
         for code in code_list:
-            path = f'{self.root_path}/{code}.csv'
+            path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             if not os.path.exists(path):
                 missing_codes.append(code)
 
@@ -177,7 +179,7 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
-            path = f'{self.root_path}/{code}.csv'
+            path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             try:
                 df = pd.read_csv(path, dtype={'datetime': int})
                 self.cache_history[code] = df
@@ -290,7 +292,7 @@ class DailyHistory:
             if i % 1000 == 0:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
-            self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
+            self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
 
     # 更新近几日数据，不用全部下载，速度快也不容易被Ban IP
@@ -325,7 +327,7 @@ class DailyHistory:
             if i % 1000 == 0:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
-            self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
+            self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
 
         self.write_last_update_datetime()
@@ -353,7 +355,7 @@ class DailyHistory:
     # ==============
 
     def remove_single_history(self, code: str) -> bool:
-        file_path = f'{self.root_path}/{code}.csv'
+        file_path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
         try:
             if not os.path.isfile(file_path):
                 return False
