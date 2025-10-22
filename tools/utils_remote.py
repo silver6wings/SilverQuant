@@ -1,8 +1,5 @@
-import os
 import csv
 import time
-import io
-import zipfile
 
 import requests
 import pandas as pd
@@ -10,10 +7,8 @@ from typing import Optional
 
 from tools.constants import DataSource, ExitRight
 from tools.utils_basic import *
-from tools.utils_cache import get_available_stock_codes, load_pickle, save_pickle
 from tools.utils_miniqmt import get_qmt_daily_history
-from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history, \
-        download_tdx_hsjday, _process_tdx_zip_to_datas, PATH_TDX_HISTORY, PATH_TDX_XDXR
+from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
 
 
 def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
@@ -109,94 +104,6 @@ def get_mootdx_quotes(code_list: list[str]) -> dict[str, any]:
         result[stock_code] = stock_data
 
     return result
-
-
-# ================
-# TDXZIP
-# ================
-# 需要安装pycurl，pip install pycurl
-
-
-def get_tdxzip_history(adjust: ExitRight = ExitRight.QFQ, day_count: int = 550) -> dict:
-    """
-    直接从通达信网站下载日线文件加载到cache_history，且完成前复权计算
-    TDX hsjday.zip 缓存在./_cache/_daily_tdxzip/ 目录下，除权除息缓存文件也在xdxr.pkl目录下
-    """
-    cache_history = {}
-    cache_history_path = PATH_TDX_HISTORY
-    cachepath = os.path.dirname(cache_history_path)
-    os.makedirs(cachepath, exist_ok=True)
-    if os.path.isfile(cache_history_path) and os.path.getmtime(cache_history_path) > time.mktime(datetime.date.today().timetuple()): #当天文件才加载
-        cache_history = load_pickle(cache_history_path)
-        return cache_history
-
-    code_list = get_available_stock_codes()
-
-    print(f'[HISTORY] Downloading {len(code_list)} gap codes data of {day_count} days.')
-    tdx_hsjday_file = f'{cachepath}/hsjday.zip'
-    cache_xdxr_file = PATH_TDX_XDXR
-
-    buffer = None
-    try:
-        if not os.path.exists(tdx_hsjday_file) or os.path.getmtime(tdx_hsjday_file) < time.mktime(datetime.date.today().timetuple()):
-            start = time.time()
-            buffer = download_tdx_hsjday()
-            end = time.time()
-            if buffer == False:
-                return cache_history
-            buffer.seek(0, io.SEEK_END)
-            response_length = buffer.tell()
-            file_size = response_length / 1024 / 1024
-            print(f'[HISTORY] 下载通达信日线文件耗时{end-start:.2f}秒, 速度：{file_size/(end-start):.2f} MB/s。')
-            with open(tdx_hsjday_file, 'wb') as file:
-                file.write(buffer.getvalue())
-                print(f"[HISTORY] 通达信日线文件已写入 {tdx_hsjday_file}。")
-        else:
-            with open(tdx_hsjday_file, "rb") as fh:
-                buffer = io.BytesIO(fh.read())
-
-        cache_xdxr = load_pickle(cache_xdxr_file)
-        if cache_xdxr is None or not isinstance(cache_xdxr, dict):
-            print('[HISTORY] 未能加载除权除息缓存文件，将重新生成')
-            cache_xdxr = {}
-
-        # 初始化计数器和列表（多线程下需考虑线程安全）
-        downloaded_count = 0
-        download_failure = []
-
-        start = time.time()
-
-        with zipfile.ZipFile(buffer, 'r') as zip_ref:
-            result_dict = _process_tdx_zip_to_datas(code_list, zip_ref, cache_xdxr, day_count, adjust)
-            for code in result_dict:
-                try:
-                    df, _code, error_type = result_dict[code]
-                    if df is not None:
-                        cache_history[code] = df
-                        downloaded_count += 1
-                        if str(error_type).startswith('xdxr error'):
-                            download_failure.append(code)
-                            print(f'{code}: {error_type}')
-                    else:
-                        download_failure.append(code)
-                        print(f'{code}: {error_type}')
-                except Exception as e:
-                    print('下载tdx数据包失败：', e)
-                    download_failure.append(code)
-
-        error_count = len(download_failure)
-
-        end = time.time()
-        buffer.close()
-        print(f'[HISTORY] Download finished with {downloaded_count} code, Elapsed time: {end-start:.2f}s, {error_count} errors and failed with {len(download_failure)} fails: {download_failure}')
-        if len(cache_xdxr) > 0:
-            save_pickle(PATH_TDX_XDXR, cache_xdxr)
-        del buffer
-        save_pickle(PATH_TDX_HISTORY, cache_history)
-        return cache_history
-    except Exception as ex:
-        print(f'[HISTORY] get tdx hsjday date error :', ex)
-        return cache_history
 
 
 # ================
