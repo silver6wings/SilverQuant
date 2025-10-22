@@ -8,6 +8,9 @@ from tools.utils_cache import AKCache, get_prev_trading_date
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
+DEFAULT_INIT_DAY_COUNT: int = 550   # 默认足够覆盖两年
+
+
 class DailyHistoryCache:
     _instance = None
     daily_history = None
@@ -22,10 +25,10 @@ class DailyHistoryCache:
         self.data_source = DailyHistory.default_data_source
         # init 之后一定set之后daily_history才不会是None
 
-    def set_data_source(self, data_source: DataSource):
+    def set_data_source(self, data_source: DataSource, init_day_count: int = DEFAULT_INIT_DAY_COUNT):
         if self.daily_history is None or self.data_source != data_source:
             self.data_source = data_source
-            self.daily_history = DailyHistory(data_source=self.data_source)
+            self.daily_history = DailyHistory(data_source=self.data_source, init_day_count=init_day_count)
             self.daily_history.load_history_from_disk_to_memory()
 
 
@@ -36,13 +39,12 @@ class DailyHistory:
     default_data_source: DataSource = DataSource.MOOTDX
     # TUSHARE 数据源 不要超过8000，7000为安全
     # MOOTDX 数据源 不要超过800，700为安全
-    default_init_day_count: int = 550   # 默认足够覆盖两年
 
     def __init__(
         self,
         root_path: str = default_root_path,
         data_source: DataSource = default_data_source,
-        init_day_count: int = default_init_day_count,
+        init_day_count: int = DEFAULT_INIT_DAY_COUNT,
     ):
         self.root_path = f'{root_path}_{data_source}'
         self.data_source = data_source

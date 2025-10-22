@@ -601,65 +601,64 @@ def _factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor:
     return raw
 
 
-# # 显示没有被引用过我就先注释掉了哈
-# def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
-#     """
-#     从通达信网站下载沪深京日线数据，并解压到通达信目录下
-#
-#     Args:
-#         TDXDIR: 通达信所在目录例如：C:/new_tdx
-#
-#     Returns:
-#         bool: 成功返回True，失败返回False
-#     """
-#
-#     try:
-#         print(f"开始下载通达信沪深京日线数据文件。")
-#         start = datetime.datetime.now().timestamp()
-#         buffer = download_tdx_hsjday()
-#         end = datetime.datetime.now().timestamp()
-#
-#         if not buffer:
-#             return False
-#
-#         buffer.seek(0, io.SEEK_END)
-#         response_length = buffer.tell()
-#         file_size = response_length / 1024 / 1024
-#         print(f'下载耗时{end-start:.2f}秒, 速度：{file_size/(end-start):.2f} MB/s。')
-#         if isExtract:
-#             vipdocdir = os.path.join(TDXDIR, 'vipdoc')
-#             os.makedirs(vipdocdir, exist_ok=True)
-#             end = datetime.datetime.now().timestamp()
-#
-#             filenum = 0
-#             print(f"已下载，文件大小：{file_size:.2f}MB。开始解压文件到: {TDXDIR} 。")
-#             with zipfile.ZipFile(buffer, 'r') as zip_ref:
-#                 zip_ref.extractall(vipdocdir)
-#                 filenum = len(zip_ref.infolist())
-#             end2 = datetime.datetime.now().timestamp()
-#             print(f'解压耗时{end2-end:.2f}秒，解压文件{filenum}个。')
-#
-#             print("下载通达信沪深京日线数据并解压完成。")
-#         if cachefile:
-#             with open(cachefile, 'wb') as file:
-#                 file.write(buffer.getvalue())
-#             print(f"文件已写入{cachefile}。")
-#
-#         buffer.close()
-#         del buffer
-#         return True
-#     except zipfile.BadZipFile as e:
-#         error_msg = f"解压文件失败，文件可能已损坏: {str(e)}"
-#         print(error_msg)
-#         return False
-#     except PermissionError as e:
-#         error_msg = f"权限错误，无法写入目录: {str(e)}"
-#         print(error_msg)
-#         return False
-#     except Exception as e:
-#         error_msg = f"未知错误: {str(e)}\n{traceback.format_exc()}"
-#         print(error_msg)
-#         return False
+def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
+    """
+    从通达信网站下载沪深京日线数据，并解压到通达信目录下
+
+    Args:
+        TDXDIR: 通达信所在目录例如：C:/new_tdx
+
+    Returns:
+        bool: 成功返回True，失败返回False
+    """
+
+    try:
+        print(f"开始下载通达信沪深京日线数据文件。")
+        start = datetime.datetime.now().timestamp()
+        buffer = download_tdx_hsjday()
+        end = datetime.datetime.now().timestamp()
+
+        if not buffer:
+            return False
+
+        buffer.seek(0, io.SEEK_END)
+        response_length = buffer.tell()
+        file_size = response_length / 1024 / 1024
+        print(f'下载耗时{end-start:.2f}秒, 速度：{file_size/(end-start):.2f} MB/s。')
+        if isExtract:
+            vipdocdir = os.path.join(TDXDIR, 'vipdoc')
+            os.makedirs(vipdocdir, exist_ok=True)
+            end = datetime.datetime.now().timestamp()
+
+            filenum = 0
+            print(f"已下载，文件大小：{file_size:.2f}MB。开始解压文件到: {TDXDIR} 。")
+            with zipfile.ZipFile(buffer, 'r') as zip_ref:
+                zip_ref.extractall(vipdocdir)
+                filenum = len(zip_ref.infolist())
+            end2 = datetime.datetime.now().timestamp()
+            print(f'解压耗时{end2-end:.2f}秒，解压文件{filenum}个。')
+
+            print("下载通达信沪深京日线数据并解压完成。")
+        if cachefile:
+            with open(cachefile, 'wb') as file:
+                file.write(buffer.getvalue())
+            print(f"文件已写入{cachefile}。")
+
+        buffer.close()
+        del buffer
+        return True
+    except zipfile.BadZipFile as e:
+        error_msg = f"解压文件失败，文件可能已损坏: {str(e)}"
+        print(error_msg)
+        return False
+    except PermissionError as e:
+        error_msg = f"权限错误，无法写入目录: {str(e)}"
+        print(error_msg)
+        return False
+    except Exception as e:
+        error_msg = f"未知错误: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        return False
 
 
 def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust):
