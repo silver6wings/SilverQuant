@@ -1,8 +1,8 @@
 import pytest
 
 from tools.utils_cache import get_prev_trading_date_str
-from tools.utils_mootdx import *
-from tools.utils_remote import ExitRight, get_mootdx_daily_history
+from tools.utils_mootdx import get_mootdx_daily_history
+from tools.utils_remote import ExitRight
 
 
 @pytest.mark.local_only
