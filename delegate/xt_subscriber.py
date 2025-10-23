@@ -17,7 +17,8 @@ from delegate.daily_reporter import DailyReporter
 from tools.utils_cache import StockNames, InfoItem, check_is_open_day, get_trading_date_list
 from tools.utils_cache import load_pickle, save_pickle, load_json, save_json
 from tools.utils_ding import BaseMessager
-from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick, get_tdxzip_history
+from tools.utils_mootdx import get_tdxzip_history
+from tools.utils_remote import DataSource, ExitRight, get_daily_history, qmt_quote_to_tick
 
 
 class BaseSubscriber:
@@ -431,6 +432,7 @@ class XtSubscriber(BaseSubscriber):
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
             if hc.daily_history is not None:
+                hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
                 hc.daily_history.download_recent_daily(20)  # 一个月数据
                 # 下载后加载进内存
                 start_date = datetime.datetime.strptime(start, '%Y%m%d')
@@ -455,7 +457,6 @@ class XtSubscriber(BaseSubscriber):
         hc = DailyHistoryCache()
         hc.set_data_source(data_source=data_source)
         if hc.daily_history is not None:
-            hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
             # 重新加载进内存
             start_date = datetime.datetime.strptime(start, '%Y%m%d')
             end_date = datetime.datetime.strptime(end, '%Y%m%d')
@@ -605,11 +606,11 @@ class XtSubscriber(BaseSubscriber):
             ['01:00', self.prev_check_open_day, None],
             ['08:30', self.near_trade_begin_wrapper, None],
             ['08:55', self.check_before_finished, None],
-            ['09:15', self.subscribe_tick, None],
-            ['11:30', self.unsubscribe_tick, (True, )],
-            ['13:00', self.subscribe_tick, (True, )],
-            ['15:00', self.unsubscribe_tick, None],
-            ['15:01', self.daily_summary, None],
+            ['09:14', self.subscribe_tick, None],
+            ['11:31', self.unsubscribe_tick, (True, )],
+            ['12:59', self.subscribe_tick, (True, )],
+            ['15:01', self.unsubscribe_tick, None],
+            ['15:02', self.daily_summary, None],
         ]
         if self.open_tick:
             cron_jobs.append(['09:10', self.clean_ticks_history, None])

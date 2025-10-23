@@ -10,6 +10,8 @@ from xtquant.xttrader import XtQuantTrader
 from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
 
 from credentials import *
+
+from tools.constants import MSG_OUTER_SEPARATOR
 from tools.utils_basic import get_code_exchange, is_stock
 from tools.utils_cache import StockNames, check_open_day
 from tools.utils_ding import BaseMessager
@@ -238,7 +240,7 @@ class XtDelegate(BaseDelegate):
         if self.ding_messager is not None:
             name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市买 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市买 {code}{MSG_OUTER_SEPARATOR}'
                 f'{name} {volume}股 {price:.2f}元',
                 '[MB]')
 
@@ -273,7 +275,7 @@ class XtDelegate(BaseDelegate):
         if self.ding_messager is not None:
             name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市卖 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 市卖 {code}{MSG_OUTER_SEPARATOR}'
                 f'{name} {volume}股 {price:.2f}元',
                 '[MS]')
 
@@ -298,7 +300,7 @@ class XtDelegate(BaseDelegate):
         if self.ding_messager is not None:
             name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限买 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限买 {code}{MSG_OUTER_SEPARATOR}'
                 f'{name} {volume}股 {price:.2f}元',
                 '[LB]')
 
@@ -323,7 +325,7 @@ class XtDelegate(BaseDelegate):
         if self.ding_messager is not None:
             name = self.stock_names.get_name(code)
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限卖 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 限卖 {code}{MSG_OUTER_SEPARATOR}'
                 f'{name} {volume}股 {price:.2f}元',
                 '[LS]')
 
@@ -343,7 +345,7 @@ class XtDelegate(BaseDelegate):
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 全撤\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 全撤{MSG_OUTER_SEPARATOR}'
                 '[CA]')
 
     def order_cancel_buy(self, code: str, strategy_name: str = DEFAULT_XT_STRATEGY_NAME):
@@ -354,7 +356,7 @@ class XtDelegate(BaseDelegate):
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤买 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤买 {code}{MSG_OUTER_SEPARATOR}'
                 '[CB]')
 
     def order_cancel_sell(self, code: str, strategy_name: str = DEFAULT_XT_STRATEGY_NAME):
@@ -365,7 +367,7 @@ class XtDelegate(BaseDelegate):
 
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤卖 {code}\n'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} 撤卖 {code}{MSG_OUTER_SEPARATOR}'
                 '[CS]')
 
     def check_ipo_data(self) -> dict:

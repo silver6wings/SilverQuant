@@ -2,7 +2,7 @@ import pytest
 
 from tools.utils_cache import get_prev_trading_date_str
 from tools.utils_mootdx import *
-from tools.utils_remote import ExitRight, get_mootdx_daily_history, get_tdxzip_history
+from tools.utils_remote import ExitRight, get_mootdx_daily_history
 
 
 @pytest.mark.local_only
@@ -32,8 +32,8 @@ def test_get_tdxzip_history():
     buffer.seek(0, io.SEEK_END)
     response_length = buffer.tell()
     buffer.close()
-    filesize = response_length / 1024 / 1024
-    assert filesize > 480.0
+    file_size = response_length / 1024 / 1024
+    assert file_size > 480.0
     
     full_history = get_tdxzip_history(adjust = ExitRight.QFQ)
     code = '002594.SZ' # 比亚迪

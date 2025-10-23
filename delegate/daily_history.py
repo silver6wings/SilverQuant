@@ -8,6 +8,9 @@ from tools.utils_cache import AKCache, get_prev_trading_date
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
+DEFAULT_INIT_DAY_COUNT: int = 550   # 默认足够覆盖两年
+
+
 class DailyHistoryCache:
     _instance = None
     daily_history = None
@@ -22,26 +25,26 @@ class DailyHistoryCache:
         self.data_source = DailyHistory.default_data_source
         # init 之后一定set之后daily_history才不会是None
 
-    def set_data_source(self, data_source: DataSource):
+    def set_data_source(self, data_source: DataSource, init_day_count: int = DEFAULT_INIT_DAY_COUNT):
         if self.daily_history is None or self.data_source != data_source:
             self.data_source = data_source
-            self.daily_history = DailyHistory(data_source=self.data_source)
+            self.daily_history = DailyHistory(data_source=self.data_source, init_day_count=init_day_count)
             self.daily_history.load_history_from_disk_to_memory()
 
 
 class DailyHistory:
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     default_root_path: str = '_cache/_daily'
+    default_kline_folder: str = 'kline'
     default_data_source: DataSource = DataSource.MOOTDX
     # TUSHARE 数据源 不要超过8000，7000为安全
     # MOOTDX 数据源 不要超过800，700为安全
-    default_init_day_count: int = 550   # 默认足够覆盖两年
 
     def __init__(
         self,
         root_path: str = default_root_path,
         data_source: DataSource = default_data_source,
-        init_day_count: int = default_init_day_count,
+        init_day_count: int = DEFAULT_INIT_DAY_COUNT,
     ):
         self.root_path = f'{root_path}_{data_source}'
         self.data_source = data_source
@@ -49,6 +52,7 @@ class DailyHistory:
         self.last_update_time = f'{self.root_path}/_last_update_time.txt'
 
         os.makedirs(self.root_path, exist_ok=True)
+        os.makedirs(f'{self.root_path}/{self.default_kline_folder}', exist_ok=True)
         self.cache_history: dict[str, pd.DataFrame] = {}
 
     def __getitem__(self, item: str) -> pd.DataFrame:
@@ -125,7 +129,7 @@ class DailyHistory:
                     download_failure.append(code)
                     continue
                 else:
-                    df.to_csv(f'{self.root_path}/{code}.csv', index=False)
+                    df.to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
                     downloaded_count += 1
 
             print(f'[HISTORY] [{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
@@ -138,7 +142,7 @@ class DailyHistory:
         print(f'[HISTORY] Checking local missed codes from {len(code_list)}...')
         missing_codes = []
         for code in code_list:
-            path = f'{self.root_path}/{code}.csv'
+            path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             if not os.path.exists(path):
                 missing_codes.append(code)
 
@@ -177,7 +181,7 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
-            path = f'{self.root_path}/{code}.csv'
+            path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             try:
                 df = pd.read_csv(path, dtype={'datetime': int})
                 self.cache_history[code] = df
@@ -290,7 +294,7 @@ class DailyHistory:
             if i % 1000 == 0:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
-            self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
+            self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
 
     # 更新近几日数据，不用全部下载，速度快也不容易被Ban IP
@@ -299,14 +303,9 @@ class DailyHistory:
             self.load_history_from_disk_to_memory()
 
         self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
-
-        ttl = self.since_last_update_datetime()
-        if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
-            return
-
         code_list = self.get_code_list()
 
-        # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍
+        # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍，所以加个缓存标记以防重复加载浪费时间
         if self.data_source == DataSource.TUSHARE:
             now = datetime.datetime.now()
             all_updated_codes = set()
@@ -315,6 +314,10 @@ class DailyHistory:
                 sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
                 all_updated_codes.update(sub_updated_codes)
         else:
+            ttl = self.since_last_update_datetime()
+            if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+                return
+
             all_updated_codes = self._update_codes_one_by_one(days, code_list)
 
         # 排序存储所有更新过的数据
@@ -325,7 +328,7 @@ class DailyHistory:
             if i % 1000 == 0:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
-            self.cache_history[code].to_csv(f'{self.root_path}/{code}.csv', index=False)
+            self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[HISTORY] Finished with {i} files updated')
 
         self.write_last_update_datetime()
@@ -353,7 +356,7 @@ class DailyHistory:
     # ==============
 
     def remove_single_history(self, code: str) -> bool:
-        file_path = f'{self.root_path}/{code}.csv'
+        file_path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
         try:
             if not os.path.isfile(file_path):
                 return False
