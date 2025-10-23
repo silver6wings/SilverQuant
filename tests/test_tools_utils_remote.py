@@ -89,8 +89,9 @@ def test_check_xdxr_cache():
             cache_xdxr_orig.pop(code)
             test_code = code
         assert xdxr_count > len(cache_xdxr_orig)
+        save_pickle(PATH_TDX_XDXR, cache_xdxr_orig)
         
-    check_xdxr_cache(adjust=ExitRight.QFQ)
+    check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date=True)
     cache_xdxr_new = load_pickle(PATH_TDX_XDXR)
     assert len(cache_xdxr_new) > 0
     if xdxr_count > 0:
