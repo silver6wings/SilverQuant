@@ -1,12 +1,17 @@
 import pytest
 
-from tools.utils_cache import get_prev_trading_date_str
-from tools.utils_mootdx import get_mootdx_daily_history
-from tools.utils_remote import ExitRight
+import os
+import io
+import datetime
 
+from tools.constants import ExitRight
+from tools.utils_cache import get_prev_trading_date_str, get_prev_trading_date_list, get_trading_date_list, \
+                            symbol_to_code, save_pickle, load_pickle
 
 @pytest.mark.local_only
 def test_get_mootdx_daily_history():
+    from tools.utils_mootdx import get_mootdx_daily_history
+
     default_columns: list[str] = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
     code = '603929.SH' #20250922 每股除权除息 10派10
     start_date = '20250915'
@@ -27,6 +32,8 @@ def test_get_mootdx_daily_history():
 
 @pytest.mark.local_only
 def test_get_tdxzip_history():
+    from tools.utils_mootdx import download_tdx_hsjday, get_tdxzip_history
+
     buffer = download_tdx_hsjday()
     assert buffer != False
     buffer.seek(0, io.SEEK_END)
@@ -66,6 +73,8 @@ def test_get_tdxzip_history():
 # 远程Github服务器访问接口会有问题，也只跑本地测试即可
 @pytest.mark.local_only
 def test_check_xdxr_cache():
+    from tools.utils_mootdx import PATH_TDX_XDXR, get_dividend_code_from_baidu, check_xdxr_cache
+
     if os.path.isfile(PATH_TDX_XDXR):
         cache_xdxr_orig = load_pickle(PATH_TDX_XDXR)
         updatedtime = cache_xdxr_orig.get('updatedtime', None)
