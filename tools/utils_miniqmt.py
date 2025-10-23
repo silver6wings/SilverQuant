@@ -1,15 +1,11 @@
-from xtquant import xtdata
-
-from tools.constants import *
-from tools.utils_basic import pd_show_all
-
-
 import threading
-from typing import Any
 import pandas as pd
 
+from xtquant import xtdata
+from tools.constants import *
 
-def _run_with_timeout(target_func, args=(), timeout=1) -> Any:
+
+def _run_with_timeout(target_func, args=(), timeout=1) -> any:
     """
     在子线程中执行目标函数，超时未返回则抛出TimeoutException
 

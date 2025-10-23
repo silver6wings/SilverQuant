@@ -1,5 +1,4 @@
 import csv
-import time
 
 import requests
 import pandas as pd
@@ -316,27 +315,27 @@ def get_ts_daily_history(
     start_date: str,  # format: 20240101
     end_date: str,
     columns: list[str] = None,
-    adjust: ExitRight = ExitRight.BFQ,
+    # adjust: ExitRight = ExitRight.BFQ,
 ) -> Optional[pd.DataFrame]:
     if not is_stock(code):
         return None
 
-    # 还是要注册一下
     from reader.tushare_agent import get_tushare_pro
-    get_tushare_pro()
-
-    import tushare as ts
-    import warnings
-    warnings.filterwarnings('ignore', category=FutureWarning,
-        message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
-
     try_times = 0
     df = None
     while (df is None or len(df) <= 0) and try_times < 3:
         try_times += 1
-        # df = pro.daily(ts_code=code, start_date=start_date, end_date=end_date)
-        df = ts.pro_bar(ts_code=code, start_date=start_date, end_date=end_date, adj=adjust)
-        time.sleep(1)
+
+        pro = get_tushare_pro()
+        df = pro.daily(ts_code=code, start_date=start_date, end_date=end_date)
+
+        # import warnings
+        # warnings.filterwarnings('ignore', category=FutureWarning,
+        #     message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
+
+        # import tushare as ts
+        # df = ts.pro_bar(ts_code=code, start_date=start_date, end_date=end_date, adj=adjust)
+        # time.sleep(1)
 
     if df is not None and len(df) > 0:
         df = _ts_to_standard(df)
@@ -353,7 +352,7 @@ def get_ts_daily_histories(
     start_date: str,    # format: 20240101
     end_date: str,
     columns: list[str] = None,
-    adjust: ExitRight = ExitRight.BFQ,
+    # adjust: ExitRight = ExitRight.BFQ,
 ) -> dict[str, pd.DataFrame]:
     for code in codes:
         if not is_stock(code):
@@ -361,27 +360,29 @@ def get_ts_daily_histories(
             return {}
 
     from reader.tushare_agent import get_tushare_pro
-    get_tushare_pro()
-
-    import tushare as ts
-    import warnings
-    warnings.filterwarnings('ignore', category=FutureWarning,
-        message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
 
     try_times = 0
     df = None
     while (df is None or len(df) <= 0) and try_times < 3:
         try_times += 1
-        # 同上
-        # pro = get_tushare_pro()
-        # df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
-        df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
-        time.sleep(1)
+
+        # tushare的通用行情 SDK 有bug，改回去了！
+
+        pro = get_tushare_pro()
+        df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
+
+        # import warnings
+        # warnings.filterwarnings('ignore', category=FutureWarning,
+        #     message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
+
+        # import tushare as ts
+        # df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
+        # time.sleep(1)
 
     ans = {}
     if df is not None and len(df) > 0:
         for code in codes:
-            temp_df = df[df['ts_code'] == code]
+            temp_df = df[df['ts_code'] == code].drop_duplicates()
             temp_df = _ts_to_standard(temp_df)
 
             if columns is None:
@@ -413,7 +414,7 @@ def get_daily_history(
     else:
         # TuShare 的数据免费的暂时不支持复权
         # TuShare 不支持 etf，其他两个支持
-        return get_ts_daily_history(code, start_date, end_date, columns, adjust)
+        return get_ts_daily_history(code, start_date, end_date, columns)
 
 
 # =======================

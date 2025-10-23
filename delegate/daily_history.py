@@ -221,7 +221,7 @@ class DailyHistory:
                 start_date=target_date,
                 end_date=target_date,
                 columns=self.default_columns,
-                adjust=ExitRight.QFQ,
+                # adjust=ExitRight.QFQ,
             )
 
             # 填补缺失的日期
