@@ -101,7 +101,8 @@ class DingMessager(BaseMessager):
 
     def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
         title = text.split('\n')[0]
-        text = text.replace('\n ', '\n>\n> ')
+        text = text.replace('\n\n ', '\n\n> ')
+        text = text.replace('\n \n', '\n>\n> ')
 
         return self.send_markdown(title, text, output, alert)
 

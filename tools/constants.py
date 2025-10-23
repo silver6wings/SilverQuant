@@ -1,4 +1,8 @@
 
+MSG_INNER_SEPARATOR = '\n \n'
+MSG_OUTER_SEPARATOR = '\n\n '
+
+
 # 数据源常量
 class DataSource:
     AKSHARE = 'akshare'
