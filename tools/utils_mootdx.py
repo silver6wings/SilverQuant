@@ -397,7 +397,7 @@ def _get_bars_with_offset(client, symbol, total_offset, start=0):
     return combined_df
 
 
-def _get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12):
+def _get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12) -> Optional[pd.DataFrame]:
     os.makedirs(cache_dir, exist_ok=True)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")  # 缓存文件名：股票代码.csv
     expire_seconds = expire_hours * 3600
@@ -412,9 +412,8 @@ def _get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hour
     try:
         client = MootdxClientInstance().client
         xdxr_data = client.xdxr(symbol=symbol)
-
-        if xdxr_data is not None:  # 简单判断数据有效性
-            xdxr_data.to_csv(cache_file, index=False)  # index=False不保存索引列
+        if xdxr_data is not None and isinstance(xdxr_data, pd.DataFrame):
+            xdxr_data.to_csv(cache_file, index=False)
 
         return xdxr_data
     except Exception as e:
@@ -444,7 +443,7 @@ def get_mootdx_daily_history(
 
     if adjust != ExitRight.BFQ:
         xdxr = _get_xdxr(symbol=symbol)
-        if xdxr is not None and len(xdxr) > 0:
+        if xdxr is not None and isinstance(xdxr, pd.DataFrame) and len(xdxr) > 0:
             xdxr['date_str'] = xdxr['year'].astype(str) + \
                                '-' + xdxr['month'].astype(str).str.zfill(2) + \
                                '-' + xdxr['day'].astype(str).str.zfill(2)
@@ -656,6 +655,7 @@ def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
         print(error_msg)
         return False
     except Exception as e:
+        import traceback
         error_msg = f"未知错误: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
         return False

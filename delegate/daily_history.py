@@ -303,14 +303,9 @@ class DailyHistory:
             self.load_history_from_disk_to_memory()
 
         self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
-
-        ttl = self.since_last_update_datetime()
-        if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
-            return
-
         code_list = self.get_code_list()
 
-        # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍
+        # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍，所以加个缓存标记以防重复加载浪费时间
         if self.data_source == DataSource.TUSHARE:
             now = datetime.datetime.now()
             all_updated_codes = set()
@@ -319,6 +314,10 @@ class DailyHistory:
                 sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
                 all_updated_codes.update(sub_updated_codes)
         else:
+            ttl = self.since_last_update_datetime()
+            if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+                return
+
             all_updated_codes = self._update_codes_one_by_one(days, code_list)
 
         # 排序存储所有更新过的数据
