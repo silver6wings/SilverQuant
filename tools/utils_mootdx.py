@@ -10,14 +10,11 @@ import pandas as pd
 
 from typing import Optional
 
-from mootdx.utils import factor
-from mootdx.consts import MARKET_BJ, MARKET_SH, MARKET_SZ
-
 from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
 from tools.constants import ExitRight
-from tools.utils_basic import symbol_to_code, code_to_symbol
+from tools.utils_basic import code_to_sina_symbol, symbol_to_code, code_to_symbol
 from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, get_available_stock_codes, \
                               load_pickle, save_pickle, TRADE_DAY_CACHE_PATH
 
@@ -499,57 +496,8 @@ def get_mootdx_daily_history(
 # ================================================
 
 
-def _get_stock_market(symbol: str = '', string: bool = False):
-    """ 本函数从mootdx而来，增加北交所判断，mootdx修复后需改为另外调用
-    判断股票ID对应的证券市场匹配规则
-
-    ['50', '51', '60', '90', '110'] 为 sh
-    ['00', '12'，'13', '18', '15', '16', '18', '20', '30', '39', '115'] 为 sz
-    ['5', '6', '9'] 开头的为 sh， 其余为 sz
-
-    :param string: False 返回市场ID，否则市场缩写名称
-    :param symbol: 股票ID, 若以 'sz', 'sh' 开头直接返回对应类型，否则使用内置规则判断
-    :return 'sh' or 'sz'
-    """
-
-    assert isinstance(symbol, str), 'stock code need str type'
-
-    market = 'sh'
-
-    if symbol.startswith(('sh', 'sz', 'SH', 'SZ', 'bj', 'BJ')):
-        market = symbol[:2].lower()
-
-    elif symbol.startswith(('50', '51', '58', '60', '68', '90', '110', '111', '113', '118', '240')):
-        market = 'sh'
-
-    elif symbol.startswith(('00', '12', '13', '18', '15', '16', '18', '20', '30', '39', '115')):
-        market = 'sz'
-
-    elif symbol.startswith(('5', '6', '7', '90', '88', '98', '99')):
-        market = 'sh'
-
-    elif symbol.startswith(('20', '4', '82', '83', '87', '92')):
-        market = 'bj'
-
-    # logger.debug(f"market => {market}")
-
-    if not string:
-        if market == 'sh':
-            market = MARKET_SH
-
-        if market == 'sz':
-            market = MARKET_SZ
-
-        if market == 'bj':
-            market = MARKET_BJ
-
-    # logger.debug(f"market => {market}")
-
-    return market
-
-
-def _get_xdxr_sina(symbol: str, adjust: ExitRight, factor_name: str = None) -> pd.DataFrame:
-    xdxr = MootdxClientInstance().client.xdxr(symbol=symbol)
+def _get_xdxr_sina(code: str, adjust: ExitRight, factor_name: str = None) -> pd.DataFrame:
+    xdxr = MootdxClientInstance().client.xdxr(symbol=code_to_symbol(code))
     if xdxr is not None and len(xdxr) > 0:
         xdxr['date_str'] = xdxr['year'].astype(str) + \
                            '-' + xdxr['month'].astype(str).str.zfill(2) + \
@@ -557,19 +505,62 @@ def _get_xdxr_sina(symbol: str, adjust: ExitRight, factor_name: str = None) -> p
         xdxr['datetime'] = pd.to_datetime(xdxr['date_str'])
         xdxr = xdxr.set_index('datetime')
 
-        fq = _fetch_xdxr_factor(symbol, adjust, factor_name)
+        fq = _fetch_xdxr_factor(code, adjust, factor_name)
         xdxr = xdxr.join(fq[1:], how='outer')
     return xdxr
 
 
-def _fetch_xdxr_factor(symbol, adjust, factor_name=None) -> pd.DataFrame:
+def _fq_factor(code: str, method: str, ) -> pd.DataFrame:
+    '''
+    本函数从mootdx 剥离出来，当前mootdx不能处理北交所
+    未来可考虑直接调用mootdx 的factor.fq_factor
+    参数 sina_symbol 为sina格式 ，需使用code_to_syna_symbol转换
+    '''
+    symbol = code_to_sina_symbol(code)
+    #symbol = symbol.replace('sh', '').replace('sz', '').replace('bj', '')
+    #market = _get_stock_market(symbol, string=True)
+    #symbol = f'{market}{symbol}'
+    #cache_file = get_config_path(f'caches/factor/{symbol}_{method}.plk') #弃用
+
+    #@file_cache(filepath=cache_file, refresh_time=3600 * 24) #弃用
+    def _factor(symbol: str, method: str, ) -> pd.DataFrame:
+        import httpx
+        headers = {
+            "referer": f'https://finance.sina.com.cn/realstock/company/{symbol}/nc.shtml',
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
+        }
+        try:
+            url = "https://finance.sina.com.cn/realstock/company/{}/{}.js"
+            rsp = httpx.get(url.format(symbol, method), headers=headers)
+            res = pd.DataFrame(eval(rsp.text.split("=")[1].split("\n")[0])["data"])
+        except (SyntaxError, httpx.ConnectError) as ex:
+            logging.error(ex)
+            return pd.DataFrame(None)
+
+        if res.shape[0] == 0:
+            raise ValueError(f"sina {method} factor not available")
+
+        res.columns = ["date", "factor"]
+        res.date = pd.to_datetime(res.date)
+
+        res.set_index("date", inplace=True)
+        time.sleep(0.3)
+        return res
+
+    return _factor(symbol, method)
+
+def _fetch_xdxr_factor(code, adjust, factor_name=None) -> pd.DataFrame:
     if factor_name is None:
         factor_name = f'{adjust}_factor'
+    '''
+    symbol = code_to_symbol(code)
+    # 直接使用factor.fq_factor 需要清理以下缓存文件避免错误，使用本文件内_fq_factor 不需要
     market = _get_stock_market(symbol, string=True)
     cache_file = factor.get_config_path(f'caches/factor/{market}{symbol}_{adjust}.plk')
     if os.path.isfile(cache_file):
         os.remove(cache_file)
-    fq = factor.fq_factor(symbol, adjust)
+    '''
+    fq = _fq_factor(code, adjust)
     fq.rename(columns={'factor': factor_name}, inplace=True)
     fq.sort_index(ascending=True, inplace=True)
     return fq
@@ -707,7 +698,7 @@ def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust
         try:
             xdxr = cache_xdxr.get(code, None)
             if xdxr is None:
-                xdxr = _get_xdxr_sina(symbol, adjust, factor_name)
+                xdxr = _get_xdxr_sina(code, adjust, factor_name)
                 if xdxr is not None and len(xdxr) > 0:
                     cache_xdxr[code] = xdxr
 
@@ -716,7 +707,7 @@ def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust
                     if symbol == '689009':
                         raise Exception('CDR公司')
                     if factor_name not in xdxr.columns: # 没有复权因子数据需要更新
-                        fq = _fetch_xdxr_factor(symbol, adjust, factor_name)
+                        fq = _fetch_xdxr_factor(code, adjust, factor_name)
                         xdxr = xdxr.join(fq[1:], how='outer')
                         cache_xdxr[code] = xdxr
                     else:
@@ -770,7 +761,7 @@ def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust
 
 
 # 检查xdxr缓存，建议定时调度运行
-def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
+def check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date: bool = False) -> None:
     """
     检查缓存的通达信除权除息数据，cache_xdxr数据格式为stockcode:pd.DataFrame，以及updatedtime: Datetime
     如果发现有除权除息日大于updatetime 且小于当前日期，就删除cache条目
@@ -788,7 +779,9 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
             date_list = get_prev_trading_date_list(curr_date, 20)
         else:
             updated_date = cache_xdxr['updatedtime'].strftime('%Y-%m-%d')
-            date_list = get_trading_date_list(updated_date, curr_date)[1:]
+            date_list = get_trading_date_list(updated_date, curr_date)
+            if not force_refresh_updated_date:
+                date_list = date_list[1:]
 
         factor_name = f'{adjust}_factor'
         removed_xdxr_codes = set()
@@ -831,7 +824,7 @@ def check_xdxr_cache(adjust=ExitRight.QFQ) -> None:
             for symbol in removed_xdxr_codes:
                 code = symbol_to_code(symbol)
                 try:
-                    xdxr = _get_xdxr_sina(symbol, adjust, factor_name)
+                    xdxr = _get_xdxr_sina(code, adjust, factor_name)
                     if xdxr is not None and not xdxr.empty:
                         curr_xc = xdxr.loc[xdxr['category'] == 1]
                         if not curr_xc.empty and factor_name in curr_xc.columns and float(curr_xc.iloc[-1][factor_name]) == 1.0 :
