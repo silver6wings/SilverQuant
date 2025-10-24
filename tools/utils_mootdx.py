@@ -954,6 +954,17 @@ def get_dividend_code_from_baidu(date: str = "20241107") -> (pd.DataFrame, int):
 def download_tdx_hsjday() -> io.BytesIO|bool:
     import pycurl
     url = "https://data.tdx.com.cn/vipdoc/hsjday.zip"
+    # 定义进度条回调函数
+    def progress_callback(download_total, download_now, upload_total, upload_now):
+        if download_total > 0:
+            percent = int(download_now * 100 / download_total)
+            # 绘制一个简单的50个字符宽的进度条
+            bar_length = 50
+            filled_len = int(bar_length * download_now // download_total)
+            bar = '=' * filled_len + ' ' * (bar_length - filled_len)
+
+            # 使用 \r 回到行首并刷新输出，实现单行更新
+            print(f'\r[{bar}] {percent}% ({download_now}/{download_total})', end='', flush=True)
     try:
         buffer = io.BytesIO()
         c = pycurl.Curl()
@@ -962,19 +973,30 @@ def download_tdx_hsjday() -> io.BytesIO|bool:
         c.setopt(c.WRITEDATA, buffer)
         c.setopt(pycurl.SSL_VERIFYPEER, 0)
         c.setopt(pycurl.SSL_VERIFYHOST, 0)
+        # 启用进度条 (设置为 0 表示启用)
+        c.setopt(pycurl.NOPROGRESS, 0)
+        # 设置回调函数
+        c.setopt(pycurl.XFERINFOFUNCTION, progress_callback)
         c.perform()
         response_code = c.getinfo(c.RESPONSE_CODE)
         c.close()
 
         response_length = buffer.tell()
         if response_code != 200 or response_length <= 102400:  #返回状态不对，或者返回文件太小
-            print(f'下载文件{url}失败')
+            print(f'下载文件{url}失败，状态码: {response_code}, 文件大小: {response_length}')
             buffer.close()
             del buffer
             return False
+
+        # 成功后，重置缓冲区的指针到开头，以便后续读取
+        # 外部调用后seek0了先注释
+        # buffer.seek(0)
         return buffer
     except Exception as e:
         print(f'下载文件失败', e)
+        # 如果 buffer 存在且未关闭，确保关闭
+        if 'buffer' in locals() and not buffer.closed:
+            buffer.close()
         return False
 
 
