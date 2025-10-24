@@ -2,82 +2,59 @@ import base64
 import hashlib
 import hmac
 import json
-import time
 import requests
+import time
 import traceback
-import urllib.parse
-import urllib.request
+from typing import Dict, Any
+
+from tools.constants import MSG_INNER_SEPARATOR, MSG_OUTER_SEPARATOR
+from tools.utils_ding import BaseMessager
 
 
 def get_feishu_markdown_card(title, text):
-    # 飞书富文本 json 1.0 结构
+    """
+    生成飞书富文本卡片 (JSON 2.0 结构)
+    """
     card_style = {
+        "schema": "2.0",
+        "config": {
+            "update_multi": True,
+            "style": {
+                "text_size": {
+                    "normal_v2": {
+                        "default": "normal",
+                        "pc": "normal",
+                        "mobile": "heading"
+                    }
+                }
+            }
+        },
+        "body": {
+            "direction": "vertical",
+            "padding": "12px 12px 12px 12px",
+            "elements": [
+                {
+                    "tag": "markdown",
+                    "content": text,
+                    "text_align": "left",
+                    "text_size": "normal_v2",
+                    "margin": "0px 0px 0px 0px"
+                }
+            ]
+        },
         "header": {
-            "template": "blue",
             "title": {
                 "tag": "plain_text",
-                "content": title,
-            }},
-
-        "elements": [
-            {
-                "tag": "markdown",
-                "content": text,
-                "text_align": "left",
-                "text_size": "normal"
-            }]
-
+                "content": title
+            },
+            "template": "blue",
+            "padding": "12px 12px 12px 12px"
+        }
     }
-    # 飞书富文本 json 2.0 结构
-    # card_style = {
-    #     "schema": "2.0",
-    #     "config": {
-    #         "update_multi": True,
-    #         "style": {
-    #             "text_size": {
-    #                 "normal_v2": {
-    #                     "default": "normal",
-    #                     "pc": "normal",
-    #                     "mobile": "heading"
-    #                 }
-    #             }
-    #         }
-    #     },
-    #     "body": {
-    #         "direction": "vertical",
-    #         "padding": "12px 12px 12px 12px",
-    #         "elements": [
-    #             {
-    #                 "tag": "markdown",
-    #                 "content": text,
-    #                 # "content": "飞书emoji :OK::THUMBSUP:\n*斜体* **粗体** ~~删除线~~ \n<font color='red'>这是红色文本</font>\n<text_tag color='blue'>标签</text_tag>\n<number_tag>1</number_tag>\n[文字链接](https://open.feishu.cn/server-docs/im-v1/message-reaction/emojis-introduce)\n<link icon='chat_outlined' url='https://open.feishu.cn' pc_url='' ios_url='' android_url=''>带图标的链接</link>\n<at id=all></at>\n- 无序列表1\n    - 无序列表 1.1\n- 无序列表2\n1. 有序列表1\n    1. 有序列表 1.1\n2. 有序列表2\n```JSON\n{\"This is\": \"JSON demo\"}\n```\n`inline-code`\n# 一级标题\n## 二级标题\n> 这是一段引用\n\n | Syntax | Description |\n| -------- | -------- |\n| Header | Title |\n| Paragraph | Text |",
-    #                 "text_align": "left",
-    #                 "text_size": "normal_v2",
-    #                 "margin": "0px 0px 0px 0px"
-    #             }
-    #             # {
-    #             #     "tag": "hr",
-    #             #     "margin": "0px 0px 0px 0px"
-    #             # }
-    #         ]
-    #     },
-    #     "header": {
-    #         "title": {
-    #             "tag": "plain_text",
-    #             "content": title
-    #         },
-    #         # "subtitle": {
-    #         #     "tag": "plain_text",
-    #         #     "content": text
-    #         # },
-    #         "template": "blue",
-    #         "padding": "12px 12px 12px 12px"
-    #     }
-    # }
     return card_style
 
 
-class FeishuMessager(object):
+class FeishuMessager(BaseMessager):
     def __init__(self, secret: str = None, webhook_url: str = None):
         """
         https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot?lang=zh-CN
@@ -88,106 +65,122 @@ class FeishuMessager(object):
         self.webhook_url = webhook_url
         self.refresh_webhook()
 
-    def refresh_webhook(self):
+    def refresh_webhook(self) -> bool:
+        """检查配置是否完整，并在缺少时打印提示"""
         if self.secret is None or self.webhook_url is None:
-            print('请先在飞书申请secret')
-            print('格式:SECa0ab7f3ba9742c0*********')
-            print('请先在飞书申请webhook')
-            print(
-                '格式:https://open.feishu.cn/open-apis/bot/v2/hook/****************')
+            print('--- FeishuMessager 配置提示 ---')
+            if self.secret is None:
+                print('请先在飞书申请secret')
+                print('格式:SECa0ab7f3ba9742c0*********')
+            if self.webhook_url is None:
+                print('请先在飞书申请webhook')
+                print('格式:https://open.feishu.cn/open-apis/bot/v2/hook/****************')
+            print('------------------------------------')
             return False
         return True
 
-    def gen_sign(self, timestamp, secret):
+    def gen_sign(self, timestamp: int) -> str:
+        """
+        生成签名
+        :param timestamp: 时间戳 (必须与消息体中的 timestamp 一致)
+        :return: sign
+        """
         # 拼接 timestamp 和 secret
-        timestamp = round(time.time())  # 时间戳
-        string_to_sign = '{}\n{}'.format(timestamp, secret)
+        string_to_sign = '{}\n{}'.format(timestamp, self.secret)
         hmac_code = hmac.new(string_to_sign.encode(
             "utf-8"), digestmod=hashlib.sha256).digest()
         # 对结果进行 Base64 处理
         sign = base64.b64encode(hmac_code).decode('utf-8')
         return sign
 
-    def send_message(self, data) -> dict:
-        # """
-        # 发送消息至机器人对应的群
-        # :param data: 发送的内容
-        # :return:
-        # """
+    def send_message(self, data: Dict[str, Any]) -> dict:
+        """
+        发送消息至机器人对应的群
+        :param data: 发送的内容
+        :return: 飞书服务器的响应字典
+        """
         try:
-            if self.refresh_webhook():
-                header = {
-                    "Content-Type": "application/json",
-                    "Charset": "UTF-8"
-                }
+            if not self.refresh_webhook():
+                return {'msg': 'ConfigurationError', 'code': -1}
 
-                send_data = json.dumps(data)
-                send_data = send_data.encode("utf-8")
+            header = {
+                "Content-Type": "application/json",
+                "Charset": "UTF-8"
+            }
 
-                response = requests.post(
-                    url=self.webhook_url, data=send_data, headers=header)
-                return json.loads(response.text)
-        except:
+            send_data = json.dumps(data)
+            send_data = send_data.encode("utf-8")
+
+            response = requests.post(
+                url=self.webhook_url, data=send_data, headers=header)
+            return json.loads(response.text)
+        except Exception:
             traceback.print_exc()
-            return {'msg': 'Exception!'}
+            return {'msg': 'Exception!', 'code': -99}
 
     def send_text(self, text: str, output: str = '', alert: bool = False) -> bool:
-
+        """发送普通文本消息"""
         timestamp = round(time.time())
-        sign = self.gen_sign(timestamp, self.secret)
+        sign = self.gen_sign(timestamp)
+
+        content_elements = [
+            {
+                "tag": "text",
+                "text": text,
+            }
+        ]
+        if alert:
+            content_elements.append({
+                "tag": "at",
+                "user_id": "all"
+            })
+
         res = self.send_message(data={
             "timestamp": timestamp,
             "sign": sign,
             "msg_type": "post",
             "content": {"post":
-                        {"zh_cn":
-                         {
-                             "title": "",
-                             "content": [
-                                 [
-                                     {
-                                         "tag": "text",
-                                         "text": text,
-                                     }
-                                 ] + (
-                                     [
-                                         {
-                                             "tag": "at",
-                                             "user_id": "all"
-                                         }
-                                     ] if alert else []
-                                 )
-                             ]
-                         }
-                         }
-                        }
+                {"zh_cn":
+                    {
+                        "title": "",
+                        "content": [content_elements]
+                    }
+                }
+            }
         }
         )
 
-        if res['msg'] == 'success':
+
+
+        #{'StatusCode': 0, 'StatusMessage': 'success', 'code': 0, 'data': {}, 'msg': 'success'}
+
+        if res.get('code') == 0 or res.get('StatusCode') == 0:
             if len(output) > 0:
                 print(output, end='')
             else:
                 print('Feishu message send success!')
             return True
         else:
-            print('Feishu message send failed: ', res['msg'])
+            print('Feishu message send failed: ', {res})
             return False
 
     def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
+        """将多行文本格式化为 Markdown 引用样式发送"""
         title = text.split('\n')[0]
-        text = text.replace('\n', '\n>\n>')
+        text = text.replace(MSG_OUTER_SEPARATOR, '\n\n>')
+        text = text.replace(MSG_INNER_SEPARATOR, '\n')
         return self.send_markdown(title, text, output, alert)
 
     def send_markdown(self, title: str, text: str, output: str = '', alert: bool = False) -> bool:
-        #飞书 markdown颜色
+        """发送 Markdown (交互式卡片) 消息"""
+        #飞书 markdown 颜色替换
         color_replace_dic = {"#DC2832": "red", "#16BC50": "green"}
         for a, b in color_replace_dic.items():
             text = text.replace(a, b)
             
         text += "\n<at id=all></at>" if alert else ""
         timestamp = round(time.time())
-        sign = self.gen_sign(timestamp, self.secret)
+        sign = self.gen_sign(timestamp)
 
         my_data = {
             "timestamp": timestamp,
@@ -195,13 +188,14 @@ class FeishuMessager(object):
             'msg_type': 'interactive',
             "card": get_feishu_markdown_card(title, text)
         }
+
         res = self.send_message(data=my_data)
-        if res['msg'] == 'success':
+        if res.get('code') == 0 or res.get('StatusCode') == 0:
             if len(output) > 0:
                 print(output, end='')
             else:
                 print('Feishu markdown send success!')
             return True
         else:
-            print('Feishu markdown send failed: ', res['msg'])
+            print(f'Feishu markdown send failed: {res}')
             return False
