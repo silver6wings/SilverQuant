@@ -60,6 +60,7 @@ def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # 查找可用缓存
             dir_name = os.path.dirname(path)
             try:
                 with open(path, 'rb') as f:
@@ -67,9 +68,14 @@ def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
                         return pd.read_csv(f, dtype=dtype)
             except FileNotFoundError:
                 os.makedirs(dir_name, exist_ok=True) if dir_name else None
-            data = func(*args, **kwargs)
-            data.to_csv(path, index=False)
-            return data
+            # 如果没有缓存
+            try:
+                data = func(*args, **kwargs)
+                data.to_csv(path, index=False)
+                return data
+            except Exception as e:
+                print('AKShare request failed: ', e)
+                return None
         return wrapper
     return decorator
 
