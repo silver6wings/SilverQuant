@@ -5,6 +5,7 @@ import pickle
 import threading
 import datetime
 import functools
+from pathlib import Path
 from typing import List, Dict, Set, Optional, Callable, Any
 
 import numpy as np
@@ -20,6 +21,10 @@ trade_max_year_key = 'max_year'
 TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
+# 确保缓存目录存在
+CACHE_DIR = Path("./_cache")
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+CACHE_HOURS = 23
 
 # 查询股票名称
 class StockNames:
@@ -575,37 +580,112 @@ def check_is_open_day(curr_date: str) -> bool:
 # 远程数据缓存
 # ==========
 
+def _fetch_with_cache_fallback(
+        cache_file: Path,
+        api_func: Callable[..., pd.DataFrame],
+        api_kwargs: Dict[str, Any],
+        fallback_func: Optional[Callable[..., pd.DataFrame]] = None,
+        fallback_kwargs: Optional[Dict[str, Any]] = None,
+        primary_warning: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    数据获取函数，处理缓存、API调用、回退和错误。
+    1. 检查有效缓存。
+    2. 如果缓存无效，尝试调用 api_func。
+    3. 如果 api_func 失败，尝试调用 fallback_func。
+    4. 如果所有调用都失败，尝试读取任何已存在的（即使是过期的）缓存。
+    5. 如果仍然失败，返回一个空的 DataFrame。
+    """
+
+    # 1. 检查是否存在有效（未过期）的缓存
+    if cache_file.exists():
+        try:
+            mtime = os.path.getmtime(cache_file)
+            is_valid = (datetime.datetime.now().timestamp() - mtime) < (CACHE_HOURS * 3600)
+            if is_valid:
+                return pd.read_pickle(cache_file)
+        except Exception as e:
+            print(f"警告：读取缓存文件 {cache_file} 失败，将重新获取。错误: {e}")
+
+    # 2. 缓存无效或不存在，尝试主 API
+    try:
+        df = api_func(**api_kwargs)
+        df.to_pickle(cache_file)
+        if primary_warning:
+            print(primary_warning)
+        return df
+    except Exception as e:
+        print(f"主 API {api_func.__name__} 调用失败 ({api_kwargs}): {e}")
+
+    # 3. 主 API 失败，尝试回退 API (如果提供)
+    if fallback_func:
+        try:
+            fallback_kwargs = fallback_kwargs if fallback_kwargs is not None else api_kwargs
+            df = fallback_func(**fallback_kwargs)
+            df.to_pickle(cache_file) # 缓存回退数据
+            print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
+            return df
+        except Exception as e2:
+            print(f"回退 API {fallback_func.__name__} 也失败了: {e2}")
+
+    # 4. 所有 API 均失败，尝试读取本地的任何（即使是过期的）缓存
+    if cache_file.exists():
+        print(f"警告：所有 API 调用均失败。作为最后手段，从本地（可能已过期）缓存加载 {cache_file}")
+        try:
+            return pd.read_pickle(cache_file)
+        except Exception as e3:
+            print(f"错误：加载过期缓存 {cache_file} 失败: {e3}")
+
+    # 5. 彻底失败
+    print(f"错误：无法从 API 或本地缓存获取 {cache_file} 的数据。")
+    return pd.DataFrame()
 
 # 获取指数成份symbol
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
-    if index_symbol[:2] in ['00', '93', '89']:
-        # 中证指数接口
-        index_file = f'./_cache/_index_{index_symbol}.pkl'
-        if not os.path.exists(index_file) or \
-                (datetime.datetime.now().timestamp() - os.path.getmtime(index_file) > 23 * 60 * 60):
-            try:
-                df = ak.index_stock_cons_csindex(symbol=index_symbol)
-                df.to_pickle(index_file)
-            except Exception as e:
-                # 很难遇到的情况就是中证网站维护不可用
-                if os.path.exists(index_file):
-                    df = pd.read_pickle(index_file)
-                else:
-                    # 实在不行用一些会出现重复不全问题的接口作为 fallback
-                    df = ak.index_stock_cons(symbol=index_symbol)
-                    print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！', e)
-        else:
-            df = pd.read_pickle(index_file)
+    """
+    获取指数成分股代码，并使用健壮的缓存和回退逻辑。
+    """
+    index_file = CACHE_DIR / f"_index_{index_symbol}.pkl"
+    # 北交所接口
+    if index_symbol == "BJ":
+        df = _fetch_with_cache_fallback(
+            cache_file=index_file,
+            api_func=ak.stock_info_bj_name_code,
+            api_kwargs={}
+        )
+    elif index_symbol[:2] in ['00', '93', '89']:
+        # 中证指数接口 (有回退)
+        df = _fetch_with_cache_fallback(
+            cache_file=index_file,
+            api_func=ak.index_stock_cons_csindex,
+            api_kwargs={'symbol': index_symbol},
+            fallback_func=ak.index_stock_cons,
+            fallback_kwargs={'symbol': index_symbol}
+        )
     else:
+        # 普通指数接口 (无回退，但有缓存和警告)
         # 普通指数接口：有重复不全，需要注意
-        df = ak.index_stock_cons(symbol=index_symbol)
-        print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
+        df = _fetch_with_cache_fallback(
+            cache_file=index_file,
+            api_func=ak.index_stock_cons,
+            api_kwargs={'symbol': index_symbol},
+            primary_warning='警告：指数成份使用备用数据，监控股池可能不完整，请注意！'
+        )
+
+    # 统一处理数据框，提取代码
+    if df.empty:
+        print(f"未能获取 {index_symbol} 的成分股数据。")
+        return []
+
 
     if '品种代码' in df.columns:
-        return [str(code).zfill(6) for code in df['品种代码'].values]
+        col_name = '品种代码'
+    elif '证券代码' in df.columns:
+        col_name = '证券代码'
     else:
-        return [str(code).zfill(6) for code in df['成分券代码'].values]
+        col_name = '成分券代码'
 
+    return [str(code).zfill(6) for code in df[col_name].values]
 
 # 获取指数成份code
 def get_index_constituent_codes(index_symbol: str) -> list:
