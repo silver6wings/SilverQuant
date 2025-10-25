@@ -10,7 +10,6 @@ import pandas as pd
 
 from typing import Optional
 
-from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
 from tools.constants import ExitRight
@@ -84,6 +83,8 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         'BJ_A_STOCK',
     ]
 
+    SECURITY_EXCHANGE = ["sz", "sh", "bj"]
+
     SECURITY_COEFFICIENT = {
         'SH_A_STOCK': [0.01, 0.01],
         'SH_B_STOCK': [0.001, 0.01],
@@ -104,7 +105,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         exchange = str(fname[-12:-10]).lower()
         code_head = fname[-10:-8]
 
-        if exchange == SECURITY_EXCHANGE[0]:
+        if exchange == self.SECURITY_EXCHANGE[0]:
             if code_head in ['00', '30']:
                 return 'SZ_A_STOCK'
 
@@ -122,7 +123,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
 
             return 'SZ_OTHER'
 
-        if exchange == SECURITY_EXCHANGE[1]:
+        if exchange == self.SECURITY_EXCHANGE[1]:
             if code_head in ['60']:
                 return 'SH_A_STOCK'
 
@@ -144,7 +145,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
 
             return 'SH_OTHER'
 
-        if exchange == SECURITY_EXCHANGE[2]:
+        if exchange == self.SECURITY_EXCHANGE[2]:
             if code_head in ['43', '82', '83', '87', '88', '92']:
                 return 'BJ_A_STOCK'
 

@@ -44,7 +44,7 @@ class IndexSymbol:
     INDEX_ZX_100 = '399005'     # 中小100
     INDEX_ZZ_A50 = '000050'     # 中证A50
     INDEX_ZZ_A500 = '000510'    # 中证A500
-
+    INDEX_BJ = 'BJ'  # 北京A股
 
 # 仓位项常量
 class InfoItem:
