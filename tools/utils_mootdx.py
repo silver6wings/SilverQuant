@@ -1,10 +1,28 @@
 import os
-import time
+import logging
+import io
 import datetime
+import json
+import time
+import zipfile
+import numpy as np
 import pandas as pd
+
+from typing import Optional
+
+from tdxpy.constants import SECURITY_EXCHANGE
+from tdxpy.reader import TdxDailyBarReader
+
+from tools.constants import ExitRight
+from tools.utils_basic import code_to_sina_symbol, symbol_to_code, code_to_symbol
+from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, get_available_stock_codes, \
+                              load_pickle, save_pickle, TRADE_DAY_CACHE_PATH
 
 
 DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
+
+PATH_TDX_HISTORY = f'./_cache/_daily_tdxzip/history_tdxhsj.pkl'
+PATH_TDX_XDXR = f'./_cache/_daily_tdxzip/xdxr.pkl'
 
 
 class MootdxClientInstance:
@@ -13,8 +31,6 @@ class MootdxClientInstance:
 
     def __new__(cls):
         if cls._instance is None:
-          
-          
             cls._instance = super(MootdxClientInstance, cls).__new__(cls)
             cls.client = None  # Initialize data as None initially
         return cls._instance
@@ -23,42 +39,20 @@ class MootdxClientInstance:
         if self.client is None:
             from mootdx.quotes import Quotes
             pd.set_option('future.no_silent_downcasting', True)
-            try:
-                from credentials import TDX_FOLDER
-                self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
-            except Exception as e:
-                print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
+            from credentials import TDX_FOLDER
+            if TDX_FOLDER is not None and len(TDX_FOLDER) > 0:
+                try:
+                    self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
+                except Exception as e:
+                    print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
+                    self.client = Quotes.factory(market='std')
+            else:
                 self.client = Quotes.factory(market='std')
 
 
-def get_xdxr(symbol: str, cache_dir: str = DEFAULT_XDXR_CACHE_PATH, expire_hours: int = 12):
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_file = os.path.join(cache_dir, f"{symbol}.csv")  # 缓存文件名：股票代码.csv
-    expire_seconds = expire_hours * 3600
-
-    if os.path.exists(cache_file):
-        file_mtime = os.path.getmtime(cache_file)
-        time_diff = time.time() - file_mtime
-
-        if time_diff <= expire_seconds:
-            return pd.read_csv(cache_file)
-
-    try:
-        client = MootdxClientInstance().client
-        xdxr_data = client.xdxr(symbol=symbol)
-
-        if xdxr_data is not None:  # 简单判断数据有效性
-            xdxr_data.to_csv(cache_file, index=False)  # index=False不保存索引列
-
-        return xdxr_data
-    except Exception as e:
-        print(f' mootdx get xdxr {symbol} error: ', e)
-        return None
-
-
-def get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
-    """
-    计算两个日期区间的交易日数（含首尾），及end到今天的交易日数（不含end）
+class MootdxDailyBarReaderInstance:
+    _instance = None
+    reader = None
 
     def __new__(cls):
         if cls._instance is None:
