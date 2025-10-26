@@ -200,16 +200,12 @@ def make_qfq(data, xdxr, fq_type="01"):
         if field in ("open", "close", "high", "low", "preclose"):
             data[field] = data[field] * data["adj"]
 
+    data[["open", "close", "high", "low", "preclose"]] = data[["open", "close", "high", "low", "preclose"]].round(3)
+
     # 清理数据, 返回结果
-    return data.query("open != 0").drop(
-        [
-            "fenhong",
-            "peigu",
-            "peigujia",
-            "songzhuangu",
-        ],
-        axis=1,
-    )
+    return data.query("open != 0").drop([
+        "fenhong", "peigu", "peigujia", "songzhuangu"
+    ], axis=1)
 
 
 def make_hfq(bfq_data, xdxr_data):
@@ -257,8 +253,11 @@ def make_hfq(bfq_data, xdxr_data):
     except Exception as e:
         print('xdxr error! ', e)
 
-    return data.query('if_trade==1 and open != 0').drop(
-        ['fenhong', 'peigu', 'peigujia', 'songzhuangu', 'if_trade', 'category'], axis=1)
+    data[["open", "close", "high", "low", "preclose"]] = data[["open", "close", "high", "low", "preclose"]].round(3)
+
+    return data.query('if_trade==1 and open != 0').drop([
+        'fenhong', 'peigu', 'peigujia', 'songzhuangu', 'if_trade', 'category'
+    ], axis=1)
 
 
 def _get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> tuple[int, int]:
@@ -439,38 +438,36 @@ def get_mootdx_daily_history(
         return None
 
     if adjust != ExitRight.BFQ:
-        try:
             xdxr = _get_xdxr(symbol=symbol)
             if xdxr is not None and isinstance(xdxr, pd.DataFrame) and len(xdxr) > 0:
                 xdxr['date_str'] = xdxr['year'].astype(str) + \
-                                   '-' + xdxr['month'].astype(str).str.zfill(2) + \
-                                   '-' + xdxr['day'].astype(str).str.zfill(2)
+                    '-' + xdxr['month'].astype(str).str.zfill(2) + \
+                    '-' + xdxr['day'].astype(str).str.zfill(2)
                 xdxr['datetime'] = pd.to_datetime(xdxr['date_str'] + ' 15:00:00')
                 xdxr = xdxr.set_index('datetime')
-
-                is_appended = False
                 xdxr_info = xdxr.loc[xdxr['category'] == 1]
 
-                now = datetime.datetime.now()
-                curr_date = now.strftime("%Y-%m-%d")
-
                 # 默认除权日当天之前的数据一样进行处理
+                is_appended = False
+                now = datetime.datetime.now()
                 if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
+                    curr_date = now.strftime("%Y-%m-%d") + ' 15:00:00'
                     last_row = df.iloc[-1].copy()
                     last_row['datetime'] = curr_date
                     df.loc[len(df)] = last_row
                     df.index = pd.to_datetime(df['datetime'].astype(str), errors="coerce")
                     is_appended  = True
 
-                if adjust == ExitRight.QFQ:
-                    df = make_qfq(df, xdxr)
-                elif adjust == ExitRight.HFQ:
-                    df = make_hfq(df, xdxr)
+                try:
+                    if adjust == ExitRight.QFQ:
+                        df = make_qfq(df, xdxr)
+                    elif adjust == ExitRight.HFQ:
+                        df = make_hfq(df, xdxr)
+                except Exception as e:
+                    print(f' mootdx make fq {code} error: ', e)
 
                 if is_appended:
                     df = df[:-1]
-        except Exception as e:
-            print(f' mootdx make fq {code} error: ', e)
 
     if df is not None and len(df) > 0 and isinstance(df, pd.DataFrame) and 'datetime' in df.columns:
         try:
@@ -619,17 +616,17 @@ def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
         file_size = response_length / 1024 / 1024
         print(f'下载耗时{end-start:.2f}秒, 速度：{file_size/(end-start):.2f} MB/s。')
         if isExtract:
-            vipdocdir = os.path.join(TDXDIR, 'vipdoc')
-            os.makedirs(vipdocdir, exist_ok=True)
+            vip_doc_dir = os.path.join(TDXDIR, 'vipdoc')
+            os.makedirs(vip_doc_dir, exist_ok=True)
             end = datetime.datetime.now().timestamp()
 
-            filenum = 0
+            file_num = 0
             print(f"已下载，文件大小：{file_size:.2f}MB。开始解压文件到: {TDXDIR} 。")
             with zipfile.ZipFile(buffer, 'r') as zip_ref:
-                zip_ref.extractall(vipdocdir)
-                filenum = len(zip_ref.infolist())
+                zip_ref.extractall(vip_doc_dir)
+                file_num = len(zip_ref.infolist())
             end2 = datetime.datetime.now().timestamp()
-            print(f'解压耗时{end2-end:.2f}秒，解压文件{filenum}个。')
+            print(f'解压耗时{end2-end:.2f}秒，解压文件{file_num}个。')
 
             print("下载通达信沪深京日线数据并解压完成。")
         if cachefile:
@@ -655,7 +652,7 @@ def update_tdx_hsjday(TDXDIR: str, isExtract = True, cachefile = None) -> bool:
         return False
 
 
-def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust):
+def _process_tdx_zip_to_datas(group_codes, zip_ref, cache_xdxr, day_count, adjust):
     """处理tdx zip文件，未来需改造多线程"""
     now = datetime.datetime.now()
     curr_date = now.strftime("%Y-%m-%d")
@@ -664,7 +661,7 @@ def _process_tdx_zip_to_datas(groupcodes, zip_ref, cache_xdxr, day_count, adjust
     default_columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'adj']
     barreader = MootdxDailyBarReaderInstance().reader
 
-    for code in groupcodes:
+    for code in group_codes:
         arr = code.split('.')
         assert len(arr) == 2, 'code不符合格式'
         symbol = arr[0]
@@ -954,17 +951,6 @@ def get_dividend_code_from_baidu(date: str = "20241107") -> (pd.DataFrame, int):
 def download_tdx_hsjday() -> io.BytesIO|bool:
     import pycurl
     url = "https://data.tdx.com.cn/vipdoc/hsjday.zip"
-    # 定义进度条回调函数
-    def progress_callback(download_total, download_now, upload_total, upload_now):
-        if download_total > 0:
-            percent = int(download_now * 100 / download_total)
-            # 绘制一个简单的50个字符宽的进度条
-            bar_length = 50
-            filled_len = int(bar_length * download_now // download_total)
-            bar = '=' * filled_len + ' ' * (bar_length - filled_len)
-
-            # 使用 \r 回到行首并刷新输出，实现单行更新
-            print(f'\r[{bar}] {percent}% ({download_now}/{download_total})', end='', flush=True)
     try:
         buffer = io.BytesIO()
         c = pycurl.Curl()
@@ -973,30 +959,19 @@ def download_tdx_hsjday() -> io.BytesIO|bool:
         c.setopt(c.WRITEDATA, buffer)
         c.setopt(pycurl.SSL_VERIFYPEER, 0)
         c.setopt(pycurl.SSL_VERIFYHOST, 0)
-        # 启用进度条 (设置为 0 表示启用)
-        c.setopt(pycurl.NOPROGRESS, 0)
-        # 设置回调函数
-        c.setopt(pycurl.XFERINFOFUNCTION, progress_callback)
         c.perform()
         response_code = c.getinfo(c.RESPONSE_CODE)
         c.close()
 
         response_length = buffer.tell()
         if response_code != 200 or response_length <= 102400:  #返回状态不对，或者返回文件太小
-            print(f'下载文件{url}失败，状态码: {response_code}, 文件大小: {response_length}')
+            print(f'下载文件{url}失败')
             buffer.close()
             del buffer
             return False
-
-        # 成功后，重置缓冲区的指针到开头，以便后续读取
-        # 外部调用后seek0了先注释
-        # buffer.seek(0)
         return buffer
     except Exception as e:
         print(f'下载文件失败', e)
-        # 如果 buffer 存在且未关闭，确保关闭
-        if 'buffer' in locals() and not buffer.closed:
-            buffer.close()
         return False
 
 

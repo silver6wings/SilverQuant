@@ -3,6 +3,9 @@ MSG_INNER_SEPARATOR = '\n \n'
 MSG_OUTER_SEPARATOR = '\n\n '
 
 
+DEFAULT_DAILY_COLUMNS = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
+
+
 # 数据源常量
 class DataSource:
     AKSHARE = 'akshare'

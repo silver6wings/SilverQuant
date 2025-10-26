@@ -211,7 +211,7 @@ class DailyHistory:
 
         updated_codes = set()
         updated_count = 0
-        group_size = 990
+        group_size = 400
         for i in range(0, len(loss_list), group_size):
             time.sleep(0.5)
             group_codes = [sub_code for sub_code in loss_list[i:i + group_size]]

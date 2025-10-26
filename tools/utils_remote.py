@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 from typing import Optional
 
-from tools.constants import DataSource, ExitRight
+from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
 from tools.utils_basic import *
 from tools.utils_miniqmt import get_qmt_daily_history
 from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
@@ -215,6 +215,80 @@ def append_ak_spot_dict(source_df: pd.DataFrame, row: pd.Series, curr_date: str)
     return df
 
 
+# =======================
+#  Convert daily history
+# =======================
+
+
+def convert_daily_to_weekly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为周线数据（datetime为该周内最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 周线数据的DataFrame，按周一到周日合并，datetime为周内最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，同时新增datetime类型列用于分组（确定属于哪一周）
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime类型索引进行周分组
+
+    # 2. 按周一到周日分组（周区间：[周一, 下周一)）
+    weekly_groups = data.resample('W-MON', closed='left', label='left')  # 分组逻辑不变，仅用于划分周范围
+
+    # 3. 聚合规则：核心是对原始datetime取组内最后一个值
+    weekly_data = weekly_groups.agg({
+        'datetime': 'last',       # 周内最后一个交易日的原始整数日期
+        'open': 'first',          # 周内第一个开盘价
+        'high': 'max',            # 周内最高价
+        'low': 'min',             # 周内最低价
+        'close': 'last',          # 周内最后一个收盘价
+        'volume': 'sum',          # 周内成交量总和
+        'amount': 'sum'           # 周内成交额总和
+    }).dropna()  # 移除无数据的周
+
+    # 4. 恢复列顺序和原始数据类型
+    weekly_data = weekly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in weekly_data.columns:
+        weekly_data[col] = weekly_data[col].astype(df[col].dtype)
+
+    return weekly_data
+
+
+def convert_daily_to_monthly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为月线数据（datetime为当月最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 月线数据的DataFrame，按自然月划分（1月-12月），datetime为当月最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，新增datetime类型列用于按月分组
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime索引进行月份分组
+
+    # 2. 按自然月分组（1月1日-1月最后一天，2月1日-2月最后一天...）
+    # 频率'M'表示按月分组，默认按自然月划分
+    monthly_groups = data.resample('M')
+
+    # 3. 聚合规则：与周线逻辑一致，仅周期改为月
+    monthly_data = monthly_groups.agg({
+        'datetime': 'last',       # 当月最后一个交易日的原始整数日期
+        'open': 'first',          # 当月第一个交易日的开盘价
+        'high': 'max',            # 当月最高价
+        'low': 'min',             # 当月最低价
+        'close': 'last',          # 当月最后一个交易日的收盘价
+        'volume': 'sum',          # 当月成交量总和
+        'amount': 'sum'           # 当月成交额总和
+    }).dropna()  # 移除无数据的月份
+
+    # 4. 恢复列顺序和原始数据类型
+    monthly_data = monthly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in monthly_data.columns:
+        monthly_data[col] = monthly_data[col].astype(df[col].dtype)
+
+    return monthly_data
+
+
 # ================
 #  Daily History
 # ================
@@ -225,7 +299,7 @@ def get_ak_daily_history(
     code: str,
     start_date: str,  # format: 20240101
     end_date: str,
-    columns: list[str] = None,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
     adjust: ExitRight = ExitRight.BFQ,
 ) -> Optional[pd.DataFrame]:
     import akshare as ak
@@ -310,12 +384,17 @@ def _ts_to_standard(df: pd.DataFrame) -> pd.DataFrame:
 # 使用 tushare 数据源记得 pip install tushare
 # 同时配置 tushare 的 token，在官网注册获取
 # https://tushare.pro/document/2?doc_id=27
+
+
+ACTIVE_TS_FQ = True  # 是否启用通用行情接口 https://tushare.pro/document/2?doc_id=109
+
+
 def get_ts_daily_history(
     code: str,
     start_date: str,  # format: 20240101
     end_date: str,
-    columns: list[str] = None,
-    # adjust: ExitRight = ExitRight.BFQ,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
 ) -> Optional[pd.DataFrame]:
     if not is_stock(code):
         return None
@@ -326,16 +405,74 @@ def get_ts_daily_history(
     while (df is None or len(df) <= 0) and try_times < 3:
         try_times += 1
 
+        if ACTIVE_TS_FQ:
+            import warnings
+            warnings.filterwarnings('ignore', category=FutureWarning,
+                message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
+
+            import tushare as ts
+            _ = get_tushare_pro()
+            df = ts.pro_bar(ts_code=code, start_date=start_date, end_date=end_date, adj=adjust)
+            df = df.drop_duplicates() if df is not None and len(df) > 0 else df
+        else:
+            pro = get_tushare_pro()
+            df = pro.daily(ts_code=code, start_date=start_date, end_date=end_date)
+
+    if df is not None and len(df) > 0:
+        df = _ts_to_standard(df)
+        if columns is not None:
+            return df[columns]
+        return df
+    return None
+
+
+# https://tushare.pro/document/2?doc_id=296
+# 可惜这个数据要氪金
+def get_ts_stk_daily_history(
+    code: str,
+    start_date: str,  # format: 20240101
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
+) -> Optional[pd.DataFrame]:
+    if not is_stock(code):
+        return None
+
+    from reader.tushare_agent import get_tushare_pro
+    try_times = 0
+    df = None
+    while (df is None or len(df) <= 0) and try_times < 3:
+        try_times += 1
+
+        if adjust == ExitRight.BFQ:
+            suffix = ''
+        else:
+            suffix = f'_{adjust}'
+
         pro = get_tushare_pro()
-        df = pro.daily(ts_code=code, start_date=start_date, end_date=end_date)
-
-        # import warnings
-        # warnings.filterwarnings('ignore', category=FutureWarning,
-        #     message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
-
-        # import tushare as ts
-        # df = ts.pro_bar(ts_code=code, start_date=start_date, end_date=end_date, adj=adjust)
-        # time.sleep(1)
+        df = pro.stk_factor(
+            ts_code=code,
+            start_date=start_date,
+            end_date=end_date,
+            fields=','.join([
+                'ts_code',
+                'trade_date',
+                f'open{suffix}',
+                f'close{suffix}',
+                f'high{suffix}',
+                f'low{suffix}',
+                f'pre_close{suffix}',
+                'vol',
+                'amount',
+            ])
+        )
+        df = df.rename(columns={
+            f'open{suffix}': 'open',
+            f'close{suffix}': 'close',
+            f'high{suffix}': 'high',
+            f'low{suffix}': 'low',
+            f'pre_close{suffix}': 'pre_close',
+        })
 
     if df is not None and len(df) > 0:
         df = _ts_to_standard(df)
@@ -351,8 +488,8 @@ def get_ts_daily_histories(
     codes: list[str],
     start_date: str,    # format: 20240101
     end_date: str,
-    columns: list[str] = None,
-    # adjust: ExitRight = ExitRight.BFQ,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
 ) -> dict[str, pd.DataFrame]:
     for code in codes:
         if not is_stock(code):
@@ -367,22 +504,23 @@ def get_ts_daily_histories(
         try_times += 1
 
         # tushare的通用行情 SDK 有bug，改回去了！
+        if ACTIVE_TS_FQ:
+            import warnings
+            warnings.filterwarnings('ignore', category=FutureWarning,
+                message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
 
-        pro = get_tushare_pro()
-        df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
-
-        # import warnings
-        # warnings.filterwarnings('ignore', category=FutureWarning,
-        #     message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
-
-        # import tushare as ts
-        # df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
-        # time.sleep(1)
+            import tushare as ts
+            _ = get_tushare_pro()
+            df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
+            df = df.drop_duplicates() if df is not None and len(df) > 0 else df
+        else:
+            pro = get_tushare_pro()
+            df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
 
     ans = {}
     if df is not None and len(df) > 0:
         for code in codes:
-            temp_df = df[df['ts_code'] == code].drop_duplicates()
+            temp_df = df[df['ts_code'] == code]
             temp_df = _ts_to_standard(temp_df)
 
             if columns is None:
@@ -396,12 +534,13 @@ def get_daily_history(
     code: str,
     start_date: str,  # format: 20240101
     end_date: str,
-    columns: list[str] = None,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
     adjust: ExitRight = ExitRight.BFQ,
-    data_source=DataSource.TUSHARE,
+    data_source: DataSource = DataSource.TUSHARE,
 ) -> Optional[pd.DataFrame]:
-    if data_source == DataSource.MINIQMT:
-        return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
+    if data_source == DataSource.TUSHARE:
+        # TuShare 不支持 etf，其他两个支持，但也注意daily_history 不支持 etf
+        return get_ts_daily_history(code, start_date, end_date, columns)
     elif data_source == DataSource.MOOTDX:
         # Mootdx 的复权是先截断数据然后复权，取三位小数
         # 暂时不支持 920xxx 的北交所股票数据
@@ -412,80 +551,5 @@ def get_daily_history(
         # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)
     else:
-        # TuShare 的数据免费的暂时不支持复权
-        # TuShare 不支持 etf，其他两个支持
-        return get_ts_daily_history(code, start_date, end_date, columns)
-
-
-# =======================
-#  Convert daily history
-# =======================
-
-
-def convert_daily_to_weekly(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    将日线K线数据转换为周线数据（datetime为该周内最后一个交易日的日期）
-    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
-    返回: 周线数据的DataFrame，按周一到周日合并，datetime为周内最后一个交易日的日期
-    """
-    data = df.copy()
-
-    # 1. 保留原始整数日期，同时新增datetime类型列用于分组（确定属于哪一周）
-    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
-    data = data.set_index('dt')  # 用datetime类型索引进行周分组
-
-    # 2. 按周一到周日分组（周区间：[周一, 下周一)）
-    weekly_groups = data.resample('W-MON', closed='left', label='left')  # 分组逻辑不变，仅用于划分周范围
-
-    # 3. 聚合规则：核心是对原始datetime取组内最后一个值
-    weekly_data = weekly_groups.agg({
-        'datetime': 'last',       # 周内最后一个交易日的原始整数日期
-        'open': 'first',          # 周内第一个开盘价
-        'high': 'max',            # 周内最高价
-        'low': 'min',             # 周内最低价
-        'close': 'last',          # 周内最后一个收盘价
-        'volume': 'sum',          # 周内成交量总和
-        'amount': 'sum'           # 周内成交额总和
-    }).dropna()  # 移除无数据的周
-
-    # 4. 恢复列顺序和原始数据类型
-    weekly_data = weekly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
-    for col in weekly_data.columns:
-        weekly_data[col] = weekly_data[col].astype(df[col].dtype)
-
-    return weekly_data
-
-
-def convert_daily_to_monthly(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    将日线K线数据转换为月线数据（datetime为当月最后一个交易日的日期）
-    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
-    返回: 月线数据的DataFrame，按自然月划分（1月-12月），datetime为当月最后一个交易日的日期
-    """
-    data = df.copy()
-
-    # 1. 保留原始整数日期，新增datetime类型列用于按月分组
-    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
-    data = data.set_index('dt')  # 用datetime索引进行月份分组
-
-    # 2. 按自然月分组（1月1日-1月最后一天，2月1日-2月最后一天...）
-    # 频率'M'表示按月分组，默认按自然月划分
-    monthly_groups = data.resample('M')
-
-    # 3. 聚合规则：与周线逻辑一致，仅周期改为月
-    monthly_data = monthly_groups.agg({
-        'datetime': 'last',       # 当月最后一个交易日的原始整数日期
-        'open': 'first',          # 当月第一个交易日的开盘价
-        'high': 'max',            # 当月最高价
-        'low': 'min',             # 当月最低价
-        'close': 'last',          # 当月最后一个交易日的收盘价
-        'volume': 'sum',          # 当月成交量总和
-        'amount': 'sum'           # 当月成交额总和
-    }).dropna()  # 移除无数据的月份
-
-    # 4. 恢复列顺序和原始数据类型
-    monthly_data = monthly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
-    for col in monthly_data.columns:
-        monthly_data[col] = monthly_data[col].astype(df[col].dtype)
-
-    return monthly_data
+        # 默认使用免费的 miniqmt数据，但就是慢的一批
+        return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
