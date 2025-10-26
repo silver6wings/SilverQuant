@@ -1,6 +1,7 @@
 import os
 import datetime
 import time
+import random
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
@@ -124,7 +125,7 @@ class DailyHistory:
                     adjust=ExitRight.QFQ,
                     data_source=self.data_source,
                 )
-                time.sleep(5)
+                time.sleep(random.uniform(1, 5))
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue
@@ -221,7 +222,7 @@ class DailyHistory:
                 start_date=target_date,
                 end_date=target_date,
                 columns=self.default_columns,
-                # adjust=ExitRight.QFQ,
+                adjust=ExitRight.QFQ,
             )
 
             # 填补缺失的日期
@@ -303,6 +304,11 @@ class DailyHistory:
             self.load_history_from_disk_to_memory()
 
         self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
+
+        ttl = self.since_last_update_datetime()
+        if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+            return
+
         code_list = self.get_code_list()
 
         # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍，所以加个缓存标记以防重复加载浪费时间
@@ -334,18 +340,17 @@ class DailyHistory:
         self.write_last_update_datetime()
 
     def write_last_update_datetime(self):
-        now = datetime.datetime.now()
+        current_utc_time = datetime.datetime.utcnow()
         with open(self.last_update_time, 'w', encoding='utf-8') as f:
-            f.write(now.isoformat())
+            f.write(current_utc_time.isoformat())
 
     def since_last_update_datetime(self):
         try:
             with open(self.last_update_time, 'r', encoding='utf-8') as f:
                 last_time_str = f.read().strip()
-
             last_time = datetime.datetime.fromisoformat(last_time_str)
-            now = datetime.datetime.now()
-            time_delta = now - last_time
+            current_time = datetime.datetime.utcnow()
+            time_delta = current_time - last_time
             return time_delta.total_seconds()
         except Exception as e:
             print(f"Get local history update TTL failed: {str(e)}")
