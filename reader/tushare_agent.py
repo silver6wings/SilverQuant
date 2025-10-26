@@ -7,7 +7,7 @@ ts_token_index = 0
 def get_tushare_pro(debugging=False):
     import tushare as ts
     from credentials import TUSHARE_TOKEN
-    for i in range(3):
+    for _ in range(3):
         try:
             global ts_token_index
             ts_token_index += 1

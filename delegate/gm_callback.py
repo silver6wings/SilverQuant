@@ -5,6 +5,7 @@ from typing import Optional
 from gmtrade.api import *
 from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
+from tools.constants import MSG_OUTER_SEPARATOR
 from tools.utils_basic import gmsymbol_to_code
 from tools.utils_cache import StockNames, record_deal, new_held, del_key, del_held_day
 from tools.utils_ding import BaseMessager
@@ -124,7 +125,7 @@ class GmCallback:
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text_as_md(
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}{MSG_OUTER_SEPARATOR}'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[SOLD]')
 
@@ -133,7 +134,7 @@ class GmCallback:
 
                 name = self.stock_names.get_name(stock_code)
                 self.ding_messager.send_text_as_md(
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}{MSG_OUTER_SEPARATOR}'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[BOUGHT]')
 

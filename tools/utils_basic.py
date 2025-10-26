@@ -81,6 +81,35 @@ def code_to_symbol(code: str) -> str:
 
 
 # ==========
+# 新浪系列代码
+# ==========
+
+
+def code_to_sina_symbol(code: str) -> str:
+    [symbol, exchange] = code.split('.')
+    if exchange == 'SZ':
+        return 'sz' + symbol
+    elif exchange == 'SH':
+        return 'sh' + symbol
+    elif exchange == 'BJ':
+        return 'bj' + symbol
+    return code         # 这里先不变，不报错
+
+
+def sina_symbol_to_code(sina_symbol: str) -> str:
+    if len(sina_symbol) != 8:
+        return sina_symbol    # 这里先不变，不报错
+    elif sina_symbol[0:2].lower() == 'sz':
+        return sina_symbol[2:8] + '.SZ'
+    elif sina_symbol[0:2].lower() == 'sh':
+        return sina_symbol[2:8] + '.SH'
+    elif sina_symbol[0:2].lower() == 'bj':
+        return sina_symbol[2:8] + '.BJ'
+    else:
+        return sina_symbol    # 这里先不变，不报错
+
+
+# ==========
 # 通达信系列代码
 # ==========
 
@@ -381,6 +410,7 @@ def xt_time_to_hms(timestamp: int) -> tuple[int, int, int]:
         timestamp = timestamp // 1000
         dt = datetime.datetime.fromtimestamp(timestamp)
         return dt.hour, dt.minute, dt.second
+    return 0, 0, 0
 
 
 def xt_time_to_past_seconds(timestamp: int) -> int:

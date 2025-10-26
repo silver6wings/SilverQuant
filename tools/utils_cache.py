@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import akshare as ak
 
+from tools.constants import *
 from tools.utils_basic import symbol_to_code
 
 trade_day_cache = {}
@@ -18,34 +19,6 @@ trade_max_year_key = 'max_year'
 
 TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
-
-
-# 指数常量
-class IndexSymbol:
-    INDEX_SH_ZS = '000001'      # 上证指数
-    INDEX_SH_50 = '000016'      # 上证50
-    INDEX_SZ_CZ = '399001'      # 深证指数
-    INDEX_SZ_50 = '399850'      # 深证50
-    INDEX_SZ_100 = '399330'     # 深证100
-    INDEX_HS_300 = '000300'     # 沪深300
-    INDEX_ZZ_100 = '000903'     # 中证100
-    INDEX_ZZ_500 = '000905'     # 中证500
-    INDEX_ZZ_800 = '000906'     # 中证800
-    INDEX_ZZ_1000 = '000852'    # 中证1000
-    INDEX_ZZ_2000 = '932000'    # 中证2000
-    INDEX_ZZ_ALL = '000985'     # 中证全指
-    INDEX_CY_ZS = '399006'      # 创业指数
-    INDEX_KC_50 = '000688'      # 科创50
-    INDEX_BZ_50 = '899050'      # 北证50
-    INDEX_ZX_100 = '399005'     # 中小100
-    INDEX_ZZ_A50 = '000050'     # 中证A50
-    INDEX_ZZ_A500 = '000510'    # 中证A500
-
-
-# 仓位项常量
-class InfoItem:
-    IncDate = '_inc_date'   # 执行所有持仓日+1操作的日期flag:'%Y-%m-%d'
-    DayCount = 'day_count'  # 持仓时间（单位：天）
 
 
 # 查询股票名称
@@ -87,6 +60,7 @@ def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # 查找可用缓存
             dir_name = os.path.dirname(path)
             try:
                 with open(path, 'rb') as f:
@@ -94,9 +68,14 @@ def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
                         return pd.read_csv(f, dtype=dtype)
             except FileNotFoundError:
                 os.makedirs(dir_name, exist_ok=True) if dir_name else None
-            data = func(*args, **kwargs)
-            data.to_csv(path, index=False)
-            return data
+            # 如果没有缓存
+            try:
+                data = func(*args, **kwargs)
+                data.to_csv(path, index=False)
+                return data
+            except Exception as e:
+                print('AKShare request failed: ', e)
+                return None
         return wrapper
     return decorator
 
@@ -187,6 +166,11 @@ def get_stock_codes_and_names() -> Dict[str, str]:
     df = load_stock_code_and_names()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     ans.update(dict(zip(df['代码'], df['名称'])))
+    
+    for code in REPURCHASE_CODES:
+        ans[code] ='逆回购'
+    ans['888880.SH'] = '标准券'
+    ans['131990.SZ'] = '标准券'
     return ans
 
 
@@ -451,6 +435,9 @@ def get_prev_trading_date(now: datetime.datetime, count: int, basic_format: bool
 @functools.cache
 def get_prev_trading_date_str(today: str, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
     try:
         trading_index = list(trading_day_list).index(today)
     except ValueError:
@@ -479,6 +466,10 @@ def get_next_trading_date(now: datetime.datetime, count: int, basic_format: bool
 @functools.cache
 def get_next_trading_date_str(today: str, count: int, basic_format: bool = True) -> str:
     trading_day_list = get_disk_trade_day_list_and_update_max_year()
+
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
     try:
         trading_index = list(trading_day_list).index(today)
     except ValueError:
@@ -496,6 +487,50 @@ def get_next_trading_date_str(today: str, count: int, basic_format: bool = True)
         else:
             return trading_day_list[-1]
 
+# 获取前n个交易日列表，返回格式 %Y-%m-%d
+@functools.cache
+def get_prev_trading_date_list(today: str, count: int) -> list:
+    if len(today) == 8:
+        today = f'{today[0:4]}-{today[4:6]}-{today[6:8]}'
+
+    trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    try:
+        trading_index = list(trading_day_list).index(today)
+    except ValueError:
+        trading_index = np.searchsorted(trading_day_list, today) - 1
+    
+    return trading_day_list[trading_index - count : trading_index]
+
+
+#获取从start_day到end_day的交易日列表，返回列表，其中日期格式 %Y-%m-%d
+@functools.cache
+def get_trading_date_list(start_date: str, end_date: str) -> list:
+    if start_date == end_date:
+        return [start_date]
+    if len(start_date) == 8:
+        start_date = f'{start_date[0:4]}-{start_date[4:6]}-{start_date[6:8]}'
+    if len(end_date) == 8:
+        end_date = f'{end_date[0:4]}-{end_date[4:6]}-{end_date[6:8]}'
+        
+    trading_day_list = get_disk_trade_day_list_and_update_max_year()
+    try:
+        start_trading_index = list(trading_day_list).index(start_date)
+    except ValueError:
+        start_trading_index = np.searchsorted(trading_day_list, start_date)
+    
+    if start_date > end_date:
+        return trading_day_list[start_trading_index : start_trading_index+1]
+    
+    try:
+        end_trading_index = list(trading_day_list).index(end_date)
+    except ValueError:
+        end_trading_index = np.searchsorted(trading_day_list, end_date) - 1
+    
+    if end_trading_index < len(trading_day_list):
+        return trading_day_list[start_trading_index : end_trading_index + 1]
+    else:
+        print('[CACHE] 找不到目标，默认返回已知最晚的交易日')
+        return trading_day_list[start_trading_index : -1]
 
 # 检查当日是否是交易日，使用sina数据源
 def check_is_open_day_sina(curr_date: str) -> bool:
@@ -639,7 +674,6 @@ def get_stock_codes_and_circulation_mv() -> Dict[str, int]:
 def check_open_day(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None                 # 非开放日直接 return，不执行函数
-        return func(*args, **kwargs)    # 开放日正常执行
+        if check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return func(*args, **kwargs)    # 开放日正常执行
     return wrapper

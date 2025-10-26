@@ -8,6 +8,7 @@ from xtquant import xtconstant
 from xtquant.xttrader import XtQuantTraderCallback
 from xtquant.xttype import XtOrder, XtTrade, XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
 
+from tools.constants import MSG_OUTER_SEPARATOR, MSG_INNER_SEPARATOR
 from tools.utils_cache import record_deal, new_held, del_key, del_held_day, StockNames
 from tools.utils_ding import BaseMessager
 
@@ -131,8 +132,8 @@ class XtCustomCallback(XtBaseCallback):
 
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(
-                    f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}\n'
+                    f'[{self.account_id}]{self.strategy_name} {order_remark}{MSG_OUTER_SEPARATOR}'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 卖成 {stock_code}{MSG_INNER_SEPARATOR}'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[SOLD]')
 
@@ -151,8 +152,8 @@ class XtCustomCallback(XtBaseCallback):
 
             if self.ding_messager is not None:
                 self.ding_messager.send_text_as_md(
-                    f'[{self.account_id}]{self.strategy_name} {order_remark}\n'
-                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}\n'
+                    f'[{self.account_id}]{self.strategy_name} {order_remark}{MSG_OUTER_SEPARATOR}'
+                    f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}{MSG_INNER_SEPARATOR}'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[BOUGHT]')
 
@@ -174,8 +175,8 @@ class XtCustomCallback(XtBaseCallback):
         logging.warning(log)
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name} 撤单成功\n'
-                f'{datetime.datetime.now().strftime("%H:%M:%S")} {res.cancel_result}\n'
+                f'[{self.account_id}]{self.strategy_name} 撤单成功{MSG_OUTER_SEPARATOR}'
+                f'{datetime.datetime.now().strftime("%H:%M:%S")} {res.cancel_result}'
                 '[CANCEL]')
 
     def on_cancel_error(self, cancel_error: XtCancelError):

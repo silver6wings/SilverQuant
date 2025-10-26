@@ -7,3 +7,4 @@ pywencai>=0.12.3
 requests>=2.31.0
 schedule>=1.2.1
 tushare>=1.4.21
+pycurl>=7.45.0
