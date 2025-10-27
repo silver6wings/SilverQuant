@@ -8,14 +8,13 @@ import zipfile
 import numpy as np
 import pandas as pd
 
-from typing import Optional
+from typing import Dict, Optional
 
-from tdxpy.constants import SECURITY_EXCHANGE
 from tdxpy.reader import TdxDailyBarReader
 
 from tools.constants import ExitRight
 from tools.utils_basic import code_to_sina_symbol, symbol_to_code, code_to_symbol
-from tools.utils_cache import get_prev_trading_date_list, get_trading_date_list, get_available_stock_codes, \
+from tools.utils_cache import get_prev_trading_date_list, get_prev_trading_date_str, get_trading_date_list, get_available_stock_codes, \
                               load_pickle, save_pickle, TRADE_DAY_CACHE_PATH
 
 
@@ -84,6 +83,8 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         'BJ_A_STOCK',
     ]
 
+    SECURITY_EXCHANGE = ["sz", "sh", "bj"]
+
     SECURITY_COEFFICIENT = {
         'SH_A_STOCK': [0.01, 0.01],
         'SH_B_STOCK': [0.001, 0.01],
@@ -104,7 +105,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
         exchange = str(fname[-12:-10]).lower()
         code_head = fname[-10:-8]
 
-        if exchange == SECURITY_EXCHANGE[0]:
+        if exchange == self.SECURITY_EXCHANGE[0]:
             if code_head in ['00', '30']:
                 return 'SZ_A_STOCK'
 
@@ -122,7 +123,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
 
             return 'SZ_OTHER'
 
-        if exchange == SECURITY_EXCHANGE[1]:
+        if exchange == self.SECURITY_EXCHANGE[1]:
             if code_head in ['60']:
                 return 'SH_A_STOCK'
 
@@ -144,7 +145,7 @@ class MooTdxDailyBarReader(TdxDailyBarReader):
 
             return 'SH_OTHER'
 
-        if exchange == SECURITY_EXCHANGE[2]:
+        if exchange == self.SECURITY_EXCHANGE[2]:
             if code_head in ['43', '82', '83', '87', '88', '92']:
                 return 'BJ_A_STOCK'
 
@@ -445,7 +446,7 @@ def get_mootdx_daily_history(
                     '-' + xdxr['day'].astype(str).str.zfill(2)
                 xdxr['datetime'] = pd.to_datetime(xdxr['date_str'] + ' 15:00:00')
                 xdxr = xdxr.set_index('datetime')
-                xdxr_info = xdxr.loc[xdxr['category'] == 1]
+                xdxr_info = xdxr.loc[xdxr['category'].isin([1, 9])]
 
                 # 默认除权日当天之前的数据一样进行处理
                 is_appended = False
@@ -572,6 +573,7 @@ def _factor_reversion(method: str = 'qfq', raw: pd.DataFrame = None, adj_factor:
 
         # 按日期升序排列复权因子
         adj_factor = adj_factor.sort_index(ascending=True)
+        adj_factor = adj_factor.loc[~adj_factor.index.duplicated(keep='last')]
         raw = raw.sort_index(ascending=True)
         # 获取原始数据期间的复权因子
         # 使用最近的可用的复权因子（向后填充）
@@ -711,10 +713,10 @@ def _process_tdx_zip_to_datas(group_codes, zip_ref, cache_xdxr, day_count, adjus
                         xdxr = xdxr.join(fq[1:], how='outer')
                         cache_xdxr[code] = xdxr
                     else:
-                        fq = xdxr.loc[xdxr['category'] == 1, [factor_name]]
+                        fq = xdxr.loc[~xdxr[factor_name].isna(), [factor_name]]
                         fq.index.name = 'date'
-                        fq.rename(columns={factor_name:'factor'}, inplace=True)
-                    xdxr_info = xdxr.loc[xdxr['category'] == 1]
+                        fq.rename(columns={factor_name: 'factor'}, inplace=True)
+                    xdxr_info = xdxr.loc[xdxr['category'].isin([1, 9])]
                     if not xdxr_info.empty and xdxr_info.index[-1].date() == now.date():
                         if fq.index[-1].date() != now.date() or pd.isna(xdxr_info.iloc[-1][factor_name]) == True:
                             raise Exception('缺少今日除权因子数据')
@@ -722,7 +724,7 @@ def _process_tdx_zip_to_datas(group_codes, zip_ref, cache_xdxr, day_count, adjus
                     df.rename(columns={'factor': 'adj'}, inplace=True)
                 except Exception:
                     is_append = False
-                    xdxr_info = xdxr.loc[xdxr['category'] == 1]
+                    xdxr_info = xdxr.loc[xdxr['category'].isin([1, 9])]
                     if not xdxr_info.empty and xdxr_info.index[-1].date() <= now.date():
                         last_row = df.iloc[-1].copy()
                         last_row['datetime'] = curr_date
@@ -802,10 +804,10 @@ def check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date: bool = Fa
                 code = symbol_to_code(symbol)
                 xdxr = cache_xdxr.get(code, None)
                 if xdxr is None: # 没有该股票的除权除息信息，需重新获取
-                    removed_xdxr_codes.add(symbol)
+                    removed_xdxr_codes.add(code)
                     continue
 
-                curr_xc = xdxr.loc[xdxr['category'] == 1]
+                curr_xc = xdxr.loc[xdxr['category'].isin([1, 9])]
                 if (
                     not curr_xc.empty
                     and factor_name in curr_xc.columns
@@ -816,17 +818,16 @@ def check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date: bool = Fa
                     )
                 ):
                     continue
-                removed_xdxr_codes.add(symbol)
+                removed_xdxr_codes.add(code)
 
         if len(removed_xdxr_codes) > 0:
             print(f'{len(removed_xdxr_codes)}只股票需要更新复权因子。')
             success_count = 0
-            for symbol in removed_xdxr_codes:
-                code = symbol_to_code(symbol)
+            for code in removed_xdxr_codes:
                 try:
                     xdxr = _get_xdxr_sina(code, adjust, factor_name)
                     if xdxr is not None and not xdxr.empty:
-                        curr_xc = xdxr.loc[xdxr['category'] == 1]
+                        curr_xc = xdxr.loc[xdxr['category'].isin([1, 9])]
                         if not curr_xc.empty and factor_name in curr_xc.columns and float(curr_xc.iloc[-1][factor_name]) == 1.0 :
                             cache_xdxr[code] = xdxr
                             success_count += 1
@@ -843,6 +844,45 @@ def check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date: bool = Fa
     except Exception as e: #异常不要紧，不要因为异常影响实际运行
         logging.error(f'处理除权除息数据出现问题：{str(e)}')
 
+def verify_xdxr_cache_completeness(cache_history: Dict[str, pd.DataFrame], curr_full_ticks: Dict[str, Dict], adjust: ExitRight = ExitRight.QFQ) -> None:
+    '''
+    校验除权缓存信息是否完整，建议定时调度运行
+    通过对比前一交易日的收盘价和当前最新tick的昨收盘价进行校验
+    参数：
+        cache_history: Dict[str, pd.DataFrame] - 股票历史日线数据缓存，key为股票代码，value为对应的历史日线DataFrame
+        curr_full_ticks: Dict[str, Dict] - 当前最新的tick数据，key为股票代码，value为对应的tick数据字典。可通过xt_get_ticks获取
+    
+    调用代码参考：
+    RUN中finish_trade_day 回调函数 最后添加以下代码进行检查
+    hsj_a_stock_list = hsj_a_stock_list = xtdata.get_stock_list_in_sector('沪深京A股')
+    verify_xdxr_cache_completeness(cache_history, xt_get_ticks(hsj_a_stock_list))
+    '''
+    cache_xdxr = load_pickle(PATH_TDX_XDXR)
+    if cache_xdxr is None or not isinstance(cache_xdxr, dict):
+        logging.warning('未能加载除权除息缓存文件')
+        print('未能加载除权除息缓存文件')
+        return
+        
+    curr_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    last_date = get_prev_trading_date_str(curr_date, 1)
+    close_dict = {code: df.loc[(df['datetime'] == int(last_date))&(df['open'] > 0.0), 'close'][-1:].values for code, df in cache_history.items() if df.empty == False}
+    removed_xdxr_codes = set()
+    for code, tick in curr_full_ticks.items():
+        if len(close_dict.get(code, [])) > 0 and abs(close_dict.get(code)[0] - tick.get('lastClose', 0.0)) > 0.01: # 股票，收盘价差不应该超过1分 #301207.SZ 差1分
+            removed_xdxr_codes.add(code)
+
+    factor_name = f'{adjust}_factor'
+    success_count = 0
+
+    for code in removed_xdxr_codes:
+        xdxr = _get_xdxr_sina(code, adjust, factor_name)
+        if xdxr is not None and not xdxr.empty:
+            cache_xdxr[code] = xdxr
+            success_count += 1
+    if success_count > 0:
+        # 这里属于修正数据，不需要更新 updatetime
+        save_pickle(PATH_TDX_XDXR, cache_xdxr)
+        print(f'成功更新{success_count}/{len(removed_xdxr_codes)}只股票复权因子。')
 
 def _pycurl_request(url, headers=None):
     import pycurl
@@ -965,13 +1005,16 @@ def download_tdx_hsjday() -> io.BytesIO|bool:
 
         response_length = buffer.tell()
         if response_code != 200 or response_length <= 102400:  #返回状态不对，或者返回文件太小
-            print(f'下载文件{url}失败')
+            print(f'下载文件{url}失败，状态码: {response_code}, 文件大小: {response_length}')
             buffer.close()
             del buffer
             return False
         return buffer
     except Exception as e:
         print(f'下载文件失败', e)
+        # 如果 buffer 存在且未关闭，确保关闭
+        if 'buffer' in locals() and buffer is not None and not buffer.closed:
+            buffer.close()
         return False
 
 
@@ -1054,4 +1097,6 @@ def get_tdxzip_history(adjust: ExitRight = ExitRight.QFQ, day_count: int = 550) 
         return cache_history
     except Exception as ex:
         print(f'[HISTORY] get tdx hsjday date error :', ex)
+        if 'buffer' in locals() and buffer is not None and not buffer.closed:
+            buffer.close()
         return cache_history
