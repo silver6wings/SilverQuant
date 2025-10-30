@@ -109,6 +109,7 @@ class XtSubscriber(BaseSubscriber):
 
         if self.use_ap_scheduler:
             from apscheduler.schedulers.blocking import BlockingScheduler
+            from apscheduler.executors.pool import ThreadPoolExecutor
             executors = {
                 'default': ThreadPoolExecutor(32),
             }
