@@ -1,8 +1,10 @@
 import pandas as pd
 from typing import Set, Callable
 
+from tools.constants import MSG_OUTER_SEPARATOR
 from tools.utils_basic import symbol_to_code
 from tools.utils_cache import get_prefixes_stock_codes, get_index_constituent_codes
+from tools.utils_ding import BaseMessager
 from tools.utils_remote import get_wencai_codes, get_tdx_zxg_code
 
 from trader.pools_indicator import get_macd_index_indicator, get_ma_index_indicator
@@ -11,10 +13,10 @@ from trader.pools_section import get_dfcf_industry_stock_codes, get_dfcf_industr
 
 
 class StockPool:
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters: any, ding_messager: BaseMessager):
         self.account_id = '**' + str(account_id)[-4:]
         self.strategy_name = strategy_name
-        self.ding_messager = ding_messager
+        self.messager = ding_messager
 
         self.pool_parameters = parameters
         self.cache_blacklist: Set[str] = set()
@@ -31,9 +33,9 @@ class StockPool:
         print(f'[POOL] Black list refreshed {len(self.cache_blacklist)} codes.')
         print(f'[POOL] Total list refreshed {len(self.get_code_list())} codes.')
 
-        if self.ding_messager is not None:
-            self.ding_messager.send_text_as_md(
-                f'{self.strategy_name}:股票池{len(self.get_code_list())}支\n'
+        if self.messager is not None:
+            self.messager.send_text_as_md(
+                f'{self.strategy_name}:股票池{len(self.get_code_list())}支{MSG_OUTER_SEPARATOR}'
                 f'白名单: {len(self.cache_whitelist)} 黑名单: {len(self.cache_blacklist)}')
 
     def refresh_black(self):
@@ -68,8 +70,8 @@ class StockPool:
 
         print(f'[POOL] {len(remove_list)} codes filter out.')
 
-        if self.ding_messager is not None:
-            self.ding_messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:筛除{len(remove_list)}支\n')
+        if self.messager is not None:
+            self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:筛除{len(remove_list)}支')
 
 
 # -----------------------
@@ -77,7 +79,7 @@ class StockPool:
 # -----------------------
 
 class StocksPoolBlackEmpty(StockPool):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
 
 
@@ -86,7 +88,7 @@ class StocksPoolBlackEmpty(StockPool):
 # -----------------------
 
 class StocksPoolBlackWencai(StockPool):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.black_prompts = parameters.black_prompts
 
@@ -102,7 +104,7 @@ class StocksPoolBlackWencai(StockPool):
 # -----------------------
 
 class StocksPoolWhiteWencai(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prompts = parameters.white_prompts
 
@@ -119,7 +121,7 @@ class StocksPoolWhiteWencai(StocksPoolBlackWencai):
 
 # 自定义白名单股票列表
 class StocksPoolWhiteCustomSymbol(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_codes_filepath = parameters.white_codes_filepath
 
@@ -139,7 +141,7 @@ class StocksPoolWhiteCustomSymbol(StocksPoolBlackWencai):
 
 
 class StocksPoolWhiteCustomTdx(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         # 自选股文件默认路径示例： r'C:\new_tdx\T0002\blocknew\ZXG.blk'
         self.tdx_codes_filepath = parameters.tdx_codes_filepath
@@ -156,7 +158,7 @@ class StocksPoolWhiteCustomTdx(StocksPoolBlackWencai):
 
 # 自定义指数成份股
 class StocksPoolWhiteIndexes(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_indexes = parameters.white_indexes
 
@@ -170,7 +172,7 @@ class StocksPoolWhiteIndexes(StocksPoolBlackWencai):
 
 # 自定义指数成份股 + 指数MA择时
 class StocksPoolWhiteIndexesMA(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_indexes = parameters.white_prefixes
         self.white_index_symbol = parameters.white_index_symbol         # 指数名称（默认中证全指000985）
@@ -191,7 +193,7 @@ class StocksPoolWhiteIndexesMA(StocksPoolBlackWencai):
 
 # 自定义指数成份股 + 指数群MACD择时
 class StocksPoolWhiteIndexesMACD(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_indexes = parameters.white_indexes
 
@@ -211,7 +213,7 @@ class StocksPoolWhiteIndexesMACD(StocksPoolBlackWencai):
 
 # 自定义前缀成份股
 class StocksPoolWhitePrefixes(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
         if hasattr(parameters, 'white_none_st'):
@@ -228,7 +230,7 @@ class StocksPoolWhitePrefixes(StocksPoolBlackWencai):
 
 # 自定义前缀成份股 + 指数MA择时
 class StocksPoolWhitePrefixesMA(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
         self.white_index_symbol = parameters.white_index_symbol         # 指数名称（默认中证全指000985）
@@ -246,9 +248,9 @@ class StocksPoolWhitePrefixesMA(StocksPoolBlackWencai):
             self.cache_whitelist.update(t_white_codes)
 
 
-# 自定义前缀成份股 + 东方财富行业板块上涨比例预筛
+# 自定义前缀成份股 + 东方财富行业板块上涨比例预筛（现在容易被封接口）
 class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
 
@@ -256,9 +258,9 @@ class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
         super().refresh_white()
 
         section_names = get_dfcf_industry_sections()
-        if self.ding_messager is not None:
-            self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name} 行业板块\n'
+        if self.messager is not None:
+            self.messager.send_text_as_md(
+                f'[{self.account_id}]{self.strategy_name} 行业板块{MSG_OUTER_SEPARATOR}'
                 f'{section_names}')
         t_white_codes = get_dfcf_industry_stock_codes(section_names)
 
@@ -266,9 +268,9 @@ class StocksPoolWhitePrefixesIndustry(StocksPoolBlackWencai):
         self.cache_whitelist.update(filter_codes)
 
 
-# 自定义前缀成份股 + 同花顺行业板块上涨个数预筛
+# 自定义前缀成份股 + 同花顺行业板块上涨个数预筛（现在容易被封接口）
 class StocksPoolWhitePrefixesConcept(StocksPoolBlackWencai):
-    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager):
+    def __init__(self, account_id: str, strategy_name: str, parameters, ding_messager: BaseMessager):
         super().__init__(account_id, strategy_name, parameters, ding_messager)
         self.white_prefixes = parameters.white_prefixes
 
@@ -276,9 +278,9 @@ class StocksPoolWhitePrefixesConcept(StocksPoolBlackWencai):
         super().refresh_white()
 
         section_names = get_ths_concept_sections()
-        if self.ding_messager is not None:
-            self.ding_messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name} 概念板块\n'
+        if self.messager is not None:
+            self.messager.send_text_as_md(
+                f'[{self.account_id}]{self.strategy_name} 概念板块{MSG_OUTER_SEPARATOR}'
                 f'{section_names}')
         t_white_codes = get_ths_concept_stock_codes(section_names)
         filter_codes = [code for code in t_white_codes if code[:2] in self.white_prefixes]
