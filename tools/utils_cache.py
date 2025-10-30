@@ -164,8 +164,9 @@ def get_stock_codes_and_names() -> Dict[str, str]:
             ans[arr['code']] = arr['name']
 
     df = load_stock_code_and_names()
-    df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
-    ans.update(dict(zip(df['代码'], df['名称'])))
+    if df is not None:
+        df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
+        ans.update(dict(zip(df['代码'], df['名称'])))
     
     for code in REPURCHASE_CODES:
         ans[code] ='逆回购'
