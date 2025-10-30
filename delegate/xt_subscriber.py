@@ -212,8 +212,8 @@ class XtSubscriber(BaseSubscriber):
             return None
 
         now = datetime.datetime.now()
-
-        if now - self.last_callback_time > datetime.timedelta(minutes=1):
+        callback_timedelta = (now - self.last_callback_time).total_seconds()
+        if callback_timedelta > 60:
             if self.messager is not None:
                 self.messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name}:中断\n请检查QMT数据源 ',
