@@ -1,3 +1,4 @@
+import os
 import csv
 
 import requests
@@ -10,7 +11,7 @@ from tools.utils_miniqmt import get_qmt_daily_history
 from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
 
 
-def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
+def set_tdx_zxg_code(data: list[str], file_name: str = None, block_name: str = '自选股') -> None:
     if file_name is None:
         try:
             from credentials import TDX_FOLDER
@@ -23,7 +24,7 @@ def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
         writer = csv.writer(file)
         for item in data:
             writer.writerow([code_to_tdxsymbol(item)])
-    print(f'已成功将数据写入自选股文件：{file_name}')
+    print(f'已成功将数据写入{block_name}文件：{file_name}')
 
 
 def get_tdx_zxg_code(file_name: str = None) -> list[str]:
@@ -34,14 +35,15 @@ def get_tdx_zxg_code(file_name: str = None) -> list[str]:
         except Exception as exception:
             print('未找到tdx配置路径，放弃写入自选股', exception)
             return []
-
+   
     ret_list = []
-    with open(file_name) as f:
-        f_reader = csv.reader(f)
-        for row in f_reader:
-            code = tdxsymbol_to_code(''.join(row))
-            if len(code) > 0:
-                ret_list.append(code)
+    if os.path.isfile(file_name):
+        with open(file_name) as f:
+            f_reader = csv.reader(f)
+            for row in f_reader:
+                code = tdxsymbol_to_code(''.join(row))
+                if len(code) > 0:
+                    ret_list.append(code)
     return ret_list
 
 
