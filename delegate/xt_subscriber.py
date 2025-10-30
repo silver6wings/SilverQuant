@@ -109,7 +109,15 @@ class XtSubscriber(BaseSubscriber):
 
         if self.use_ap_scheduler:
             from apscheduler.schedulers.blocking import BlockingScheduler
-            self.scheduler = BlockingScheduler()
+            executors = {
+                'default': ThreadPoolExecutor(32),
+            }
+            job_defaults = {
+                'coalesce': True,
+                'misfire_grace_time': 180,
+                'max_instances': 3
+            }
+            self.scheduler = BlockingScheduler(timezone='Asia/Shanghai', executors=executors, job_defaults=job_defaults)
 
         if self.is_ticks_df:
             self.tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
