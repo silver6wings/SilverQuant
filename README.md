@@ -53,11 +53,13 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 # 设计规格
 
-> `release_x.x.x`分支为稳定发布版本；
-> 
+> `release_x.x.x` 分支为稳定发布版本；
+
 > `main` 分支为最近待发布版本;
->
+
 > `develop` 分支为开发版本，包含所有最近的更新；
+>
+> 查看完整变更历史: [[CHANGELOG]](_doc/CHANGELOG.md)
 
 以下为架构示意图，帮助二次开发的朋友们更好地理解和快速上手
 
@@ -241,8 +243,6 @@ run_ai_gen.py
 # 高级配置
 
 > 查看进阶配置文档: [[CONFIGURATION]](_doc/CONFIGURATION.md)
-
-> 查看完整变更历史: [[CHANGELOG]](_doc/CHANGELOG.md)
 
 # 已知问题
 
