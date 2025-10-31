@@ -71,11 +71,11 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 > 盘中数据源：主要使用 `MiniQMT` 提供的 Tick 级别的数据源
 
-## 策略
+策略
 
 > 策略可以设置执行频率，秒级处理最新的截面数据，订阅范围可以自行定义
 
-## 交易端
+交易端
 
 > 交易端可以对接 QMT 实盘和掘金的模拟盘，支持市价单、限价单以及撤单
 
