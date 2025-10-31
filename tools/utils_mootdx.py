@@ -873,7 +873,7 @@ def verify_xdxr_cache_completeness(cache_history: Dict[str, pd.DataFrame], curr_
 
     factor_name = f'{adjust}_factor'
     success_count = 0
-
+    removed_xdxr_codes.discard('689009.SH') # 9号公司 CDR公司不处理
     for code in removed_xdxr_codes:
         xdxr = _get_xdxr_sina(code, adjust, factor_name)
         if xdxr is not None and not xdxr.empty:
