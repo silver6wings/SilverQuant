@@ -163,9 +163,9 @@ class XtSubscriber(BaseSubscriber):
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
-    def callback_run_no_quotes(self) -> None:
+    def callback_run_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         now = datetime.datetime.now()
         self.last_callback_time = now
@@ -188,17 +188,17 @@ class XtSubscriber(BaseSubscriber):
                 # str(%Y-%m-%d), str(%H:%M), str(%S)
                 self.execute_strategy(curr_date, curr_time, curr_seconds, {})
 
-    def callback_open_no_quotes(self) -> None:
+    def callback_open_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启')
         print('[启动策略]', end='')
 
-    def callback_close_no_quotes(self) -> None:
+    def callback_close_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         print('\n[关闭策略]')
         if self.messager is not None:
@@ -209,11 +209,11 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def callback_monitor(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         now = datetime.datetime.now()
-
-        if now - self.last_callback_time > datetime.timedelta(minutes=1):
+        callback_timedelta = (now - self.last_callback_time).total_seconds()
+        if callback_timedelta > 60:
             if self.messager is not None:
                 self.messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name}:中断\n请检查QMT数据源 ',
@@ -229,7 +229,7 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def subscribe_tick(self, resume: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
@@ -240,7 +240,7 @@ class XtSubscriber(BaseSubscriber):
 
     def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
@@ -251,7 +251,7 @@ class XtSubscriber(BaseSubscriber):
 
     def resubscribe_tick(self, notice: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
@@ -306,7 +306,7 @@ class XtSubscriber(BaseSubscriber):
 
     def clean_ticks_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         self.today_ticks.clear()
         self.today_ticks = {}
@@ -314,7 +314,7 @@ class XtSubscriber(BaseSubscriber):
 
     def save_tick_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.is_ticks_df:
             pickle_file = f'./_cache/debug/tick_history_{self.strategy_name}.pkl'
@@ -452,7 +452,7 @@ class XtSubscriber(BaseSubscriber):
         data_source: DataSource,
     ):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         hc = DailyHistoryCache()
         hc.set_data_source(data_source=data_source)
@@ -468,7 +468,7 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def daily_summary(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         curr_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
@@ -494,7 +494,7 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def before_trade_day_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         self.cache_quotes.clear()
         self.cache_history.clear()
@@ -509,17 +509,17 @@ class XtSubscriber(BaseSubscriber):
 
     def near_trade_begin_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.near_trade_begin is not None:
             self.near_trade_begin()
-            if self.before_trade_day is None: #没有设置before_trade_day 情况
+            if self.before_trade_day is None:  # 没有设置before_trade_day 情况
                 self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            print(f'今日盘前准备工作已完成。')
+            print(f'今日盘前准备工作已完成')
 
     def finish_trade_day_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.finish_trade_day is not None:
             self.finish_trade_day()
@@ -528,7 +528,8 @@ class XtSubscriber(BaseSubscriber):
     # @check_open_day
     def check_before_finished(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
+
         if (
             self.before_trade_day is not None or self.near_trade_begin is not None
         ) and (

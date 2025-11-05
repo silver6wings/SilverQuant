@@ -23,9 +23,9 @@ DEFAULT_GM_STRATEGY_NAME = '模拟策略'
 
 
 class GmAsset:
-    def __init__(self, cash: Cash):
+    def __init__(self, cash: Cash, account_id: str = ''):
         self.account_type = 0
-        self.account_id = cash.account_id
+        self.account_id = account_id
         self.cash = round(cash.available, 3)
         self.frozen_cash = round(cash.order_frozen, 3)
         self.market_value = round(cash.frozen, 3)
@@ -81,7 +81,7 @@ class GmDelegate(BaseDelegate):
 
     def check_asset(self) -> GmAsset:
         cash: Cash = get_cash(self.account)
-        return GmAsset(cash)
+        return GmAsset(cash, GM_ACCOUNT_ID)
 
     def check_orders(self) -> List[GmOrder]:
         orders = get_orders(self.account)
