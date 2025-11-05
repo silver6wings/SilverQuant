@@ -820,6 +820,7 @@ def check_xdxr_cache(adjust=ExitRight.QFQ, force_refresh_updated_date: bool = Fa
                     continue
                 removed_xdxr_codes.add(code)
 
+        removed_xdxr_codes.discard('689009.SH') # 9号公司 CDR公司不处理
         if len(removed_xdxr_codes) > 0:
             print(f'{len(removed_xdxr_codes)}只股票需要更新复权因子。')
             success_count = 0

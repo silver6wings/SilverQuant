@@ -1,6 +1,6 @@
 import datetime
 import logging
-
+import pandas as pd
 from decimal import Decimal, ROUND_HALF_UP
 
 
@@ -14,7 +14,6 @@ def debug(*args, **kwargs):
 
 # pandas dataframe 显示配置优化
 def pd_show_all() -> None:
-    import pandas as pd
     pd.set_option('display.width', None)
     pd.set_option('display.min_rows', 9999)
     pd.set_option('display.max_rows', 9999)
@@ -416,3 +415,77 @@ def xt_time_to_hms(timestamp: int) -> tuple[int, int, int]:
 def xt_time_to_past_seconds(timestamp: int) -> int:
     hour, minute, second = xt_time_to_hms(timestamp)
     return hms_to_past_seconds(hour, minute, second)
+
+
+# =======================
+#  Convert daily history
+# =======================
+
+
+def convert_daily_to_weekly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为周线数据（datetime为该周内最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 周线数据的DataFrame，按周一到周日合并，datetime为周内最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，同时新增datetime类型列用于分组（确定属于哪一周）
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime类型索引进行周分组
+
+    # 2. 按周一到周日分组（周区间：[周一, 下周一)）
+    weekly_groups = data.resample('W-MON', closed='left', label='left')  # 分组逻辑不变，仅用于划分周范围
+
+    # 3. 聚合规则：核心是对原始datetime取组内最后一个值
+    weekly_data = weekly_groups.agg({
+        'datetime': 'last',       # 周内最后一个交易日的原始整数日期
+        'open': 'first',          # 周内第一个开盘价
+        'high': 'max',            # 周内最高价
+        'low': 'min',             # 周内最低价
+        'close': 'last',          # 周内最后一个收盘价
+        'volume': 'sum',          # 周内成交量总和
+        'amount': 'sum'           # 周内成交额总和
+    }).dropna()  # 移除无数据的周
+
+    # 4. 恢复列顺序和原始数据类型
+    weekly_data = weekly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in weekly_data.columns:
+        weekly_data[col] = weekly_data[col].astype(df[col].dtype)
+
+    return weekly_data
+
+
+def convert_daily_to_monthly(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将日线K线数据转换为月线数据（datetime为当月最后一个交易日的日期）
+    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
+    返回: 月线数据的DataFrame，按自然月划分（1月-12月），datetime为当月最后一个交易日的日期
+    """
+    data = df.copy()
+
+    # 1. 保留原始整数日期，新增datetime类型列用于按月分组
+    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
+    data = data.set_index('dt')  # 用datetime索引进行月份分组
+
+    # 2. 按自然月分组（1月1日-1月最后一天，2月1日-2月最后一天...）
+    # 频率'M'表示按月分组，默认按自然月划分
+    monthly_groups = data.resample('M')
+
+    # 3. 聚合规则：与周线逻辑一致，仅周期改为月
+    monthly_data = monthly_groups.agg({
+        'datetime': 'last',       # 当月最后一个交易日的原始整数日期
+        'open': 'first',          # 当月第一个交易日的开盘价
+        'high': 'max',            # 当月最高价
+        'low': 'min',             # 当月最低价
+        'close': 'last',          # 当月最后一个交易日的收盘价
+        'volume': 'sum',          # 当月成交量总和
+        'amount': 'sum'           # 当月成交额总和
+    }).dropna()  # 移除无数据的月份
+
+    # 4. 恢复列顺序和原始数据类型
+    monthly_data = monthly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+    for col in monthly_data.columns:
+        monthly_data[col] = monthly_data[col].astype(df[col].dtype)
+
+    return monthly_data

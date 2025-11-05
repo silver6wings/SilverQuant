@@ -53,11 +53,34 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 # 设计规格
 
-`main`分支为开发版本，包含所有最近的更新；`release`分支为稳定版本，作为最近的产品发布。
+> `release_x.x.x` 分支为稳定发布版本；
+
+> `main` 分支为最近待发布版本;
+
+> `develop` 分支为开发版本，包含所有最近的更新；
+>
+> 查看完整变更历史: [[CHANGELOG]](_doc/CHANGELOG.md)
 
 以下为架构示意图，帮助二次开发的朋友们更好地理解和快速上手
 
 ![image](_imgs/architecture.png)
+
+数据源
+
+> 历史数据源：主要使用第三方`AKShare`, `Tushare`, `TDX` 以及 `MiniQMT` 自带的数据源
+
+> 盘中数据源：主要使用 `MiniQMT` 提供的 Tick 级别的数据源
+
+策略
+
+> 策略可以设置执行频率，秒级处理最新的截面数据，订阅范围可以自行定义
+
+交易端
+
+> 交易端可以对接 QMT 实盘和掘金的模拟盘，支持市价单、限价单以及撤单
+
+> 目前暂无TWAP，VWAP以及冰山指令等拆单算法
+
 
 # 快速开始
 
@@ -220,8 +243,6 @@ run_ai_gen.py
 # 高级配置
 
 > 查看进阶配置文档: [[CONFIGURATION]](_doc/CONFIGURATION.md)
-
-> 查看完整变更历史: [[CHANGELOG]](_doc/CHANGELOG.md)
 
 # 已知问题
 
