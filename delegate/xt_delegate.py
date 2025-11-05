@@ -57,7 +57,7 @@ class XtDelegate(BaseDelegate):
         self.connect(self.callback)
         if keep_run:
             # 保证QMT持续连接
-            Thread(target=self.keep_connected).start()
+            Thread(target=self.keep_connected, daemon=True).start()
 
     def connect(self, callback: object) -> (XtQuantTrader, bool):
         session_id = int(time.time())  # 生成session id 整数类型 同时运行的策略不能重复
