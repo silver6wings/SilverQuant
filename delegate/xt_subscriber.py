@@ -406,6 +406,7 @@ class XtSubscriber(BaseSubscriber):
         columns: list[str],
         data_source: DataSource,
     ):
+        # ======== 每日一次性全量数据源 ========
         if data_source == DataSource.AKSHARE or data_source == DataSource.TDXZIP:
             temp_indicators = load_pickle(cache_path)
             if temp_indicators is not None and len(temp_indicators) > 0:
@@ -437,6 +438,7 @@ class XtSubscriber(BaseSubscriber):
             if data_source == DataSource.TDXZIP and self.history_day_klines is None:
                 self.history_day_klines = get_tdxzip_history(adjust=adjust)
 
+        # ======== 预加载每日增量数据源 ========
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
@@ -450,8 +452,7 @@ class XtSubscriber(BaseSubscriber):
                 self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
         else:
             if self.messager is not None:
-                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'无法识别数据源')
+                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:\n无法识别的数据源')
 
     def refresh_memory_history(
         self,
