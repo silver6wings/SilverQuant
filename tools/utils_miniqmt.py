@@ -1,7 +1,6 @@
 import threading
 import pandas as pd
 
-from xtquant import xtdata
 from tools.constants import *
 
 
@@ -37,6 +36,7 @@ def _run_with_timeout(target_func, args=(), timeout=1) -> any:
 
 
 def _download_and_fetch_qmt_daily(code_list: list[str], start_time: str, end_time: str, adjust: ExitRight) -> dict:
+    from xtquant import xtdata
     xtdata.enable_hello = False
     period = '1d'
 

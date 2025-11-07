@@ -2,7 +2,6 @@ import os
 import csv
 
 import requests
-import pandas as pd
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
@@ -458,6 +457,67 @@ def get_ts_daily_histories(
     return ans
 
 
+# http://www.baostock.com
+def get_bao_daily_history(
+    code: str,
+    start_date: str,  # format: 20240101
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
+) -> Optional[pd.DataFrame]:
+    start = f"{str(start_date)[:4]}-{str(start_date)[4:6]}-{str(start_date)[6:]}"
+    end = f"{str(end_date)[:4]}-{str(end_date)[4:6]}-{str(end_date)[6:]}"
+
+    import baostock as bs
+    lg = bs.login()
+
+    if lg.error_code == '0':
+        # 1：后复权， 2：前复权，3：不复权
+        adjust_flag = '3'
+        if adjust == ExitRight.QFQ:
+            adjust_flag = '2'
+        elif adjust == ExitRight.HFQ:
+            adjust_flag = '1'
+
+        rs = bs.query_history_k_data_plus(
+            code,
+            "date,code,open,high,low,close,volume,amount",
+            start_date=start,
+            end_date=end,
+            frequency='d',
+            adjustflag=adjust_flag,
+        )
+        if rs.error_code == '0':
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+
+            bs.logout()
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y%m%d').astype(int)
+            df = df.rename(columns={'date': 'datetime'})
+            df['datetime'] = df['datetime'].astype(int)
+            df['open'] = df['open'].astype(float)
+            df['high'] = df['high'].astype(float)
+            df['low'] = df['low'].astype(float)
+            df['close'] = df['close'].astype(float)
+            df['volume'] = df['volume'].astype(int)
+            df['amount'] = df['amount'].astype(float)
+
+            if df is not None and len(df) > 0:
+                if columns is not None:
+                    return df[columns]
+                return df
+            return None
+        else:
+            print(f'query_history_k_data_plus {code} respond error_msg:' + rs.error_msg)
+        return None
+    else:
+        print('login respond error_msg:' + lg.error_msg)
+        return None
+
+
 def get_daily_history(
     code: str,
     start_date: str,  # format: 20240101
@@ -478,6 +538,8 @@ def get_daily_history(
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
         # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)
+    elif data_source == DataSource.BAOSTOCK:
+        return get_bao_daily_history(code, start_date, end_date, columns, adjust)
     else:
         # 默认使用免费的 miniqmt数据，但就是慢的一批
         return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
