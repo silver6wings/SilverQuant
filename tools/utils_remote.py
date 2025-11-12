@@ -479,8 +479,9 @@ def get_bao_daily_history(
         elif adjust == ExitRight.HFQ:
             adjust_flag = '1'
 
+        [symbol, exchange] = code.split('.')
         rs = bs.query_history_k_data_plus(
-            code,
+            f'{exchange.lower()}.{symbol}',
             "date,code,open,high,low,close,volume,amount",
             start_date=start,
             end_date=end,
