@@ -8,3 +8,4 @@ requests>=2.31.0
 schedule>=1.2.1
 tushare>=1.4.21
 pycurl>=7.45.0
+xtquant>=250516.1.1
