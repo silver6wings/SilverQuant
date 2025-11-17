@@ -33,7 +33,6 @@ PATH_LOGS = PATH_BASE + '/logs.txt'             # 用来存储选股和委托操
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
 
 cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
-cache_history: Dict[str, pd.DataFrame] = {}     # 记录历史日线行情的信息 { code: DataFrame }
 
 
 class PoolConf:
