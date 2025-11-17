@@ -84,12 +84,12 @@ class AKCache:
     import akshare as _ak
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_stock_info_a_code_name.csv', ttl=60*60*12, dtype={'code': str})
+    @cache_with_path_ttl(path='./_cache/_ak_stock_info_a_code_name.csv', ttl=60*60*23, dtype={'code': str})
     def stock_info_a_code_name(cls):
         return cls._ak.stock_info_a_code_name()
 
     @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_fund_etf_spot_em.csv', ttl=60*60*24, dtype={'代码': str})
+    @cache_with_path_ttl(path='./_cache/_ak_fund_etf_spot_em.csv', ttl=60*60*23, dtype={'代码': str})
     def fund_etf_spot_em(cls):
         return cls._ak.fund_etf_spot_em()
 
