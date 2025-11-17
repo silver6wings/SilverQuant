@@ -23,13 +23,13 @@ class StockPool:
         self.cache_whitelist: set[str] = set()
         self.cache_code_list: list[str] = []
 
-    def get_code_list(self) -> set[str]:
+    def get_code_list(self) -> list[str]:
         return self.cache_code_list
 
     def refresh(self):
         self.refresh_black()
         self.refresh_white()
-        self.cache_code_list = self.cache_whitelist.difference(self.cache_blacklist)
+        self.cache_code_list = list(self.cache_whitelist.difference(self.cache_blacklist))
 
         print(f'[POOL] White list refreshed {len(self.cache_whitelist)} codes.')
         print(f'[POOL] Black list refreshed {len(self.cache_blacklist)} codes.')
