@@ -126,6 +126,10 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > https://www.myquant.cn/terminal
 
+> 如果需要数据策略分离类架构，需要安装 redis，Windows MSI 安装包在下边找
+>
+> https://github.com/MicrosoftArchive/redis/releases
+
 
 ## 配置环境
 
