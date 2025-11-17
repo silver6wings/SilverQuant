@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Set, Callable
+from typing import Callable
 
 from tools.constants import MSG_OUTER_SEPARATOR
 from tools.utils_basic import symbol_to_code
@@ -19,15 +19,17 @@ class StockPool:
         self.messager = ding_messager
 
         self.pool_parameters = parameters
-        self.cache_blacklist: Set[str] = set()
-        self.cache_whitelist: Set[str] = set()
+        self.cache_blacklist: set[str] = set()
+        self.cache_whitelist: set[str] = set()
+        self.cache_code_list: list[str] = []
 
-    def get_code_list(self) -> list[str]:
-        return list(self.cache_whitelist.difference(self.cache_blacklist))
+    def get_code_list(self) -> set[str]:
+        return self.cache_code_list
 
     def refresh(self):
         self.refresh_black()
         self.refresh_white()
+        self.cache_code_list = self.cache_whitelist.difference(self.cache_blacklist)
 
         print(f'[POOL] White list refreshed {len(self.cache_whitelist)} codes.')
         print(f'[POOL] Black list refreshed {len(self.cache_blacklist)} codes.')
