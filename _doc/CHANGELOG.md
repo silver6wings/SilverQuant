@@ -4,14 +4,27 @@
 
 ## [ In Progress ]
 
-### 添加 Add
+### 添加
+
+### 修改
+
+### 删除
+
+## [ 4.2.0 ] 2025-11-18
+
+### 添加
 - Baostock 数据源添加
+- Redis 数据策略分离的 Demo
 
-### 修改 Modify
+### 修改
 - AKShare 指数成份的缓存机制
+- Daily Report 添加成本价显示
+- 线程安全优化 @nackel
+- TDX 除权细节优化 @dominicx
+- apscheduler 稳定性增强 @dominicx
 
-### 删除 Remove
-- 无
+### 删除
+- xtquant 静态库删除，改为 pip install
 
 ## [ 4.1.0 ] 2025-10-27
 
