@@ -93,7 +93,6 @@ class SellConf:
 
 
 def before_trade_day() -> None:
-    # held_increase() -> None:
     if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
         return
 
@@ -102,7 +101,6 @@ def before_trade_day() -> None:
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'All held stock day +1!')
 
-    # refresh_code_list() -> None:
     my_pool.refresh()
     positions = my_delegate.check_positions()
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
@@ -182,6 +180,8 @@ def redis_subscriber():
     sub.subscribe(REDIS_CHANNEL)  # 订阅频道
 
     print('[开始监听数据]')
+
+    my_code_set = set(my_pool.get_code_list())
     for message in sub.listen():
         if message['type'] == 'message':
             data = json.loads(message['data'])
@@ -189,7 +189,7 @@ def redis_subscriber():
             curr_time = data['curr_time']
             curr_seconds = data['curr_seconds']
             curr_quotes = data['curr_quotes']
-            pool_quotes = {code: curr_quotes[code] for code in my_pool.get_code_list() if code in curr_quotes}
+            pool_quotes = {code: curr_quotes[code] for code in my_code_set if code in curr_quotes}
             redis_execute_strategy(curr_date, curr_time, curr_seconds, pool_quotes)
 
 
