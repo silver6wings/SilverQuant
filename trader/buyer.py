@@ -41,6 +41,7 @@ class BaseBuyer:
         curr_date: str,
         positions: list,
         remark: str = DEFAULT_BUY_REMARK,
+        available_cash: float = 0.0,
         all_in_buy: bool = False,   # 最后一点零头不够也要尝试买入
         all_market: bool = True,    # 全部都是市价单
     ) -> dict[str, set]:
@@ -49,7 +50,8 @@ class BaseBuyer:
 
             position_codes = [position.stock_code for position in positions]
             position_count = self.delegate.get_holding_position_count(positions)
-            available_cash = self.delegate.check_asset().cash
+            if available_cash <= 0.0:
+                available_cash = self.delegate.check_asset().cash
             available_slot = available_cash // final_capacity
 
             # 不足一手把剩下的钱尽可能买一手
@@ -74,8 +76,8 @@ class BaseBuyer:
                         continue
 
                     selection = selections[code]
-                    price = round(selection[SelectionItem.BUY_PRICE], 2)
-                    last_close = round(selection[SelectionItem.LAST_CLOSE], 2)
+                    price = round(selection[SelectionItem.BUY_PRICE], 4)
+                    last_close = round(selection[SelectionItem.LAST_CLOSE], 4)
 
                     if SelectionItem.BUY_VOLUME in selection:
                         buy_volume = selection[SelectionItem.BUY_VOLUME]

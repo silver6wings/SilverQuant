@@ -13,6 +13,7 @@ class DataSource:
     MOOTDX = 'mootdx'
     TDXZIP = 'tdxzip'
     MINIQMT = 'miniqmt'
+    BAOSTOCK = 'baostock'
 
 
 # 复权常量

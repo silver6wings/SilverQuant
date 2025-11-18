@@ -67,12 +67,20 @@ def order_buy(code: str, price: float, volume: int):
 # 回测框架函数
 # ===========
 def get_history_data(context, code: str, days: int, fields: list[str], frequency='1d') -> pd.DataFrame:
-    return context.data(
+    df = context.data(
         symbol=code_to_dfcf_symbol(code),
         frequency=frequency,
         count=days,
         fields=','.join(fields),
     )
+    if 'volume' in df.columns:
+        df['volume'] = df['volume'] / 100
+    if 'bob' in df.columns:
+        df['bob'] = pd.to_datetime(df['bob'])
+        df['datetime'] = df['bob'].dt.strftime('%Y%m%d').astype(int)
+        df = df.drop('bob', axis=1)
+
+    return df
 
 
 def update_cache_quote(quotes: dict[str, dict], bars: list[dict], curr_time: str) -> dict[str, dict]:

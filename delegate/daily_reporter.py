@@ -115,22 +115,29 @@ class DailyReporter:
                 total_change = curr_price - open_price
                 ratio_change = curr_price / open_price - 1
                 hold_count += 1
-                display_list.append([code, curr_price, vol, ratio_change, total_change])
+                display_list.append([code, curr_price, open_price, vol, ratio_change, total_change])
 
-        sorted_list_desc = sorted(display_list, key=lambda x: x[3], reverse=True)
+        sorted_list_desc = sorted(display_list, key=lambda x: x[4], reverse=True)
 
         # 渲染输出内容
         for i in range(hold_count):
-            [code, curr_price, vol, ratio_change, total_change] = sorted_list_desc[i]
-            total_change = colour_text(f"{total_change * vol:.2f}", total_change > 0, total_change < 0)
-            ratio_change = colour_text(f'{ratio_change * 100:.2f}%', ratio_change > 0, ratio_change < 0)
+            [code, curr_price, open_price, vol, ratio_change, total_change] = sorted_list_desc[i]
+            total_change = colour_text(
+                f"{total_change * vol:.2f}",
+                total_change > 0.000001,
+                total_change < -0.000001)
+            ratio_prefix = '+' if ratio_change > 0 else ''
+            ratio_change = colour_text(
+                f'{ratio_prefix}{ratio_change * 100:.2f}%',
+                ratio_change > 0.000001,
+                ratio_change < -0.000001)
 
             text += MSG_OUTER_SEPARATOR
             text += f'{code_to_symbol(code)} ' \
                     f'{self.stock_names.get_name(code)} ' \
                     f'{curr_price * vol:.2f}元'
             text += MSG_INNER_SEPARATOR
-            text += f'盈亏比: {ratio_change} 盈亏额: {total_change}'
+            text += f'成本 {open_price:.2f} 盈亏 {total_change} ({ratio_change})'
 
         title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'

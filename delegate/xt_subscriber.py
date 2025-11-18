@@ -109,7 +109,16 @@ class XtSubscriber(BaseSubscriber):
 
         if self.use_ap_scheduler:
             from apscheduler.schedulers.blocking import BlockingScheduler
-            self.scheduler = BlockingScheduler()
+            from apscheduler.executors.pool import ThreadPoolExecutor
+            executors = {
+                'default': ThreadPoolExecutor(32),
+            }
+            job_defaults = {
+                'coalesce': True,
+                'misfire_grace_time': 180,
+                'max_instances': 3
+            }
+            self.scheduler = BlockingScheduler(timezone='Asia/Shanghai', executors=executors, job_defaults=job_defaults)
 
         if self.is_ticks_df:
             self.tick_df_cols = ['time', 'price', 'high', 'low', 'volume', 'amount'] \
@@ -163,9 +172,9 @@ class XtSubscriber(BaseSubscriber):
 
                 print(print_mark, end='')  # 每秒钟开始的时候输出一个点
 
-    def callback_run_no_quotes(self) -> None:
+    def callback_run_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         now = datetime.datetime.now()
         self.last_callback_time = now
@@ -183,22 +192,21 @@ class XtSubscriber(BaseSubscriber):
             self.cache_limits['prev_seconds'] = curr_seconds
 
             if int(curr_seconds) % self.execute_interval == 0:
-                print('.' if len(self.cache_quotes) > 0 else 'x', end='')  # 每秒钟开始的时候输出一个点
-
+                print('.', end='')  # cache_quotes 肯定没数据，这里就是输出观察线程健康
                 # str(%Y-%m-%d), str(%H:%M), str(%S)
                 self.execute_strategy(curr_date, curr_time, curr_seconds, {})
 
-    def callback_open_no_quotes(self) -> None:
+    def callback_open_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启')
         print('[启动策略]', end='')
 
-    def callback_close_no_quotes(self) -> None:
+    def callback_close_no_quotes(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         print('\n[关闭策略]')
         if self.messager is not None:
@@ -209,11 +217,11 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def callback_monitor(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         now = datetime.datetime.now()
-
-        if now - self.last_callback_time > datetime.timedelta(minutes=1):
+        callback_timedelta = (now - self.last_callback_time).total_seconds()
+        if callback_timedelta > 60:
             if self.messager is not None:
                 self.messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name}:中断\n请检查QMT数据源 ',
@@ -229,7 +237,7 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def subscribe_tick(self, resume: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
@@ -240,7 +248,7 @@ class XtSubscriber(BaseSubscriber):
 
     def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
@@ -251,7 +259,7 @@ class XtSubscriber(BaseSubscriber):
 
     def resubscribe_tick(self, notice: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if 'sub_seq' in self.cache_limits:
             xtdata.unsubscribe_quote(self.cache_limits['sub_seq'])
@@ -306,7 +314,7 @@ class XtSubscriber(BaseSubscriber):
 
     def clean_ticks_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         self.today_ticks.clear()
         self.today_ticks = {}
@@ -314,7 +322,7 @@ class XtSubscriber(BaseSubscriber):
 
     def save_tick_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.is_ticks_df:
             pickle_file = f'./_cache/debug/tick_history_{self.strategy_name}.pkl'
@@ -397,6 +405,7 @@ class XtSubscriber(BaseSubscriber):
         columns: list[str],
         data_source: DataSource,
     ):
+        # ======== 每日一次性全量数据源 ========
         if data_source == DataSource.AKSHARE or data_source == DataSource.TDXZIP:
             temp_indicators = load_pickle(cache_path)
             if temp_indicators is not None and len(temp_indicators) > 0:
@@ -428,6 +437,7 @@ class XtSubscriber(BaseSubscriber):
             if data_source == DataSource.TDXZIP and self.history_day_klines is None:
                 self.history_day_klines = get_tdxzip_history(adjust=adjust)
 
+        # ======== 预加载每日增量数据源 ========
         elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
@@ -441,8 +451,7 @@ class XtSubscriber(BaseSubscriber):
                 self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
         else:
             if self.messager is not None:
-                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
-                                              f'无法识别数据源')
+                self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:\n无法识别的数据源')
 
     def refresh_memory_history(
         self,
@@ -452,7 +461,7 @@ class XtSubscriber(BaseSubscriber):
         data_source: DataSource,
     ):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         hc = DailyHistoryCache()
         hc.set_data_source(data_source=data_source)
@@ -468,33 +477,43 @@ class XtSubscriber(BaseSubscriber):
     # -----------------------
     def daily_summary(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         curr_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
-        try:
-            if self.open_today_deal_report:
+        if self.open_today_deal_report:
+            try:
                 self.daily_reporter.today_deal_report(today=curr_date)
+            except Exception as e:
+                print('Report deal failed: ', e)
+                traceback.print_exc()
 
-            if self.delegate is not None:
-                if self.open_today_hold_report:
+        if self.open_today_hold_report:
+            try:
+                if self.delegate is not None:
                     positions = self.delegate.check_positions()
                     self.daily_reporter.today_hold_report(today=curr_date, positions=positions)
+                else:
+                    print('Missing delegate to complete reporting!')
+            except Exception as e:
+                print('Report position failed: ', e)
+                traceback.print_exc()
 
+        try:
+            if self.delegate is not None:
                 asset = self.delegate.check_asset()
                 self.daily_reporter.check_asset(today=curr_date, asset=asset)
-            else:
-                print('Missing delegate to complete reporting!')
         except Exception as e:
-            print('Report failed: ', e)
+            print('Report asset failed: ', e)
             traceback.print_exc()
+
 
     # -----------------------
     # 定时器
     # -----------------------
     def before_trade_day_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         self.cache_quotes.clear()
         self.cache_history.clear()
@@ -509,17 +528,17 @@ class XtSubscriber(BaseSubscriber):
 
     def near_trade_begin_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.near_trade_begin is not None:
             self.near_trade_begin()
-            if self.before_trade_day is None: #没有设置before_trade_day 情况
+            if self.before_trade_day is None:  # 没有设置before_trade_day 情况
                 self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            print(f'今日盘前准备工作已完成。')
+            print(f'今日盘前准备工作已完成')
 
     def finish_trade_day_wrapper(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
 
         if self.finish_trade_day is not None:
             self.finish_trade_day()
@@ -528,7 +547,8 @@ class XtSubscriber(BaseSubscriber):
     # @check_open_day
     def check_before_finished(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return None
+            return
+
         if (
             self.before_trade_day is not None or self.near_trade_begin is not None
         ) and (
@@ -596,11 +616,7 @@ class XtSubscriber(BaseSubscriber):
         finally:
             self.delegate.shutdown()
 
-    def start_scheduler(self):
-        if self.use_outside_data:
-            self.start_scheduler_without_qmt_data()
-            return
-
+    def start_scheduler_with_qmt_data(self):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
@@ -621,7 +637,7 @@ class XtSubscriber(BaseSubscriber):
                 f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}',
                 self.before_trade_day_wrapper,
                 None,
-            ])  # random时间为了跑多个策略时防止短期预加载数据流量压力过大
+            ])  # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
 
         if self.finish_trade_day is not None:
             cron_jobs.append([  # 16:05 ~ 16:15
@@ -637,11 +653,6 @@ class XtSubscriber(BaseSubscriber):
             '13:05', '13:15', '13:25', '13:35', '13:45', '13:55',
             '14:05', '14:15', '14:25', '14:35', '14:45', '14:55',
         ]
-
-        temp_now = datetime.datetime.now()
-        temp_date = temp_now.strftime('%Y-%m-%d')
-        temp_time = temp_now.strftime('%H:%M')
-
         if self.use_ap_scheduler:
             # 新版 apscheduler
             for cron_job in cron_jobs:
@@ -652,18 +663,11 @@ class XtSubscriber(BaseSubscriber):
                     self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
 
             # 尝试重新订阅 tick 数据，减少30分时无数据返回机率
-            self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30) 
+            self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30)
 
             for monitor_time in monitor_time_list:
                 [hr, mn] = monitor_time.split(':')
                 self.scheduler.add_job(self.callback_monitor, 'cron', hour=hr, minute=mn)
-
-            # 盘中执行需要补齐
-            if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
-                self.before_trade_day_wrapper()
-                self.near_trade_begin_wrapper()
-                if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
-                    self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
 
             # 启动定时器
             try:
@@ -709,6 +713,24 @@ class XtSubscriber(BaseSubscriber):
             # finally:
             #     schedule.clear()
             #     self.delegate.shutdown()
+
+    def start_scheduler(self):
+        if self.use_ap_scheduler:
+            temp_now = datetime.datetime.now()
+            temp_date = temp_now.strftime('%Y-%m-%d')
+            temp_time = temp_now.strftime('%H:%M')
+            # 盘中执行需要补齐
+            if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
+                self.before_trade_day_wrapper()
+                self.near_trade_begin_wrapper()
+                if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
+                    self.subscribe_tick()  # 重启时如果在交易时间则订阅Tick
+
+        if self.use_outside_data:
+            self.start_scheduler_without_qmt_data()
+            return
+        else:
+            self.start_scheduler_with_qmt_data()
 
     # -----------------------
     # 检查是否交易日

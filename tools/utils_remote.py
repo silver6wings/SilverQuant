@@ -1,7 +1,7 @@
+import os
 import csv
 
 import requests
-import pandas as pd
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
@@ -10,7 +10,7 @@ from tools.utils_miniqmt import get_qmt_daily_history
 from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
 
 
-def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
+def set_tdx_zxg_code(data: list[str], file_name: str = None, block_name: str = '自选股') -> None:
     if file_name is None:
         try:
             from credentials import TDX_FOLDER
@@ -23,7 +23,7 @@ def set_tdx_zxg_code(data: list[str], file_name: str = None) -> None:
         writer = csv.writer(file)
         for item in data:
             writer.writerow([code_to_tdxsymbol(item)])
-    print(f'已成功将数据写入自选股文件：{file_name}')
+    print(f'已成功将数据写入{block_name}文件：{file_name}')
 
 
 def get_tdx_zxg_code(file_name: str = None) -> list[str]:
@@ -34,14 +34,15 @@ def get_tdx_zxg_code(file_name: str = None) -> list[str]:
         except Exception as exception:
             print('未找到tdx配置路径，放弃写入自选股', exception)
             return []
-
+   
     ret_list = []
-    with open(file_name) as f:
-        f_reader = csv.reader(f)
-        for row in f_reader:
-            code = tdxsymbol_to_code(''.join(row))
-            if len(code) > 0:
-                ret_list.append(code)
+    if os.path.isfile(file_name):
+        with open(file_name) as f:
+            f_reader = csv.reader(f)
+            for row in f_reader:
+                code = tdxsymbol_to_code(''.join(row))
+                if len(code) > 0:
+                    ret_list.append(code)
     return ret_list
 
 
@@ -213,80 +214,6 @@ def append_ak_spot_dict(source_df: pd.DataFrame, row: pd.Series, curr_date: str)
     }
     df = append_ak_daily_row(source_df, formatted_row)
     return df
-
-
-# =======================
-#  Convert daily history
-# =======================
-
-
-def convert_daily_to_weekly(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    将日线K线数据转换为周线数据（datetime为该周内最后一个交易日的日期）
-    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
-    返回: 周线数据的DataFrame，按周一到周日合并，datetime为周内最后一个交易日的日期
-    """
-    data = df.copy()
-
-    # 1. 保留原始整数日期，同时新增datetime类型列用于分组（确定属于哪一周）
-    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
-    data = data.set_index('dt')  # 用datetime类型索引进行周分组
-
-    # 2. 按周一到周日分组（周区间：[周一, 下周一)）
-    weekly_groups = data.resample('W-MON', closed='left', label='left')  # 分组逻辑不变，仅用于划分周范围
-
-    # 3. 聚合规则：核心是对原始datetime取组内最后一个值
-    weekly_data = weekly_groups.agg({
-        'datetime': 'last',       # 周内最后一个交易日的原始整数日期
-        'open': 'first',          # 周内第一个开盘价
-        'high': 'max',            # 周内最高价
-        'low': 'min',             # 周内最低价
-        'close': 'last',          # 周内最后一个收盘价
-        'volume': 'sum',          # 周内成交量总和
-        'amount': 'sum'           # 周内成交额总和
-    }).dropna()  # 移除无数据的周
-
-    # 4. 恢复列顺序和原始数据类型
-    weekly_data = weekly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
-    for col in weekly_data.columns:
-        weekly_data[col] = weekly_data[col].astype(df[col].dtype)
-
-    return weekly_data
-
-
-def convert_daily_to_monthly(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    将日线K线数据转换为月线数据（datetime为当月最后一个交易日的日期）
-    参数: df: 包含日线数据的DataFrame，需包含datetime, open, high, low, close, volume, amount列
-    返回: 月线数据的DataFrame，按自然月划分（1月-12月），datetime为当月最后一个交易日的日期
-    """
-    data = df.copy()
-
-    # 1. 保留原始整数日期，新增datetime类型列用于按月分组
-    data['dt'] = pd.to_datetime(data['datetime'], format='%Y%m%d')
-    data = data.set_index('dt')  # 用datetime索引进行月份分组
-
-    # 2. 按自然月分组（1月1日-1月最后一天，2月1日-2月最后一天...）
-    # 频率'M'表示按月分组，默认按自然月划分
-    monthly_groups = data.resample('M')
-
-    # 3. 聚合规则：与周线逻辑一致，仅周期改为月
-    monthly_data = monthly_groups.agg({
-        'datetime': 'last',       # 当月最后一个交易日的原始整数日期
-        'open': 'first',          # 当月第一个交易日的开盘价
-        'high': 'max',            # 当月最高价
-        'low': 'min',             # 当月最低价
-        'close': 'last',          # 当月最后一个交易日的收盘价
-        'volume': 'sum',          # 当月成交量总和
-        'amount': 'sum'           # 当月成交额总和
-    }).dropna()  # 移除无数据的月份
-
-    # 4. 恢复列顺序和原始数据类型
-    monthly_data = monthly_data.reset_index(drop=True)[['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']]
-    for col in monthly_data.columns:
-        monthly_data[col] = monthly_data[col].astype(df[col].dtype)
-
-    return monthly_data
 
 
 # ================
@@ -530,6 +457,68 @@ def get_ts_daily_histories(
     return ans
 
 
+# http://www.baostock.com
+def get_bao_daily_history(
+    code: str,
+    start_date: str,  # format: 20240101
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
+) -> Optional[pd.DataFrame]:
+    start = f"{str(start_date)[:4]}-{str(start_date)[4:6]}-{str(start_date)[6:]}"
+    end = f"{str(end_date)[:4]}-{str(end_date)[4:6]}-{str(end_date)[6:]}"
+
+    import baostock as bs
+    lg = bs.login()
+
+    if lg.error_code == '0':
+        # 1：后复权， 2：前复权，3：不复权
+        adjust_flag = '3'
+        if adjust == ExitRight.QFQ:
+            adjust_flag = '2'
+        elif adjust == ExitRight.HFQ:
+            adjust_flag = '1'
+
+        [symbol, exchange] = code.split('.')
+        rs = bs.query_history_k_data_plus(
+            f'{exchange.lower()}.{symbol}',
+            "date,code,open,high,low,close,volume,amount",
+            start_date=start,
+            end_date=end,
+            frequency='d',
+            adjustflag=adjust_flag,
+        )
+        if rs.error_code == '0':
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+
+            bs.logout()
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y%m%d').astype(int)
+            df = df.rename(columns={'date': 'datetime'})
+            df['datetime'] = df['datetime'].astype(int)
+            df['open'] = df['open'].astype(float)
+            df['high'] = df['high'].astype(float)
+            df['low'] = df['low'].astype(float)
+            df['close'] = df['close'].astype(float)
+            df['volume'] = df['volume'].astype(int)
+            df['amount'] = df['amount'].astype(float)
+
+            if df is not None and len(df) > 0:
+                if columns is not None:
+                    return df[columns]
+                return df
+            return None
+        else:
+            print(f'query_history_k_data_plus {code} respond error_msg:' + rs.error_msg)
+        return None
+    else:
+        print('login respond error_msg:' + lg.error_msg)
+        return None
+
+
 def get_daily_history(
     code: str,
     start_date: str,  # format: 20240101
@@ -550,6 +539,8 @@ def get_daily_history(
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
         # Akshare 的 etf 取三位小数，成交量略有不同
         return get_ak_daily_history(code, start_date, end_date, columns, adjust)
+    elif data_source == DataSource.BAOSTOCK:
+        return get_bao_daily_history(code, start_date, end_date, columns, adjust)
     else:
         # 默认使用免费的 miniqmt数据，但就是慢的一批
         return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
