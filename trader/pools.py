@@ -26,10 +26,16 @@ class StockPool:
     def get_code_list(self) -> list[str]:
         return self.cache_code_list
 
+    def update_code_list(self) -> None:
+        self.cache_code_list = list(self.cache_whitelist.difference(self.cache_blacklist))
+
+    def clear_code_list(self) -> None:
+        self.cache_code_list = []
+
     def refresh(self):
         self.refresh_black()
         self.refresh_white()
-        self.cache_code_list = list(self.cache_whitelist.difference(self.cache_blacklist))
+        self.update_code_list()
 
         print(f'[POOL] White list refreshed {len(self.cache_whitelist)} codes.')
         print(f'[POOL] Black list refreshed {len(self.cache_blacklist)} codes.')
@@ -70,7 +76,8 @@ class StockPool:
         for code in remove_list:
             self.cache_whitelist.discard(code)
 
-        print(f'[POOL] {len(remove_list)} codes filter out.')
+        self.update_code_list()
+        print(f'[POOL] {len(remove_list)} codes filter out, {len(self.get_code_list())} codes left.')
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:筛除{len(remove_list)}支')
