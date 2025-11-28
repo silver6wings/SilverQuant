@@ -172,7 +172,7 @@ def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> 
 
 def empty_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
     # 这里的时间是本机时间，redis listener 的时间是数据推送服务器时间，需要注意时间不对齐的问题
-    return False
+    return curr_date is None and curr_time is None and curr_seconds is None and curr_quotes is None
 
 
 def redis_subscriber():
