@@ -2,12 +2,54 @@ import os
 import csv
 
 import requests
+import threading
+import atexit
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
 from tools.utils_basic import *
 from tools.utils_miniqmt import get_qmt_daily_history
 from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
+
+
+class BaoStockInstance:
+    _instance = None
+    _lock = threading.Lock()
+    bs = None
+    _initialized = False
+    _login_ok = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(BaoStockInstance, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if not self._initialized:
+            import baostock as bs
+            self.bs = bs
+            print('[BAOSTOCK] login...', end='')
+            lg = bs.login()
+            if lg.error_code == '0':
+                self._login_ok = True
+            else:
+                print('[BAOSTOCK] login respond error_msg: ' + lg.error_msg)
+            atexit.register(self.logout)
+            self._initialized = True
+
+    def logout(self):
+        if self.bs is not None and self._login_ok:
+            try:
+                print('[BAOSTOCK] logout...', end='')
+                self.bs.logout()
+            except Exception as e:
+                print('[BAOSTOCK] logout error!', e)
+            self._login_ok = False
+
+    def __del__(self):
+        self.logout()
 
 
 def set_tdx_zxg_code(data: list[str], file_name: str = None, block_name: str = '自选股') -> None:
@@ -468,54 +510,46 @@ def get_bao_daily_history(
     start = f"{str(start_date)[:4]}-{str(start_date)[4:6]}-{str(start_date)[6:]}"
     end = f"{str(end_date)[:4]}-{str(end_date)[4:6]}-{str(end_date)[6:]}"
 
-    import baostock as bs
-    lg = bs.login()
+    bs = BaoStockInstance().bs
 
-    if lg.error_code == '0':
-        # 1：后复权， 2：前复权，3：不复权
-        adjust_flag = '3'
-        if adjust == ExitRight.QFQ:
-            adjust_flag = '2'
-        elif adjust == ExitRight.HFQ:
-            adjust_flag = '1'
+    adjust_flag = '3'
+    if adjust == ExitRight.QFQ:
+        adjust_flag = '2'
+    elif adjust == ExitRight.HFQ:
+        adjust_flag = '1'
 
-        [symbol, exchange] = code.split('.')
-        rs = bs.query_history_k_data_plus(
-            f'{exchange.lower()}.{symbol}',
-            "date,code,open,high,low,close,volume,amount",
-            start_date=start,
-            end_date=end,
-            frequency='d',
-            adjustflag=adjust_flag,
-        )
-        if rs.error_code == '0':
-            data_list = []
-            while (rs.error_code == '0') & rs.next():
-                data_list.append(rs.get_row_data())
+    [symbol, exchange] = code.split('.')
+    rs = bs.query_history_k_data_plus(
+        f'{exchange.lower()}.{symbol}',
+        "date,code,open,high,low,close,volume,amount",
+        start_date=start,
+        end_date=end,
+        frequency='d',
+        adjustflag=adjust_flag,
+    )
+    if rs.error_code == '0':
+        data_list = []
+        while (rs.error_code == '0') & rs.next():
+            data_list.append(rs.get_row_data())
 
-            bs.logout()
+        df = pd.DataFrame(data_list, columns=rs.fields)
+        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y%m%d').astype(int)
+        df = df.rename(columns={'date': 'datetime'})
+        df['datetime'] = df['datetime'].astype(int)
+        df['open'] = df['open'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
+        df['close'] = df['close'].astype(float)
+        df['volume'] = df['volume'].astype(int) / 100
+        df['amount'] = df['amount'].astype(float)
 
-            df = pd.DataFrame(data_list, columns=rs.fields)
-            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y%m%d').astype(int)
-            df = df.rename(columns={'date': 'datetime'})
-            df['datetime'] = df['datetime'].astype(int)
-            df['open'] = df['open'].astype(float)
-            df['high'] = df['high'].astype(float)
-            df['low'] = df['low'].astype(float)
-            df['close'] = df['close'].astype(float)
-            df['volume'] = df['volume'].astype(int) / 100
-            df['amount'] = df['amount'].astype(float)
-
-            if df is not None and len(df) > 0:
-                if columns is not None:
-                    return df[columns]
-                return df
-            return None
-        else:
-            print(f'query_history_k_data_plus {code} respond error_msg:' + rs.error_msg)
+        if df is not None and len(df) > 0:
+            if columns is not None:
+                return df[columns]
+            return df
         return None
     else:
-        print('login respond error_msg:' + lg.error_msg)
+        print(f'query_history_k_data_plus {code} respond error_msg:' + rs.error_msg)
         return None
 
 
