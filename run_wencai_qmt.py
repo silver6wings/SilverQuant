@@ -1,12 +1,18 @@
 import logging
+import threading
+from typing import Dict, Set, List
 
-from credentials import *
+from credentials import (
+    DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH,
+    QMT_ACCOUNT_ID, QMT_CLIENT_PATH
+)
 from tools.utils_basic import logging_init, is_symbol, debug
-from tools.utils_cache import *
+from tools.utils_cache import all_held_inc, update_max_prices
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
+from delegate.base_delegate import update_position_held
+from delegate.xt_subscriber import XtSubscriber, xt_get_ticks
 
 from trader.pools import StocksPoolBlackWencai as Pool
 from trader.buyer import BaseBuyer as Buyer
@@ -150,7 +156,7 @@ def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict
 
 def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
     selected_codes = pull_stock_codes()
-    print(f'[{len(selected_codes)}]', end='')
+    debug(f'[{len(selected_codes)}]', end='')
 
     selections = {}
     if selected_codes is not None and len(selected_codes) > 0:

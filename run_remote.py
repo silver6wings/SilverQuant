@@ -7,7 +7,8 @@ from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource, ExitRight
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held, xt_get_ticks
+from delegate.base_delegate import update_position_held
+from delegate.xt_subscriber import XtSubscriber, xt_get_ticks
 
 from trader.pools import StocksPoolBlackEmpty as Pool
 from trader.buyer import BaseBuyer as Buyer

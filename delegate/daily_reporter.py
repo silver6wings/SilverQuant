@@ -4,7 +4,7 @@ from typing import Optional
 import pandas as pd
 from xtquant import xtdata
 
-from delegate.xt_delegate import BaseDelegate
+from delegate.base_delegate import BaseDelegate
 
 from tools.constants import MSG_INNER_SEPARATOR, MSG_OUTER_SEPARATOR
 from tools.utils_basic import code_to_symbol
@@ -50,15 +50,14 @@ class DailyReporter:
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
     ):
         self.account_id = account_id
-        self.strategy_name = strategy_name
         self.delegate = delegate
-
+        self.strategy_name = strategy_name
         self.path_deal = path_deal
         self.path_assets = path_assets
 
         self.messager = messager
-        self.today_report_show_bank = today_report_show_bank
         self.use_outside_data = use_outside_data
+        self.today_report_show_bank = today_report_show_bank
         self.stock_names = StockNames()
 
     def today_deal_report(self, today: str):

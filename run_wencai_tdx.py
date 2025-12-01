@@ -12,7 +12,8 @@ from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes, get_mootdx_quotes
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.base_delegate import update_position_held
+from delegate.base_subscriber import HistorySubscriber
 
 from trader.pools import StocksPoolBlackWencai as Pool
 from trader.buyer import BaseBuyer as Buyer
@@ -252,7 +253,7 @@ if __name__ == '__main__':
         delegate=my_delegate,
         parameters=SellConf,
     )
-    my_suber = XtSubscriber(
+    my_suber = HistorySubscriber(
         account_id=QMT_ACCOUNT_ID,
         strategy_name=STRATEGY_NAME,
         delegate=my_delegate,
@@ -260,8 +261,6 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
         before_trade_day=before_trade_day,
-        use_outside_data=True,
-        use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_today_deal_report=True,
         open_today_hold_report=True,

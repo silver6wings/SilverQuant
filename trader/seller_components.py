@@ -1,9 +1,9 @@
 import logging
-
-from mytt.MyTT_advance import *
-# from mytt.MyTT_custom import *
 from typing import Dict, Optional
 
+import pandas as pd
+
+from mytt.MyTT import MA, MACD, CCI, WR
 from xtquant.xttype import XtPosition
 from tools.utils_basic import get_limit_up_price
 from tools.utils_remote import concat_ak_quote_dict
