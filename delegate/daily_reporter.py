@@ -136,7 +136,7 @@ class DailyReporter:
                     f'{self.stock_names.get_name(code)} ' \
                     f'{curr_price * vol:.2f}元'
             text += MSG_INNER_SEPARATOR
-            text += f'成本 {open_price:.2f} 盈亏 {total_change} ({ratio_change})'
+            text += f'成本 {open_price:.3f} 盈亏 {total_change} ({ratio_change})'
 
         title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'
