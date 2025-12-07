@@ -540,8 +540,8 @@ def get_bao_daily_history(
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
         df['close'] = df['close'].astype(float)
-        df['volume'] = df['volume'].astype(int) / 100
-        df['amount'] = df['amount'].astype(float)
+        df['volume'] = df['volume'].replace('', '0').astype(int) / 100
+        df['amount'] = df['amount'].replace('', '0').astype(float)
 
         if df is not None and len(df) > 0:
             if columns is not None:

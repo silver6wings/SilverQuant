@@ -6,7 +6,8 @@ from tools.utils_basic import logging_init, is_symbol, time_diff_seconds
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.base_delegate import update_position_held
+from delegate.xt_subscriber import XtSubscriber
 
 from trader.pools import StocksPoolWhiteCustomSymbol as Pool
 from trader.buyer import BaseBuyer as Buyer
@@ -173,13 +174,7 @@ def select_stocks(
     return selections
 
 
-def scan_buy(
-    quotes: Dict,
-    curr_date: str,
-    curr_time: str,
-    curr_seconds: str,
-    positions: List,
-) -> None:
+def scan_buy(quotes: Dict, curr_date: str, curr_time: str, curr_seconds: str, positions: List) -> None:
     selections = select_stocks(quotes, curr_time, curr_seconds)
     # debug(f'本次扫描:{len(quotes)}, 选股{selections})
 

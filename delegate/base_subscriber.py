@@ -124,7 +124,7 @@ class BaseSubscriber:
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
-        print('[启动策略]', end='')
+        print('[启动策略]')
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启')
@@ -136,13 +136,13 @@ class BaseSubscriber:
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
-        if self.custom_end_unsub is not None:
-            threading.Thread(target=self.custom_end_unsub).start()
+        print('\n[关闭策略]')
 
         if self.messager is not None:
             self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:结束')
 
-        print('\n[关闭策略]')
+        if self.custom_end_unsub is not None:
+            threading.Thread(target=self.custom_end_unsub).start()
 
     def update_code_list(self, code_list: list[str]):
         self.code_list = code_list
