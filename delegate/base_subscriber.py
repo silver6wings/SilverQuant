@@ -225,7 +225,7 @@ class BaseSubscriber:
     # -----------------------
     # 定时器
     # -----------------------
-    def _start_scheduler(self):
+    def _init_scheduler_jobs(self):
         run_time_ranges = [
             # 上午时间段: 09:15:00 到 11:29:59
             {
@@ -271,6 +271,8 @@ class BaseSubscriber:
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=15, minute=0, second=30)
         self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=1, second=0)
 
+    def _start_scheduler(self):
+        self._init_scheduler_jobs()
         try:
             print('[定时器已启动]')
             self.scheduler.start()
