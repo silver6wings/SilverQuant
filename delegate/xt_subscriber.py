@@ -275,6 +275,7 @@ class XtSubscriber(HistorySubscriber):
                 or len(self.cache_history) < 1
             ):
             print('[警告] 盘前准备未完成，尝试重新执行盘前函数')
+            self.prev_check_open_day()
             self.before_trade_day_wrapper()
             self.near_trade_begin_wrapper()
         print(f'[提示] 当前交易日：{self.curr_trade_date}')
