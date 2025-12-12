@@ -29,6 +29,7 @@ class XtSubscriber(HistorySubscriber):
         path_assets: str,
         # 回调
         execute_strategy: Callable,         # 策略回调函数
+        execute_call_end: Callable = None,  # 策略竞价结束回调
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
@@ -38,6 +39,7 @@ class XtSubscriber(HistorySubscriber):
         # 通知
         ding_messager: BaseMessager = None,
         # 日报
+        open_middle_end_report: bool = False,   # 午盘结束的报告
         open_today_deal_report: bool = False,   # 每日交易记录报告
         open_today_hold_report: bool = False,   # 每日持仓记录报告
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
@@ -52,10 +54,12 @@ class XtSubscriber(HistorySubscriber):
             path_deal=path_deal,
             path_assets=path_assets,
             execute_strategy=execute_strategy,
+            execute_call_end=execute_call_end,
             execute_interval=execute_interval,
             before_trade_day=before_trade_day,
             near_trade_begin=near_trade_begin,
             finish_trade_day=finish_trade_day,
+            open_middle_end_report=open_middle_end_report,
             open_today_deal_report=open_today_deal_report,
             open_today_hold_report=open_today_hold_report,
             today_report_show_bank=today_report_show_bank,
@@ -309,23 +313,26 @@ class XtSubscriber(HistorySubscriber):
             ['15:01', self.unsubscribe_tick, None],
             ['15:02', self.daily_summary, None],
         ]
+
         if self.open_tick:
             cron_jobs.append(['09:10', self.clean_ticks_history, None])
             cron_jobs.append(['15:10', self.save_tick_history, None])
 
         if self.before_trade_day is not None:
-            cron_jobs.append([  # 03:00 ~ 06:59
-                f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}',
-                self.before_trade_day_wrapper,
-                None,
-            ])  # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
+            # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
+            before_time = f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}'  # 03:00 ~ 06:59
+            cron_jobs.append([before_time, self.before_trade_day_wrapper, None])
 
         if self.finish_trade_day is not None:
-            cron_jobs.append([  # 16:05 ~ 16:15
-                f'16:{random.randint(0, 10) + 5}',
-                self.finish_trade_day_wrapper,
-                None,
-            ])
+            # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
+            finish_time = f'16:{random.randint(0, 10) + 5}'  # 16:05 ~ 16:15
+            cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
+
+        if self.execute_call_end is not None:
+            cron_jobs.append(['09:26', self.execute_call_end_wrapper, None])
+
+        if self.open_middle_end_report:
+            cron_jobs.append(['11:32', self.daily_summary, None])
 
         # 数据源中断检查时间点
         monitor_time_list = [
@@ -334,6 +341,7 @@ class XtSubscriber(HistorySubscriber):
             '13:05', '13:15', '13:25', '13:35', '13:45', '13:55',
             '14:05', '14:15', '14:25', '14:35', '14:45', '14:55',
         ]
+
         if self.use_ap_scheduler:
             # 新版 apscheduler
             for cron_job in cron_jobs:

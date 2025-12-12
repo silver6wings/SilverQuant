@@ -28,6 +28,7 @@ class BaseSubscriber:
         path_assets: str,
         # 回调
         execute_strategy: Callable,         # 策略回调函数
+        execute_call_end: Callable = None,  # 策略竞价结束回调
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
@@ -38,6 +39,7 @@ class BaseSubscriber:
         # 通知
         ding_messager: BaseMessager = None,
         # 日报
+        open_middle_end_report: bool = False,   # 午盘结束的报告
         open_today_deal_report: bool = False,   # 每日交易记录报告
         open_today_hold_report: bool = False,   # 每日持仓记录报告
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
@@ -52,6 +54,7 @@ class BaseSubscriber:
         self.path_assets = path_assets
 
         self.execute_strategy = execute_strategy
+        self.execute_call_end = execute_call_end
         self.execute_interval = execute_interval
         self.before_trade_day = before_trade_day    # 提前准备某些耗时长的任务
         self.near_trade_begin = near_trade_begin    # 有些数据临近开盘才更新，这里保证内存里的数据正确
@@ -60,6 +63,7 @@ class BaseSubscriber:
         self.custom_begin_sub = custom_sub_begin
         self.custom_end_unsub = custom_unsub_end
 
+        self.open_middle_end_report = open_middle_end_report
         self.open_today_deal_report = open_today_deal_report
         self.open_today_hold_report = open_today_hold_report
         self.today_report_show_bank = today_report_show_bank
@@ -175,6 +179,14 @@ class BaseSubscriber:
         if self.finish_trade_day is not None:
             self.finish_trade_day()
 
+    def execute_call_end_wrapper(self):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return
+
+        print('[竞价结束回调]')
+        if self.execute_call_end is not None:
+            self.execute_call_end()
+
     # 检查是否完成盘前准备
     def check_before_finished(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -263,13 +275,19 @@ class BaseSubscriber:
             random_minute = random.randint(0, 10) + 5
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
-        self.scheduler.add_job(self.prev_check_open_day, 'cron', hour=1, minute=0, second=0)
+        if self.execute_call_end is not None:
+            self.scheduler.add_job(self.execute_call_end_wrapper(), 'cron', hour=9, minute=25, second=30)
+
+        if self.open_middle_end_report:
+            self.scheduler.add_job(self.daily_summary, 'cron', hour=11, minute=32)
+
+        self.scheduler.add_job(self.prev_check_open_day, 'cron', hour=1, minute=0)
         self.scheduler.add_job(self.check_before_finished, 'cron', hour=8, minute=55) # 检查当天是否完成准备
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=9, minute=14, second=30)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=11, minute=30, second=30)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=12, minute=59, second=30)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=15, minute=0, second=30)
-        self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=1, second=0)
+        self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=2)
 
         try:
             print('[定时器已启动]')
