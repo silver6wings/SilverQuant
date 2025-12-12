@@ -540,7 +540,7 @@ def get_bao_daily_history(
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
         df['close'] = df['close'].astype(float)
-        df['volume'] = df['volume'].replace('', '0').astype(int) / 100
+        df['volume'] = df['volume'].replace('', '0').astype(int) / 100  # 停牌的票会返回空串所以改成0
         df['amount'] = df['amount'].replace('', '0').astype(float)
 
         if df is not None and len(df) > 0:
