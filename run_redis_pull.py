@@ -179,6 +179,7 @@ def empty_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, cu
 def redis_subscribe():
     print('[开始监听数据]')
     my_redis.subscribe(REDIS_CHANNEL)  # 订阅频道
+    my_code_set = set(my_pool.get_code_list())  # set 提高 in 操作的性能 O(1) 查找复杂度
     for message in my_redis.listen():
         try:
             if message['type'] == 'message':
@@ -187,7 +188,7 @@ def redis_subscribe():
                 curr_time = data['curr_time']
                 curr_seconds = data['curr_seconds']
                 curr_quotes = data['curr_quotes']
-                pool_quotes = {code: curr_quotes[code] for code in my_suber.code_list if code in curr_quotes}
+                pool_quotes = {code: curr_quotes[code] for code in my_code_set if code in curr_quotes}
                 redis_execute_strategy(curr_date, curr_time, curr_seconds, pool_quotes)
                 print('!' if len(curr_quotes) > 0 else 'x', end='')  # 这里确保有数据
         except Exception as e:

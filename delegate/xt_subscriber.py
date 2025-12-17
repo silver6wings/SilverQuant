@@ -98,7 +98,8 @@ class XtSubscriber(HistorySubscriber):
                 + [f'askPrice{i}' for i in range(1, 6)] \
                 + [f'askVol{i}' for i in range(1, 6)] \
                 + [f'bidPrice{i}' for i in range(1, 6)] \
-                + [f'bidVol{i}' for i in range(1, 6)]
+                + [f'bidVol{i}' for i in range(1, 6)] \
+                + ['lastClose']
 
         self.curr_trade_date = '1990-12-19' #记录当前股票交易日期
 

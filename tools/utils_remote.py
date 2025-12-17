@@ -191,9 +191,10 @@ def _adjust_list(input_list: list, target_length: int) -> list:
     return adjusted
 
 
-def qmt_quote_to_tick(quote: dict):
+def qmt_quote_to_tick(quote: dict) -> dict:
     ans = {
         'time': datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S'),
+        'lastClose': quote['lastClose'],
         'price': quote['lastPrice'],
         'high': quote['high'],
         'low': quote['low'],

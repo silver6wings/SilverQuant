@@ -1,4 +1,5 @@
 import os
+import datetime
 from typing import Optional
 
 import pandas as pd
@@ -29,11 +30,13 @@ def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float
         df = pd.read_csv(path_assets)               # 读取
         prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
         df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
-        df.to_csv(path_assets, index=False)         # 存储
+        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+            df.to_csv(path_assets, index=False)     # 存储
         return curr_asset - prev_asset
     else:
         df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
-        df.to_csv(path_assets, index=False)
+        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+            df.to_csv(path_assets, index=False)
         return None
 
 
