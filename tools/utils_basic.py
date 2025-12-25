@@ -64,7 +64,7 @@ def symbol_to_code(symbol: str | int) -> str:
 
     if symbol[:2] in ['00', '30', '15', '12']:
         return f'{symbol}.SZ'
-    elif symbol[:2] in ['60', '68', '51', '52', '53', '56', '58', '11']:
+    elif symbol[:2] in ['60', '68', '51', '52', '53', '55', '56', '58', '11']:
         return f'{symbol}.SH'
     elif symbol[:2] in ['83', '87', '43', '82', '88', '92']:
         return f'{symbol}.BJ'
@@ -162,7 +162,7 @@ def symbol_to_gmsymbol(symbol: str | int) -> str:
 
     if symbol[:2] in ['00', '30', '15', '12']:
         return f'SZSE.{symbol}'
-    elif symbol[:2] in ['60', '68', '51', '52', '53', '56', '58', '11']:
+    elif symbol[:2] in ['60', '68', '51', '52', '53', '55', '56', '58', '11']:
         return f'SHSE.{symbol}'
     elif symbol[:2] in ['83', '87', '43', '82', '88', '92']:
         return f'BJSE.{symbol}'
@@ -190,7 +190,7 @@ def is_symbol(code_or_symbol: str):
         '00', '30',  # 深交所
         '60', '68',  # 上交所
         '82', '83', '87', '88', '43', '92',  # 北交所
-        '15', '51', '52', '53', '56', '58',  # ETF
+        '15', '51', '52', '53', '55', '56', '58',  # ETF
         '11', '12',  # 可转债
     ]
 
@@ -240,7 +240,7 @@ def is_stock_bj(code_or_symbol: str | int):
 def is_fund_etf(code_or_symbol: str | int):
     """ 判断是不是etf代码 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
-    return code_or_symbol[:2] in ['15', '51', '52', '53', '56', '58']
+    return code_or_symbol[:2] in ['15', '51', '52', '53', '55', '56', '58']
 
 
 def is_bond(code_or_symbol: str | int):
@@ -253,7 +253,7 @@ def is_bond(code_or_symbol: str | int):
 def get_symbol_exchange(symbol: str) -> str:
     if symbol[:2] in ['00', '30', '15', '12']:
         return 'SZ'
-    elif symbol[:2] in ['60', '68', '51', '52', '53', '56', '58', '11']:
+    elif symbol[:2] in ['60', '68', '51', '52', '53', '55', '56', '58', '11']:
         return 'SH'
     elif symbol[:2] in ['83', '87', '43', '82', '88', '92']:
         return 'BJ'
