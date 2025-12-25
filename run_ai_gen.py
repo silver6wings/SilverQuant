@@ -99,7 +99,7 @@ def before_trade_day() -> None:
     update_position_held(disk_lock, my_delegate, PATH_HELD)
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
-        print(f'All held stock day +1!')
+        print(f'[持仓计数] All stocks held day +1')
 
     # refresh_code_list() -> None:
     my_pool.refresh()
@@ -244,7 +244,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
     STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
-    print(f'正在启动 {STRATEGY_NAME}...')
+    print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
         from delegate.xt_delegate import XtDelegate

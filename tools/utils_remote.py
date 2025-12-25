@@ -237,7 +237,7 @@ def qmt_quote_to_day_kline(quote: dict, curr_date: str) -> dict:
 def concat_ak_quote_dict(source_df: pd.DataFrame, quote: dict, curr_date: str) -> pd.DataFrame:
     record = qmt_quote_to_day_kline(quote, curr_date=curr_date)
     new_row_df = pd.DataFrame([record.values()], columns=list(record.keys()))
-    return pd.concat([source_df, new_row_df], ignore_index=True)
+    return pd.concat([source_df, new_row_df], ignore_index=True) if len(source_df) > 0 else new_row_df
 
 
 def append_ak_daily_row(source_df: pd.DataFrame, row: dict) -> pd.DataFrame:

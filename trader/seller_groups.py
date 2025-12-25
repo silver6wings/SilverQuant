@@ -6,10 +6,11 @@ class GroupSellers:
         pass
 
     def group_init(self, strategy_name, delegate, parameters):
+        print('[卖出策略] ', end='')
         for parent in self.__class__.__bases__:
             if parent.__name__ != 'GroupSellers':
                 parent.__init__(self, strategy_name, delegate, parameters)
-        print('>> 初始化完成')
+        print('>> 组合完成')
 
     def group_check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,

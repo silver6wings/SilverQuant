@@ -71,7 +71,6 @@ class BaseSubscriber:
         self.messager = ding_messager
 
         self.scheduler = None
-        self.use_ap_scheduler = True  # 如果use_outside_data 被设置为True，则需强制使用apscheduler
         self.create_scheduler()
 
         self.stock_names = StockNames()
@@ -128,10 +127,10 @@ class BaseSubscriber:
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
-        print('[启动策略]')
-
         if self.messager is not None:
-            self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启')
+            self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:开启', output='[MSG START]\n')
+
+        print('[启动策略]')
 
         if self.custom_begin_sub is not None:
             threading.Thread(target=self.custom_begin_sub).start()
@@ -143,7 +142,7 @@ class BaseSubscriber:
         print('\n[关闭策略]')
 
         if self.messager is not None:
-            self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:结束')
+            self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:结束', output='[MSG STOP]\n')
 
         if self.custom_end_unsub is not None:
             threading.Thread(target=self.custom_end_unsub).start()
@@ -300,30 +299,28 @@ class BaseSubscriber:
             self.delegate.shutdown()
 
     def create_scheduler(self):
-        if self.use_ap_scheduler:
-            from apscheduler.schedulers.blocking import BlockingScheduler
-            from apscheduler.executors.pool import ThreadPoolExecutor
-            executors = {
-                'default': ThreadPoolExecutor(32),
-            }
-            job_defaults = {
-                'coalesce': True,
-                'misfire_grace_time': 180,
-                'max_instances': 3
-            }
-            self.scheduler = BlockingScheduler(timezone='Asia/Shanghai', executors=executors, job_defaults=job_defaults)
+        from apscheduler.schedulers.blocking import BlockingScheduler
+        from apscheduler.executors.pool import ThreadPoolExecutor
+        executors = {
+            'default': ThreadPoolExecutor(32),
+        }
+        job_defaults = {
+            'coalesce': True,
+            'misfire_grace_time': 180,
+            'max_instances': 3
+        }
+        self.scheduler = BlockingScheduler(timezone='Asia/Shanghai', executors=executors, job_defaults=job_defaults)
 
     def start_scheduler(self):
-        if self.use_ap_scheduler:
-            temp_now = datetime.datetime.now()
-            temp_date = temp_now.strftime('%Y-%m-%d')
-            temp_time = temp_now.strftime('%H:%M')
-            # 盘中执行需要补齐
-            if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
-                self.before_trade_day_wrapper()
-                self.near_trade_begin_wrapper()
-                if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
-                    self.callback_open_no_quotes()  # 重启时如果在交易时间则订阅Tick
+        temp_now = datetime.datetime.now()
+        temp_date = temp_now.strftime('%Y-%m-%d')
+        temp_time = temp_now.strftime('%H:%M')
+        # 盘中执行需要补齐
+        if '08:05' < temp_time < '15:30' and check_is_open_day(temp_date):
+            self.before_trade_day_wrapper()
+            self.near_trade_begin_wrapper()
+            if '09:15' < temp_time < '11:30' or '13:00' <= temp_time < '14:57':
+                self.callback_open_no_quotes()  # 重启时如果在交易时间则订阅Tick
 
         self._start_scheduler()
 

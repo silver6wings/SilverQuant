@@ -551,7 +551,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
         if curr_year <= trade_day_cache[trade_max_year_key]:  # 未过期
             ans = curr_date in trade_day_list
             trade_day_cache[curr_date] = ans
-            print(f'[{curr_date} is {ans} trade day in memory]')
+            print(f'[文件缓存] {curr_date} is {ans} trade day')
             return ans
 
     # 网络缓存
@@ -563,7 +563,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
     if curr_year <= trade_day_cache[trade_max_year_key]:  # 未过期
         ans = curr_date in trade_day_list
         trade_day_cache[curr_date] = ans
-        print(f'[{curr_date} is {ans} trade day in memory]')
+        print(f'[网络缓存] {curr_date} is {ans} trade day')
         return ans
 
     # 实在拿不到数据默认为True
