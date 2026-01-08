@@ -49,7 +49,7 @@ class SafeSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('临跌停卖点模块', end=' ')
-        self.stop_time_range = parameters.hard_time_range
+        self.safe_time_range = parameters.hard_time_range
         self.safe_rate = parameters.safe_rate
 
     def check_sell(
@@ -57,7 +57,7 @@ class SafeSeller(BaseSeller):
             position: XtPosition, held_day: int, max_price: Optional[float],
             history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
     ) -> bool:
-        if (held_day > 0) and (self.stop_time_range[0] <= curr_time < self.stop_time_range[1]):
+        if (held_day > 0) and (self.safe_time_range[0] <= curr_time < self.safe_time_range[1]):
             curr_price = quote['lastPrice']
             last_close = quote['lastClose']
             sell_volume = position.can_use_volume
