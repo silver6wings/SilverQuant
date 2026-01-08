@@ -4,7 +4,7 @@ import logging
 
 from delegate.base_delegate import BaseDelegate
 
-from tools.utils_basic import get_limit_up_price, debug
+from tools.utils_basic import get_limit_up_price, debug, is_stock_kc
 
 
 DEFAULT_BUY_REMARK = '买入委托'
@@ -111,55 +111,62 @@ class BaseBuyer:
         remark: str,
         market: bool = True,
         log: bool = True,
-    ):
+    ) -> bool:
         buy_volume = volume
         if self.risk_control and buy_volume > self.slot_capacity / price:
             buy_volume = math.floor(self.slot_capacity / price / 100) * 100
             logging.warning(f'{code} 超过风险控制，买入量调整为 {buy_volume} 股')
 
-        if buy_volume > 0:
-            order_price = price + self.order_premium
-            limit_price = get_limit_up_price(code, last_close)
+        if buy_volume < 1:
+            print(f'{code} 挂单买量为0，不委托')
+            return False
 
-            if market:
-                buy_type = '市买'
-                if order_price > limit_price:
-                    # 如果涨停了只能挂限价单
-                    self.delegate.order_limit_open(
-                        code=code,
-                        price=limit_price,
-                        volume=buy_volume,
-                        remark=remark,
-                        strategy_name=self.strategy_name)
-                else:
-                    self.delegate.order_market_open(
-                        code=code,
-                        price=min(order_price, limit_price),
-                        volume=buy_volume,
-                        remark=remark,
-                        strategy_name=self.strategy_name)
-            else:
-                buy_type = '限买'
+        if buy_volume < 200 and is_stock_kc(code):
+            print(f'{code} 科创最少200，不委托')
+            return False
+
+        order_price = price + self.order_premium
+        limit_price = get_limit_up_price(code, last_close)
+
+        if market:
+            buy_type = '市买'
+            if order_price > limit_price:
+                # 如果涨停了只能挂限价单
                 self.delegate.order_limit_open(
+                    code=code,
+                    price=limit_price,
+                    volume=buy_volume,
+                    remark=remark,
+                    strategy_name=self.strategy_name)
+            else:
+                self.delegate.order_market_open(
                     code=code,
                     price=min(order_price, limit_price),
                     volume=buy_volume,
                     remark=remark,
                     strategy_name=self.strategy_name)
-
-            if log:
-                logging.warning(f'{buy_type}委托 {code} \t现价:{price:.3f} {buy_volume}股')
-
-            if self.delegate.callback is not None:
-                self.delegate.callback.record_order(
-                    order_time=datetime.datetime.now().timestamp(),
-                    code=code,
-                    price=price,
-                    volume=buy_volume,
-                    side=f'{buy_type}委托',
-                    remark=remark)
         else:
-            print(f'{code} 挂单买量为0，不委托')
+            buy_type = '限买'
+            self.delegate.order_limit_open(
+                code=code,
+                price=min(order_price, limit_price),
+                volume=buy_volume,
+                remark=remark,
+                strategy_name=self.strategy_name)
+
+        if log:
+            logging.warning(f'{buy_type}委托 {code} \t现价:{price:.3f} {buy_volume}股')
+
+        if self.delegate.callback is not None:
+            self.delegate.callback.record_order(
+                order_time=datetime.datetime.now().timestamp(),
+                code=code,
+                price=price,
+                volume=buy_volume,
+                side=f'{buy_type}委托',
+                remark=remark)
+
+        return True
 
 
 class LimitedBuyer(BaseBuyer):
