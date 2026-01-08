@@ -149,12 +149,10 @@ class DailyReporter:
 
     def check_asset(self, today: str, asset):
         title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
-        text = title
+        text = title + MSG_OUTER_SEPARATOR
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
-            text += MSG_OUTER_SEPARATOR
-
             total_change = colour_text(
                 f'{"+" if increase > 0 else ""}{round(increase, 2)}',
                 increase > 0,
