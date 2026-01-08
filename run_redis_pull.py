@@ -1,5 +1,4 @@
 import logging
-import redis
 
 from credentials import *
 from tools.utils_basic import logging_init, is_symbol, debug
@@ -7,7 +6,8 @@ from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes, get_mootdx_quotes
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.base_delegate import update_position_held
+from delegate.base_subscriber import HistorySubscriber
 
 from trader.pools import StocksPoolBlackWencai as Pool
 from trader.buyer import BaseBuyer as Buyer
@@ -15,17 +15,18 @@ from trader.seller_groups import WencaiGroupSeller as Seller
 
 from selector.select_wencai import get_prompt
 
+import redis
+
+REDIS_HOST = '192.168.1.6'
+REDIS_PORT = 6379
+REDIS_CHANNEL = 'quotes_data'
+my_redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0).pubsub()
 
 STRATEGY_NAME = '数据接收'
 SELECT_PROMPT = get_prompt('')
 DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
-
-REDIS_HOST = '192.168.1.6'
-REDIS_PORT = 6379
-REDIS_CHANNEL = 'quotes_data'
-my_redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 
 PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
@@ -99,7 +100,7 @@ def before_trade_day() -> None:
     update_position_held(disk_lock, my_delegate, PATH_HELD)
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
-        print(f'All held stock day +1!')
+        print(f'[持仓计数] All stocks held day +1')
 
     my_pool.refresh()
     positions = my_delegate.check_positions()
@@ -172,29 +173,35 @@ def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> 
 
 def empty_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
     # 这里的时间是本机时间，redis listener 的时间是数据推送服务器时间，需要注意时间不对齐的问题
-    return False
+    return curr_date is None and curr_time is None and curr_seconds is None and curr_quotes is None
 
 
-def redis_subscriber():
-    sub = my_redis.pubsub()
-    sub.subscribe(REDIS_CHANNEL)  # 订阅频道
+def redis_subscribe():
+    print('[开始监听]')
+    my_redis.subscribe(REDIS_CHANNEL)  # 订阅频道
+    my_code_set = set(my_suber.code_list)  # set 提高 in 操作的性能 O(1) 查找复杂度
+    for message in my_redis.listen():
+        try:
+            if message['type'] == 'message':
+                data = json.loads(message['data'])
+                curr_date = data['curr_date']
+                curr_time = data['curr_time']
+                curr_seconds = data['curr_seconds']
+                curr_quotes = data['curr_quotes']
+                pool_quotes = {code: curr_quotes[code] for code in my_code_set if code in curr_quotes}
+                redis_execute_strategy(curr_date, curr_time, curr_seconds, pool_quotes)
+                print('!' if len(curr_quotes) > 0 else 'x', end='')  # 这里确保有数据
+        except Exception as e:
+            err = '[redis err] {}'.format(e)
+            print(err, end='')
 
-    print('[开始监听数据]')
 
-    my_code_set = set(my_pool.get_code_list())
-    for message in sub.listen():
-        if message['type'] == 'message':
-            data = json.loads(message['data'])
-            curr_date = data['curr_date']
-            curr_time = data['curr_time']
-            curr_seconds = data['curr_seconds']
-            curr_quotes = data['curr_quotes']
-            pool_quotes = {code: curr_quotes[code] for code in my_code_set if code in curr_quotes}
-            redis_execute_strategy(curr_date, curr_time, curr_seconds, pool_quotes)
+def redis_unsubscribe():
+    my_redis.unsubscribe(REDIS_CHANNEL)
+    print('[停止监听]')
 
 
 def redis_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> None:
-    print('!' if len(curr_quotes) > 0 else 'x', end='')  # 这里确保有数据
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:
@@ -209,8 +216,8 @@ def redis_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, cu
 
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
-    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
-    print(f'正在启动 {STRATEGY_NAME}...')
+    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + '[测]'
+    print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
         from delegate.xt_delegate import XtDelegate
@@ -267,7 +274,7 @@ if __name__ == '__main__':
         delegate=my_delegate,
         parameters=SellConf,
     )
-    my_suber = XtSubscriber(
+    my_suber = HistorySubscriber(
         account_id=QMT_ACCOUNT_ID,
         strategy_name=STRATEGY_NAME,
         delegate=my_delegate,
@@ -275,11 +282,10 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=empty_execute_strategy,
         before_trade_day=before_trade_day,
-        use_outside_data=True,
-        use_ap_scheduler=True,
+        custom_sub_begin=redis_subscribe,
+        custom_unsub_end=redis_unsubscribe,
         ding_messager=DING_MESSAGER,
         open_today_deal_report=True,
         open_today_hold_report=True,
     )
-    threading.Thread(target=redis_subscriber).start()
     my_suber.start_scheduler()

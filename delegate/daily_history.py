@@ -71,7 +71,7 @@ class DailyHistory:
             if code in self.cache_history:
                 i += 1
                 ans[code] = self[code].tail(days).copy()
-        print(f'[HISTORY] Find {i}/{len(codes)} codes returned.')
+        print(f'[历史日线] Find {i}/{len(codes)} codes returned.')
         return ans
 
     # 获取代码列表
@@ -85,7 +85,7 @@ class DailyHistory:
                 df = AKCache.stock_info_a_code_name()
                 df.to_csv(code_list_path, index=False)
             except Exception as e:
-                print('[HISTORY] Download code list failed! ', e)
+                print('[历史日线] Download code list failed! ', e)
 
         # 获取本地列表时 prefix 生效
         if os.path.exists(code_list_path):
@@ -132,33 +132,33 @@ class DailyHistory:
                     df.to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
                     downloaded_count += 1
 
-            print(f'[HISTORY] [{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
+            print(f'[历史日线] [{downloaded_count}/{min(i + group_size, len(code_list))}]', group_codes)
         # 有可能是当天新股没有数据，下载失败也正常
-        print(f'[HISTORY] Download finished with {len(download_failure)} fails: {download_failure}')
+        print(f'[历史日线] Download finished with {len(download_failure)} fails: {download_failure}')
 
     # 自动补全本地缺失股票代码
     def _download_local_missed(self):
         code_list = self.get_code_list()
-        print(f'[HISTORY] Checking local missed codes from {len(code_list)}...')
+        print(f'[历史日线] Checking local missed codes from {len(code_list)}...')
         missing_codes = []
         for code in code_list:
             path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             if not os.path.exists(path):
                 missing_codes.append(code)
 
-        print(f'[HISTORY] Downloading missing {len(missing_codes)} codes...')
+        print(f'[历史日线] Downloading missing {len(missing_codes)} codes...')
         self._download_codes(missing_codes, self.init_day_count)
 
     # 下载本地缺失的股票代码数据
     def _download_remote_missed(self) -> None:
-        print('[HISTORY] Searching local missed code...')
+        print('[历史日线] Searching local missed code...')
         prev_code_list = self.get_code_list()
         curr_code_list = self.get_code_list(force_download=True)
         gap_codes = []
         for code in curr_code_list:
             if code not in prev_code_list:
                 gap_codes.append(code)
-        print(f'[HISTORY] Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
+        print(f'[历史日线] Downloading {len(gap_codes)} gap codes data of {self.init_day_count} days...')
         self._download_codes(gap_codes, self.init_day_count)
 
     # ==============
@@ -173,7 +173,7 @@ class DailyHistory:
         if auto_update:
             self._download_local_missed()
 
-        print(f'[HISTORY] Loading {len(code_list)} codes...', end='')
+        print(f'[历史日线] Loading {len(code_list)} codes...', end='')
         self.cache_history.clear()
         error_count = 0
         i = 0
@@ -188,11 +188,11 @@ class DailyHistory:
             except Exception as e:
                 print(code, e)
                 error_count += 1
-        print(f'\n[HISTORY] Loading finished with {error_count}/{i} errors')
+        print(f'\n[历史日线] Loading finished with {error_count}/{i} errors')
 
     def download_all_to_disk(self, renew_code_list: bool = True) -> None:
         code_list = self.get_code_list(force_download=renew_code_list)
-        print(f'[HISTORY] Downloading all {len(code_list)} codes data of {self.init_day_count} days...')
+        print(f'[历史日线] Downloading all {len(code_list)} codes data of {self.init_day_count} days...')
         self._download_codes(code_list, self.init_day_count)
 
     # ==============
@@ -202,7 +202,7 @@ class DailyHistory:
     # 下载具体某天的数据 TUSHARE
     def _update_codes_by_tushare(self, target_date: str, code_list: list[str]) -> set[str]:
         target_date_int = int(target_date)
-        print(f'[HISTORY] Updating {target_date} ', end='')
+        print(f'[历史日线] Updating {target_date} ', end='')
 
         loss_list = []  # 找到缺失当天数据的codes
         for code in code_list:
@@ -243,13 +243,13 @@ class DailyHistory:
         now = datetime.datetime.now()
         start_date = get_prev_trading_date(now, days)
         end_date = get_prev_trading_date(now, 1)
-        print(f'[HISTORY] Updating {start_date} - {end_date}', end='')
+        print(f'[历史日线] Updating {start_date} - {end_date}', end='')
 
         updated_codes = set()
         updated_count = 0
         group_size = 100
         for i in range(0, len(code_list), group_size):
-            print(f'\n[HISTORY] [{min(i + group_size, len(code_list))}]', end='')
+            print(f'\n[历史日线] [{min(i + group_size, len(code_list))}]', end='')
             group_codes = [sub_code for sub_code in code_list[i:i + group_size]]
             for code in group_codes:
                 df = get_daily_history(
@@ -287,7 +287,7 @@ class DailyHistory:
             self.load_history_from_disk_to_memory()
         code_list = self.get_code_list()
         updated_codes = self._update_codes_by_tushare(target_date, code_list)
-        print('[HISTORY] Sort and Save all history data ', end='')
+        print('[历史日线] Sort and Save all history data ', end='')
         i = 0
         for code in updated_codes:
             i += 1
@@ -295,7 +295,7 @@ class DailyHistory:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
-        print(f'\n[HISTORY] Finished with {i} files updated')
+        print(f'\n[历史日线] Finished with {i} files updated')
 
     # 更新近几日数据，不用全部下载，速度快也不容易被Ban IP
     def download_recent_daily(self, days: int) -> None:
@@ -309,7 +309,12 @@ class DailyHistory:
         if self.data_source == DataSource.TUSHARE:
             now = datetime.datetime.now()
             all_updated_codes = set()
-            for forward_day in range(days, 0, -1):
+            # 每日 18:59 之后默认更新当日数据
+            forward_end = 0
+            if now.hour > 18:
+                forward_end -= 1
+
+            for forward_day in range(days, forward_end, -1):
                 target_date = get_prev_trading_date(now, forward_day)
                 sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
                 all_updated_codes.update(sub_updated_codes)
@@ -321,7 +326,7 @@ class DailyHistory:
             all_updated_codes = self._update_codes_one_by_one(days, code_list)
 
         # 排序存储所有更新过的数据
-        print('[HISTORY] Sorting and Saving all history data ', end='')
+        print('[历史日线] Sorting and Saving all history data ', end='')
         i = 0
         for code in all_updated_codes:
             i += 1
@@ -329,7 +334,7 @@ class DailyHistory:
                 print('.', end='')
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
-        print(f'\n[HISTORY] Finished with {i} files updated')
+        print(f'\n[历史日线] Finished with {i} files updated')
 
         self.write_last_update_datetime()
 
@@ -363,10 +368,10 @@ class DailyHistory:
             os.remove(file_path)
             return True
         except PermissionError:
-            print(f'[HISTORY] No Permission deleting {file_path}')
+            print(f'[历史日线] No Permission deleting {file_path}')
             return False
         except OSError as e:
-            print(f'[HISTORY] Error when deleting: {e}')
+            print(f'[历史日线] Error when deleting: {e}')
             return False
 
     @staticmethod
@@ -388,4 +393,4 @@ class DailyHistory:
         for code in codes:
             if self.remove_single_history(code):
                 removed_count += 1
-        print(f'[HISTORY] Removed {removed_count} histories with Exit Right announced')
+        print(f'[历史日线] Removed {removed_count} histories with Exit Right announced')

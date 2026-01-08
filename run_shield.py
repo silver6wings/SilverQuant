@@ -1,15 +1,19 @@
 import logging
+import threading
+from typing import Dict, Set, List
 
-from credentials import *
-
+from credentials import (
+    DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH,
+    QMT_ACCOUNT_ID, QMT_CLIENT_PATH
+)
 from tools.utils_basic import logging_init, is_symbol
-from tools.utils_cache import *
+from tools.utils_cache import all_held_inc, update_max_prices
 from tools.utils_ding import DingMessager
 
-from delegate.xt_subscriber import XtSubscriber, update_position_held
+from delegate.base_delegate import update_position_held
+from delegate.xt_subscriber import XtSubscriber
 
 from trader.pools import StocksPoolWhiteIndexes as Pool
-from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ShieldGroupSeller as Seller
 
 
@@ -67,7 +71,7 @@ def before_trade_day() -> None:
     update_position_held(disk_lock, my_delegate, PATH_HELD)
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
-        print(f'All held stock day +1!')
+        print(f'[持仓计数] All stocks held day +1')
 
     # refresh_code_list() -> None:
     my_pool.refresh()
@@ -103,8 +107,8 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
-    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
-    print(f'正在启动 {STRATEGY_NAME}...')
+    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + '[测]'
+    print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback
         from delegate.xt_delegate import XtDelegate

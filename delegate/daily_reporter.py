@@ -1,10 +1,11 @@
 import os
+import datetime
 from typing import Optional
 
 import pandas as pd
 from xtquant import xtdata
 
-from delegate.xt_delegate import BaseDelegate
+from delegate.base_delegate import BaseDelegate
 
 from tools.constants import MSG_INNER_SEPARATOR, MSG_OUTER_SEPARATOR
 from tools.utils_basic import code_to_symbol
@@ -29,11 +30,13 @@ def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float
         df = pd.read_csv(path_assets)               # 读取
         prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
         df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
-        df.to_csv(path_assets, index=False)         # 存储
+        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+            df.to_csv(path_assets, index=False)     # 存储
         return curr_asset - prev_asset
     else:
         df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
-        df.to_csv(path_assets, index=False)
+        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+            df.to_csv(path_assets, index=False)
         return None
 
 
@@ -50,15 +53,14 @@ class DailyReporter:
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
     ):
         self.account_id = account_id
-        self.strategy_name = strategy_name
         self.delegate = delegate
-
+        self.strategy_name = strategy_name
         self.path_deal = path_deal
         self.path_assets = path_assets
 
         self.messager = messager
-        self.today_report_show_bank = today_report_show_bank
         self.use_outside_data = use_outside_data
+        self.today_report_show_bank = today_report_show_bank
         self.stock_names = StockNames()
 
     def today_deal_report(self, today: str):
@@ -128,7 +130,7 @@ class DailyReporter:
                 total_change < -0.000001)
             ratio_prefix = '+' if ratio_change > 0 else ''
             ratio_change = colour_text(
-                f'{ratio_prefix}{ratio_change * 100:.2f}%',
+                f'{ratio_prefix}{ratio_change * 100:.1f}%',
                 ratio_change > 0.000001,
                 ratio_change < -0.000001)
 
@@ -137,7 +139,7 @@ class DailyReporter:
                     f'{self.stock_names.get_name(code)} ' \
                     f'{curr_price * vol:.2f}元'
             text += MSG_INNER_SEPARATOR
-            text += f'成本 {open_price:.2f} 盈亏 {total_change} ({ratio_change})'
+            text += f'成本 {open_price:.3f} 浮 {total_change} ({ratio_change})'
 
         title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'
@@ -147,12 +149,10 @@ class DailyReporter:
 
     def check_asset(self, today: str, asset):
         title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
-        text = title
+        text = title + MSG_OUTER_SEPARATOR
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
-            text += MSG_OUTER_SEPARATOR
-
             total_change = colour_text(
                 f'{"+" if increase > 0 else ""}{round(increase, 2)}',
                 increase > 0,

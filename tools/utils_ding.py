@@ -93,10 +93,10 @@ class DingMessager(BaseMessager):
             if len(output) > 0:
                 print(output, end='')
             else:
-                print('Ding message send success!')
+                print('[Ding] message send success!')
             return True
         else:
-            print('Ding message send failed: ', res['errmsg'])
+            print('[Ding] message send failed: ', res['errmsg'])
             return False
 
     def send_text_as_md(self, text: str, output: str = '', alert: bool = False) -> bool:
@@ -136,8 +136,8 @@ class DingMessager(BaseMessager):
             if len(output) > 0:
                 print(output, end='')
             else:
-                print('Ding markdown send success!')
+                print('[Ding] markdown send success!')
             return True
         else:
-            print('Ding markdown send failed: ', res['errmsg'])
+            print('[Ding] markdown send failed: ', res['errmsg'])
             return False

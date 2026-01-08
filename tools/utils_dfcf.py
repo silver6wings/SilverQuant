@@ -1,12 +1,15 @@
 '''
-https://www.myquant.cn/docs2/sdk/python/%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B.html
+https://www.myquant.cn/docs2/sdk/python/API%E4%BB%8B%E7%BB%8D/%E4%BA%A4%E6%98%93%E5%87%BD%E6%95%B0.html
 需要另建一个虚拟环境，pandas改为1.5.3版本
 需要在新环境安装 pip install gm
 '''
 import logging
+from abc import ABC
+
 import pandas as pd
 from gm.api import *
 
+from delegate.base_delegate import BaseDelegate
 from tools.utils_basic import symbol_to_code, code_to_symbol
 
 
@@ -138,9 +141,71 @@ def update_cache_quote(quotes: dict[str, dict], bars: list[dict], curr_time: str
 # ===========
 # 回测Delegate
 # ===========
-class EmDelegate:
+
+
+DEFAULT_STRATEGY_NAME = '回测策略'
+
+
+class EmDelegate(BaseDelegate, ABC):
     """
     主要用东方财富内置的掘金系统做回测，因为可用的数据更多一些
     为了跟GmDelegate作区分，起名EasyMoneyDelegate
     """
-    pass
+
+    def check_asset(self) -> any:
+        pass
+
+    def check_orders(self) -> list:
+        pass
+
+    def check_positions(self) -> list:
+        pass
+
+    def order_market_open(
+            self,
+            code: str,
+            price: float,
+            volume: int,
+            remark: str,
+            strategy_name: str = DEFAULT_STRATEGY_NAME,
+    ) -> None:
+        pass
+
+    def order_market_close(
+            self,
+            code: str,
+            price: float,
+            volume: int,
+            remark: str,
+            strategy_name: str = DEFAULT_STRATEGY_NAME,
+    ) -> None:
+        pass
+
+    def order_limit_open(
+            self,
+            code: str,
+            price: float,
+            volume: int,
+            remark: str,
+            strategy_name: str = DEFAULT_STRATEGY_NAME,
+    ) -> None:
+        pass
+
+    def order_limit_close(
+            self,
+            code: str,
+            price: float,
+            volume: int,
+            remark: str,
+            strategy_name: str = DEFAULT_STRATEGY_NAME,
+    ) -> None:
+        pass
+
+    def order_cancel_all(self, strategy_name: str = DEFAULT_STRATEGY_NAME) -> None:
+        pass
+
+    def order_cancel_buy(self, code: str, strategy_name: str = DEFAULT_STRATEGY_NAME) -> None:
+        pass
+
+    def order_cancel_sell(self, code: str, strategy_name: str = DEFAULT_STRATEGY_NAME) -> None:
+        pass

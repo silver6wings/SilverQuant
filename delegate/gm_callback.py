@@ -45,33 +45,33 @@ class GmCallback:
         try:
             status = start(filename=file_name)
             if status == 0:
-                print(f'[掘金]:使用{file_name}订阅回调成功')
+                print(f'[掘金信息] 使用 {file_name} 订阅回调成功')
             else:
-                print(f'[掘金]:使用{file_name}订阅回调失败，状态码：{status}')
+                print(f'[掘金信息] 使用 {file_name} 订阅回调失败，状态码：{status}')
         except Exception as e0:
-            print(f'[掘金]:使用{file_name}订阅回调异常：{e0}')
+            print(f'[掘金信息] 使用 {file_name} 订阅回调异常：{e0}')
             try:
                 # 直接使用当前模块进行注册，不使用filename参数
                 status = start(filename='__main__')
                 if status == 0:
-                    print(f'[掘金]:使用__main__订阅回调成功')
+                    print(f'[掘金信息] 使用 __main__ 订阅回调成功')
                 else:
-                    print(f'[掘金]:使用__main__订阅回调失败，状态码：{status}')
+                    print(f'[掘金信息] 使用 __main__ 订阅回调失败，状态码：{status}')
             except Exception as e1:
-                print(f'[掘金]:使用__main__订阅回调异常：{e1}')
+                print(f'[掘金信息] 使用 __main__ 订阅回调异常：{e1}')
                 try:
                     # 如果start()不带参数失败，尝试使用空参数
                     status = start()
                     if status == 0:
-                        print(f'[掘金]:订阅回调成功')
+                        print(f'[掘金信息] 订阅回调成功')
                     else:
-                        print(f'[掘金]:订阅回调失败，状态码：{status}')
+                        print(f'[掘金信息] 订阅回调失败，状态码：{status}')
                 except Exception as e2:
-                    print(f'[掘金]:使用空参数订阅回调也失败：{e2}')
+                    print(f'[掘金信息] 使用空参数订阅回调也失败：{e2}')
 
     @staticmethod
     def unregister_callback():
-        print(f'[掘金]:取消订阅回调')
+        print(f'[掘金信息] 取消订阅回调')
         # stop()
 
     def record_order(self, order_time: str, code: str, price: float, volume: int, side: str, remark: str):
@@ -111,7 +111,7 @@ class GmCallback:
 
     def on_order_status(self, order: Order):
         if order.status == OrderStatus_Rejected:
-            self.ding_messager.send_text_as_md(f'订单已拒绝:{order.symbol} {order.ord_rej_reason_detail}')
+            self.ding_messager.send_text_as_md(f'订单驳回：{order.symbol} {order.ord_rej_reason_detail}')
 
         elif order.status == OrderStatus_Filled:
             stock_code = gmsymbol_to_code(order.symbol)
@@ -137,33 +137,39 @@ class GmCallback:
                     f'{datetime.datetime.now().strftime("%H:%M:%S")} 买成 {stock_code}{MSG_OUTER_SEPARATOR}'
                     f'{name} {traded_volume}股 {traded_price:.2f}元',
                     '[BOUGHT]')
-
+        elif order.status == OrderStatus_New:
+            print(f'[NEW:{order.symbol}]', end='')
+        elif order.status == OrderStatus_Canceled:
+            print(f'[CANCELED:{order.symbol}]', end='')
         else:
-            print(order.status, order.symbol)
+            print(f'[掘金订单]{order.symbol} 订单状态：{order.status}')
 
 
 class GmCache:
     gm_callback: Optional[GmCallback] = None
 
 
-def on_trade_data_connected():
-    print('[掘金回调]:交易服务已连接')
-
-
-def on_trade_data_disconnected():
-    print('\n[掘金回调]:交易服务已断开')
-
-
-def on_account_status(account_status: AccountStatus):
-    print('[掘金回调]:账户状态已变化')
-    print(f'on_account_status status={account_status}')
-
-
 def on_execution_report(rpt: ExecRpt):
-    # print('[掘金回调]:成交状态已变化')
+    # print(f'[掘金回调] {rpt.symbol} 成交状态已变化')
     GmCache.gm_callback.on_execution_report(rpt)
 
 
 def on_order_status(order: Order):
-    # print('[掘金回调]:订单状态已变')
+    # print(f'[掘金回调] {order.symbol} 订单状态已变')
     GmCache.gm_callback.on_order_status(order)
+
+
+def on_trade_data_connected():
+    print('[掘金回调] 交易服务已连接')
+
+
+def on_trade_data_disconnected():
+    print('[掘金回调] 交易服务已断开')
+
+
+def on_account_status(account_status: AccountStatus):
+    print(f'[掘金回调] 账户状态已变化 状态：{account_status}')
+
+
+def on_error(error_code, error_info):
+    print(f'[掘金报错] 错误码:{error_code} 错误信息:{error_info}')
