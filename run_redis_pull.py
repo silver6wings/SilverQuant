@@ -177,7 +177,7 @@ def empty_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, cu
 
 
 def redis_subscribe():
-    print('[开始监听数据]')
+    print('[开始监听]')
     my_redis.subscribe(REDIS_CHANNEL)  # 订阅频道
     my_code_set = set(my_suber.code_list)  # set 提高 in 操作的性能 O(1) 查找复杂度
     for message in my_redis.listen():
@@ -198,7 +198,7 @@ def redis_subscribe():
 
 def redis_unsubscribe():
     my_redis.unsubscribe(REDIS_CHANNEL)
-    print('[停止监听数据]')
+    print('[停止监听]')
 
 
 def redis_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> None:
@@ -216,7 +216,7 @@ def redis_execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, cu
 
 if __name__ == '__main__':
     logging_init(path=PATH_LOGS, level=logging.INFO)
-    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "[测]"
+    STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + '[测]'
     print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:
         from delegate.xt_callback import XtCustomCallback

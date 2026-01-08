@@ -1,3 +1,4 @@
+import os
 import time
 import datetime
 import random
@@ -289,14 +290,17 @@ class BaseSubscriber:
         self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=2)
 
         try:
-            print('[定时器已启动]')
+            print('[定时任务] 计划启动')
             self.scheduler.start()
         except KeyboardInterrupt:
-            print('[手动结束进程]')
+            print('[定时任务] 手动结束')
+            os.system('pause')
         except Exception as e:
-            print('策略定时器出错：', e)
+            print('[定时任务] 执行出错：', e)
+            os.system('pause')
         finally:
             self.delegate.shutdown()
+            print('[定时任务] 关闭完成')
 
     def create_scheduler(self):
         from apscheduler.schedulers.blocking import BlockingScheduler

@@ -1,3 +1,4 @@
+import os
 import time
 import datetime
 import json
@@ -131,14 +132,14 @@ class XtSubscriber(HistorySubscriber):
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
                 if self.open_tick and (not self.quick_ticks):
-                    self.record_tick_to_memory(self.cache_quotes)
+                    self.record_tick_to_memory(self.cache_quotes)   # 这里用 cache_quotes 是防止积压导致丢数据
 
                 # str(%Y-%m-%d) str(%H:%M) str(%S) dict(code: quotes)
                 is_clear = self.execute_strategy(curr_date, curr_time, curr_seconds, self.cache_quotes)
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(self.cache_quotes)
+                    self.record_tick_to_memory(self.cache_quotes)   # 这里用 cache_quotes 是防止积压导致丢数据
 
                 if is_clear:
                     with self.lock_quotes_update:
@@ -368,20 +369,21 @@ class XtSubscriber(HistorySubscriber):
 
         # 启动定时器
         try:
-            print('[定时进程] 任务启动')
+            print('[定时任务] 计划启动')
             self.scheduler.start()
         except KeyboardInterrupt:
-            print('[定时进程] 手动结束')
+            print('[定时任务] 手动结束')
+            os.system('pause')
         except Exception as e:
-            print('[定时进程] 任务出错：', e)
+            print('[定时任务] 执行出错：', e)
+            os.system('pause')
         finally:
             self.delegate.shutdown()
-            print('[定时进程] 关闭完成')
+            print('[定时任务] 关闭完成')
             try:
                 import sys
                 sys.exit(0)
             except SystemExit:
-                import os
                 os._exit(0)
 
 

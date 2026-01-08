@@ -309,7 +309,12 @@ class DailyHistory:
         if self.data_source == DataSource.TUSHARE:
             now = datetime.datetime.now()
             all_updated_codes = set()
-            for forward_day in range(days, 0, -1):
+            # 每日 18:59 之后默认更新当日数据
+            forward_end = 0
+            if now.hour > 18:
+                forward_end -= 1
+
+            for forward_day in range(days, forward_end, -1):
                 target_date = get_prev_trading_date(now, forward_day)
                 sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
                 all_updated_codes.update(sub_updated_codes)

@@ -557,7 +557,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
     # 网络缓存
     df = ak.tool_trade_date_hist_sina()
     df.to_csv(TRADE_DAY_CACHE_PATH)
-    print(f'Cache trade day list {curr_year} - {int(curr_year) + 1} in {TRADE_DAY_CACHE_PATH}.')
+    print(f'[网络缓存] 更新交易日历 {curr_year} - {int(curr_year) + 1} 已存入 {TRADE_DAY_CACHE_PATH}.')
 
     trade_day_list = get_disk_trade_day_list_and_update_max_year()
     if curr_year <= trade_day_cache[trade_max_year_key]:  # 未过期

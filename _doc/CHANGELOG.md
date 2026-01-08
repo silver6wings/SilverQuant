@@ -2,6 +2,10 @@
 
 所有关于本项目的显著变更都将记录在本文件中。
 
+## [ To Do List ]
+
+- LimitSeller 逻辑优化
+
 ## [ In Progress ]
 
 ### 添加

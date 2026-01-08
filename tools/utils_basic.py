@@ -187,18 +187,25 @@ def gmsymbol_to_code(gmsymbol: str) -> str:
 # 判断是不是可交易股票代码 包含 股票 ETF 可转债
 def is_symbol(code_or_symbol: str):
     return code_or_symbol[:2] in [
-        '00', '30',  # 深交所
-        '60', '68',  # 上交所
-        '82', '83', '87', '88', '43', '92',  # 北交所
-        '15', '51', '52', '53', '55', '56', '58',  # ETF
-        '11', '12',  # 可转债
+        '00', '30',                                 # 深交所
+        '60', '68',                                 # 上交所
+        '82', '83', '87', '88', '43', '92',         # 北交所
+        '15', '51', '52', '53', '55', '56', '58',   # ETF
+        '11', '12',                                 # 可转债
     ]
 
 
 def is_stock(code_or_symbol: str | int):
-    """ 判断是不是股票代码 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
     return code_or_symbol[:2] in ['00', '30', '60', '68', '82', '83', '87', '88', '43', '92']
+
+
+def is_stock_code(code: str):
+    """ 判断是不是股票代码 """
+    ex = code.split('.')[1]
+    if ex == 'SH' and code[:2] in ['00']:
+        return False
+    return code[:2] in ['00', '30', '60', '68', '82', '83', '87', '88', '43', '92']
 
 
 def is_stock_10cm(code_or_symbol: str | int):
