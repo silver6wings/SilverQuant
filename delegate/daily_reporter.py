@@ -147,12 +147,14 @@ class DailyReporter:
         if self.messager is not None:
             self.messager.send_text_as_md(text)
 
-    def check_asset(self, today: str, asset):
-        title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
-        text = title + MSG_OUTER_SEPARATOR
+    def check_asset(self, today: str, asset, is_afternoon: bool = True):
+        title = f'[{self.account_id}]{self.strategy_name} {"午盘" if is_afternoon else "早盘"}清点'
+        text = title
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
+            text += MSG_OUTER_SEPARATOR
+
             total_change = colour_text(
                 f'{"+" if increase > 0 else ""}{round(increase, 2)}',
                 increase > 0,
@@ -164,7 +166,7 @@ class DailyReporter:
                 increase > 0,
                 increase < 0,
             )
-            text += f'当日变动: {total_change}元({ratio_change})'
+            text += f'{"当日" if is_afternoon else "盘中"}变动: {total_change}元({ratio_change})'
 
             if self.today_report_show_bank \
                     and hasattr(self.delegate, 'xt_trader') \
@@ -195,7 +197,7 @@ class DailyReporter:
                     text += f'银证转账: {cash_change}元'
 
         text += MSG_INNER_SEPARATOR
-        text += f'持仓市值: {round(asset.market_value, 2)}元'
+        text += f'{"持仓" if is_afternoon else "浮动"}市值: {round(asset.market_value, 2)}元'
 
         text += MSG_INNER_SEPARATOR
         text += f'剩余现金: {round(asset.cash, 2)}元'

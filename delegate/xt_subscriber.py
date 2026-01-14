@@ -127,7 +127,8 @@ class XtSubscriber(HistorySubscriber):
         if self.cache_limits['prev_seconds'] != curr_seconds:
             self.cache_limits['prev_seconds'] = curr_seconds
 
-            print_mark = '.' if len(self.cache_quotes) > 0 else 'x'
+            print_mark = "'" if int(curr_seconds) % 10 == 9 else "."
+            print_mark = print_mark if len(self.cache_quotes) > 0 else "x"
 
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
