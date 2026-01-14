@@ -171,30 +171,30 @@ class DailyReporter:
             if self.today_report_show_bank \
                     and hasattr(self.delegate, 'xt_trader') \
                     and hasattr(self.delegate.xt_trader, 'query_bank_info'):
-
                 cash_change = 0.0
                 today_xt = today.replace('-', '')
+                yestoday_xt = get_prev_trading_date_str(today, 1)
                 bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account)  # 银行信息查询
                 for bank in bank_info:
-                    if bank.success:
+                    if bank.success or bank.error_msg == '':
                         # 银行卡流水记录查询
                         transfers = self.delegate.xt_trader.query_bank_transfer_stream(
-                            self.delegate.account, today_xt, today_xt, bank.bank_no, bank.bank_account)
+                            self.delegate.account, yestoday_xt, today_xt, bank.bank_no, bank.bank_account)
                         total_change = sum(
                             -t.balance
                             if t.transfer_direction == '2' else t.balance
-                            for t in transfers if t.success
+                            for t in transfers if (t.success or t.error_msg == '') and  t.date == today_xt and  t.transfer_status == '成功'
                         )
                         cash_change += total_change
 
                 if abs(cash_change) > 0.0001:
-                    cash_change = colour_text(
+                    cash_change_str = colour_text(
                         f'{"+" if cash_change > 0 else ""}{round(cash_change, 2)}',
                         cash_change > 0,
                         cash_change < 0,
                         )
                     text += MSG_INNER_SEPARATOR
-                    text += f'银证转账: {cash_change}元'
+                    text += f'银证转账: {cash_change_str}元'
 
         text += MSG_INNER_SEPARATOR
         text += f'{"持仓" if is_afternoon else "浮动"}市值: {round(asset.market_value, 2)}元'
