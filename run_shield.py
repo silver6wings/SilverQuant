@@ -22,6 +22,9 @@ DING_MESSAGER = DingMessager(DING_SECRET, DING_TOKENS)
 IS_PROD = False     # 生产环境标志：False 表示使用掘金模拟盘 True 表示使用QMT账户下单交易
 IS_DEBUG = True     # 日志输出标记：控制台是否打印debug方法的输出
 
+CAN_BUY = False     # 双重保险，改为 True 才会下单买
+CAN_SELL = False    # 双重保险，改为 True 才会下单卖
+
 PATH_BASE = CACHE_PROD_PATH if IS_PROD else CACHE_TEST_PATH
 
 PATH_ASSETS = PATH_BASE + '/assets.csv'         # 记录历史净值
@@ -68,7 +71,10 @@ class SellConf:
 
 def before_trade_day() -> None:
     # held_increase() -> None:
-    update_position_held(disk_lock, my_delegate, PATH_HELD)
+
+    # 持仓自动发现，对于连续做波段的票，会因为券商不同可能有成本价的问题，所以暂时禁用
+    # update_position_held(disk_lock, my_delegate, PATH_HELD)
+
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'[持仓计数] All stocks held day +1')
@@ -100,7 +106,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
     for time_range in SellConf.time_ranges:
         if time_range[0] <= curr_time <= time_range[1]:
             if int(curr_seconds) % SellConf.interval == 0:
-                scan_sell(curr_quotes, curr_date, curr_time, positions)
+                CAN_SELL & bool(scan_sell(curr_quotes, curr_date, curr_time, positions))
 
     return False
 
