@@ -50,7 +50,7 @@ class SafeSeller(BaseSeller):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('临跌停卖点模块', end=' ')
         self.safe_time_range = parameters.hard_time_range
-        self.safe_rate = parameters.safe_rate
+        self.safe_rate = parameters.safe_rate   # 在跌停价上方百分之多少卖出，例：0.01 = 还有 1% 跌停时就开始挂卖单
 
     def check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,

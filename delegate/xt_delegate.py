@@ -61,7 +61,7 @@ class XtDelegate(BaseDelegate):
 
     def connect(self, callback: object) -> (XtQuantTrader, bool):
         session_id = int(time.time())  # 生成session id 整数类型 同时运行的策略不能重复
-        print("[交易通道] 生成临时 session_id: ", session_id)
+        print("[交易通道] 连接开始，临时 session_id: ", session_id)
         self.xt_trader = XtQuantTrader(self.path, session_id)
 
         if callback is None:
@@ -85,14 +85,14 @@ class XtDelegate(BaseDelegate):
         # 对交易回调进行订阅，订阅后可以收到交易主推，返回0表示订阅成功
         print('[交易通道] 正在订阅主推回调...', end='')
         subscribe_result = self.xt_trader.subscribe(self.account)
-        print(f' 返回值：{subscribe_result}...', end='')
+        print(f'返回值：{subscribe_result}...', end='')
         if subscribe_result != 0:
-            print(' 失败!')
+            print('失败!')
             self.xt_trader = None
             return None, False
-        print(' 成功!')
+        print('成功!')
 
-        print('[交易通道] 连接完毕')
+        print('[交易通道] 连接完毕！')
         return self.xt_trader, True
 
     def reconnect(self) -> None:

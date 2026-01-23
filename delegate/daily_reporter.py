@@ -9,7 +9,7 @@ from delegate.base_delegate import BaseDelegate
 
 from tools.constants import MSG_INNER_SEPARATOR, MSG_OUTER_SEPARATOR
 from tools.utils_basic import code_to_symbol
-from tools.utils_cache import StockNames
+from tools.utils_cache import StockNames, get_prev_trading_date_str
 from tools.utils_ding import BaseMessager
 
 
@@ -173,13 +173,13 @@ class DailyReporter:
                     and hasattr(self.delegate.xt_trader, 'query_bank_info'):
                 cash_change = 0.0
                 today_xt = today.replace('-', '')
-                yestoday_xt = get_prev_trading_date_str(today, 1)
+                yesterday_xt = get_prev_trading_date_str(today, 1)
                 bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account)  # 银行信息查询
                 for bank in bank_info:
                     if bank.success or bank.error_msg == '':
                         # 银行卡流水记录查询
                         transfers = self.delegate.xt_trader.query_bank_transfer_stream(
-                            self.delegate.account, yestoday_xt, today_xt, bank.bank_no, bank.bank_account)
+                            self.delegate.account, yesterday_xt, today_xt, bank.bank_no, bank.bank_account)
                         total_change = sum(
                             -t.balance
                             if t.transfer_direction == '2' else t.balance

@@ -338,7 +338,8 @@ class BaseSubscriber:
         curr_time = now.strftime('%H:%M')
         print(f'[{curr_time}]', end='')
         is_open_day = check_is_open_day(curr_date)
-        self.delegate.is_open_day = is_open_day
+        if self.delegate is not None:
+            self.delegate.is_open_day = is_open_day
 
 
 class HistorySubscriber(BaseSubscriber):

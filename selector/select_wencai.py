@@ -12,16 +12,16 @@ from selector.select_prompts import prompts
 default_prompt = "中证500成分股，非ST，非科创，MACD金叉，按价格从小到大"  # 这里自定义问财选股的问句prompt
 
 
-def get_prompt(prompt_number: any = 0) -> str:
+def get_prompt(prompt_index: any = 0) -> str:
     ans = default_prompt
 
-    if type(prompts) == list and prompt_number < len(prompts):
-        ans = prompts[prompt_number]
+    if type(prompts) == list and prompt_index < len(prompts):
+        ans = prompts[prompt_index]
 
-    if type(prompts) == dict and prompt_number in prompts:
-        ans = prompts[prompt_number]
+    if type(prompts) == dict and prompt_index in prompts:
+        ans = prompts[prompt_index]
 
-    print('选股问句：', ans, '\n')
+    print(f'[{prompt_index}]: {ans}')
     return ans
 
 
