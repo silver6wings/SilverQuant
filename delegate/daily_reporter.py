@@ -9,7 +9,7 @@ from delegate.base_delegate import BaseDelegate
 
 from tools.constants import MSG_INNER_SEPARATOR, MSG_OUTER_SEPARATOR
 from tools.utils_basic import code_to_symbol
-from tools.utils_cache import StockNames
+from tools.utils_cache import StockNames, get_prev_trading_date_str
 from tools.utils_ding import BaseMessager
 
 
@@ -113,9 +113,10 @@ class DailyReporter:
                 if open_price == 0.0 or curr_price is None:
                     continue
 
+                # 负成本不显示变化
+                total_change = curr_price - open_price if open_price > 0 else 0
+                ratio_change = curr_price / open_price - 1 if open_price > 0 else 0
                 vol = position.volume
-                total_change = curr_price - open_price
-                ratio_change = curr_price / open_price - 1
                 hold_count += 1
                 display_list.append([code, curr_price, open_price, vol, ratio_change, total_change])
 
@@ -147,12 +148,14 @@ class DailyReporter:
         if self.messager is not None:
             self.messager.send_text_as_md(text)
 
-    def check_asset(self, today: str, asset):
-        title = f'[{self.account_id}]{self.strategy_name} 盘后清点'
-        text = title + MSG_OUTER_SEPARATOR
+    def check_asset(self, today: str, asset, is_afternoon: bool = True):
+        title = f'[{self.account_id}]{self.strategy_name} {"午盘" if is_afternoon else "早盘"}清点'
+        text = title
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
         if increase is not None:
+            text += MSG_OUTER_SEPARATOR
+
             total_change = colour_text(
                 f'{"+" if increase > 0 else ""}{round(increase, 2)}',
                 increase > 0,
@@ -164,38 +167,38 @@ class DailyReporter:
                 increase > 0,
                 increase < 0,
             )
-            text += f'当日变动: {total_change}元({ratio_change})'
+            text += f'{"当日" if is_afternoon else "盘中"}变动: {total_change}元({ratio_change})'
 
             if self.today_report_show_bank \
                     and hasattr(self.delegate, 'xt_trader') \
                     and hasattr(self.delegate.xt_trader, 'query_bank_info'):
-
                 cash_change = 0.0
                 today_xt = today.replace('-', '')
+                yesterday_xt = get_prev_trading_date_str(today, 1)
                 bank_info = self.delegate.xt_trader.query_bank_info(self.delegate.account)  # 银行信息查询
                 for bank in bank_info:
-                    if bank.success:
+                    if bank.success or bank.error_msg == '':
                         # 银行卡流水记录查询
                         transfers = self.delegate.xt_trader.query_bank_transfer_stream(
-                            self.delegate.account, today_xt, today_xt, bank.bank_no, bank.bank_account)
+                            self.delegate.account, yesterday_xt, today_xt, bank.bank_no, bank.bank_account)
                         total_change = sum(
                             -t.balance
                             if t.transfer_direction == '2' else t.balance
-                            for t in transfers if t.success
+                            for t in transfers if (t.success or t.error_msg == '') and  t.date == today_xt and  t.transfer_status == '成功'
                         )
                         cash_change += total_change
 
                 if abs(cash_change) > 0.0001:
-                    cash_change = colour_text(
+                    cash_change_str = colour_text(
                         f'{"+" if cash_change > 0 else ""}{round(cash_change, 2)}',
                         cash_change > 0,
                         cash_change < 0,
                         )
                     text += MSG_INNER_SEPARATOR
-                    text += f'银证转账: {cash_change}元'
+                    text += f'银证转账: {cash_change_str}元'
 
         text += MSG_INNER_SEPARATOR
-        text += f'持仓市值: {round(asset.market_value, 2)}元'
+        text += f'{"持仓" if is_afternoon else "浮动"}市值: {round(asset.market_value, 2)}元'
 
         text += MSG_INNER_SEPARATOR
         text += f'剩余现金: {round(asset.cash, 2)}元'

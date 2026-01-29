@@ -23,6 +23,7 @@ class BaseSeller:
             limit_price = get_limit_down_price(code, quote['lastClose'])
             if order_price < limit_price:
                 # 如果跌停了只能挂限价单
+                sell_type = '限卖'
                 self.delegate.order_limit_close(
                     code=code,
                     price=limit_price,
@@ -30,6 +31,7 @@ class BaseSeller:
                     remark=remark,
                     strategy_name=self.strategy_name)
             else:
+                sell_type = '市卖'
                 self.delegate.order_market_close(
                     code=code,
                     price=order_price,
@@ -38,7 +40,7 @@ class BaseSeller:
                     strategy_name=self.strategy_name)
 
             if log:
-                logging.warning(f'{remark} {code}\t现价:{order_price:.3f} {volume}股')
+                logging.warning(f'[{sell_type}委托]{code}\t委托价:{order_price:.3f} {volume}股 {remark} ')
 
             if self.delegate.callback is not None:
                 self.delegate.callback.record_order(
@@ -46,11 +48,10 @@ class BaseSeller:
                     code=code,
                     price=order_price,
                     volume=volume,
-                    side='卖出委托',
+                    side=f'{sell_type}委托',
                     remark=remark)
-
         else:
-            print(f'{code} 挂单卖量为0，不委托')
+            logging.warning(f'[取消委托]{code} 挂单卖量=0')
 
     def execute_sell(
         self,

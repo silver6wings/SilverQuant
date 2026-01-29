@@ -203,10 +203,11 @@ class BaseSubscriber:
     # 盘后报告总结
     # -----------------------
     def daily_summary(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        now = datetime.datetime.now()
+        if not check_is_open_day(now.strftime('%Y-%m-%d')):
             return
 
-        curr_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        curr_date = now.strftime('%Y-%m-%d')
 
         if self.open_today_deal_report:
             try:
@@ -229,7 +230,7 @@ class BaseSubscriber:
         try:
             if self.delegate is not None:
                 asset = self.delegate.check_asset()
-                self.daily_reporter.check_asset(today=curr_date, asset=asset)
+                self.daily_reporter.check_asset(today=curr_date, asset=asset, is_afternoon=(now.hour > 12))
         except Exception as e:
             print('Report asset failed: ', e)
             traceback.print_exc()
@@ -337,7 +338,8 @@ class BaseSubscriber:
         curr_time = now.strftime('%H:%M')
         print(f'[{curr_time}]', end='')
         is_open_day = check_is_open_day(curr_date)
-        self.delegate.is_open_day = is_open_day
+        if self.delegate is not None:
+            self.delegate.is_open_day = is_open_day
 
 
 class HistorySubscriber(BaseSubscriber):

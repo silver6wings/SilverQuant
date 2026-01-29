@@ -300,7 +300,7 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
             else:
                 return False
         except Exception as e:
-            print('held days +1 failed! ', e)
+            print('[持仓计数] Held days +1 failed! ', e)
             return False
 
 

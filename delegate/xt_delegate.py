@@ -61,7 +61,7 @@ class XtDelegate(BaseDelegate):
 
     def connect(self, callback: object) -> (XtQuantTrader, bool):
         session_id = int(time.time())  # 生成session id 整数类型 同时运行的策略不能重复
-        print("生成临时 session_id: ", session_id)
+        print("[交易通道] 连接开始，临时 session_id: ", session_id)
         self.xt_trader = XtQuantTrader(self.path, session_id)
 
         if callback is None:
@@ -73,7 +73,7 @@ class XtDelegate(BaseDelegate):
         self.xt_trader.start()  # 启动交易线程
 
         # 建立交易连接，返回0表示连接成功
-        print('正在建立交易连接...', end='')
+        print('[交易通道] 正在建立交易连接...', end='')
         connect_result = self.xt_trader.connect()
         print(f'返回值：{connect_result}...', end='')
         if connect_result != 0:
@@ -83,7 +83,7 @@ class XtDelegate(BaseDelegate):
         print('成功!')
 
         # 对交易回调进行订阅，订阅后可以收到交易主推，返回0表示订阅成功
-        print('正在订阅主推回调...', end='')
+        print('[交易通道] 正在订阅主推回调...', end='')
         subscribe_result = self.xt_trader.subscribe(self.account)
         print(f'返回值：{subscribe_result}...', end='')
         if subscribe_result != 0:
@@ -92,15 +92,15 @@ class XtDelegate(BaseDelegate):
             return None, False
         print('成功!')
 
-        print('连接完毕。')
+        print('[交易通道] 连接完毕！')
         return self.xt_trader, True
 
     def reconnect(self) -> None:
         if self.xt_trader is None and self.is_open_day:  # 仅在交易日重连
-            print('开始重连交易接口')
+            print('[交易通道] 开始重连交易接口')
             _, success = self.connect(self.callback)
             if success:
-                print('交易接口重连成功')
+                print('[交易通道] 交易接口重连成功')
                 if self.subscriber is not None:
                     self.subscriber.resubscribe_tick(True)
         # else:

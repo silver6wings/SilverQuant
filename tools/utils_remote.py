@@ -522,7 +522,7 @@ def get_bao_daily_history(
     [symbol, exchange] = code.split('.')
     rs = bs.query_history_k_data_plus(
         f'{exchange.lower()}.{symbol}',
-        "date,code,open,high,low,close,volume,amount",
+        "date,code,open,high,low,close,volume,amount,peTTM",
         start_date=start,
         end_date=end,
         frequency='d',
