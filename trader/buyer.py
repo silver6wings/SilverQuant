@@ -97,7 +97,7 @@ class BaseBuyer:
                         # 记录买入历史
                         if code not in today_buy[curr_date]:
                             today_buy[curr_date].add(code)
-                            logging.warning(f"记录选股 {code}\t现价: {price:.2f}")
+                            logging.warning(f"[记录选股]{code}\t现价: {price:.2f}")
                 else:
                     break
         return today_buy
@@ -115,14 +115,14 @@ class BaseBuyer:
         buy_volume = volume
         if self.risk_control and buy_volume > self.slot_capacity / price:
             buy_volume = math.floor(self.slot_capacity / price / 100) * 100
-            logging.warning(f'{code} 超过风险控制，买入量调整为 {buy_volume} 股')
+            logging.warning(f'[触发风控]{code} 超过风险控制，买入量调整为 {buy_volume} 股')
 
         if buy_volume < 1:
-            print(f'{code} 挂单买量为0，不委托')
+            logging.warning(f'[取消委托]{code} 挂单买量=0')
             return False
 
         if buy_volume < 200 and is_stock_kc(code):
-            print(f'{code} 科创最少200，不委托')
+            logging.warning(f'[取消委托]{code} 科创最少200')
             return False
 
         order_price = price + self.order_premium
@@ -132,30 +132,33 @@ class BaseBuyer:
             buy_type = '市买'
             if order_price > limit_price:
                 # 如果涨停了只能挂限价单
+                final_price = limit_price
                 self.delegate.order_limit_open(
                     code=code,
-                    price=limit_price,
+                    price=final_price,
                     volume=buy_volume,
                     remark=remark,
                     strategy_name=self.strategy_name)
             else:
+                final_price = min(order_price, limit_price)
                 self.delegate.order_market_open(
                     code=code,
-                    price=min(order_price, limit_price),
+                    price=final_price,
                     volume=buy_volume,
                     remark=remark,
                     strategy_name=self.strategy_name)
         else:
             buy_type = '限买'
+            final_price = min(order_price, limit_price)
             self.delegate.order_limit_open(
                 code=code,
-                price=min(order_price, limit_price),
+                price=final_price,
                 volume=buy_volume,
                 remark=remark,
                 strategy_name=self.strategy_name)
 
         if log:
-            logging.warning(f'{buy_type}委托 {code} \t现价:{price:.3f} {buy_volume}股')
+            logging.warning(f'[{buy_type}委托]{code}\t委托价:{final_price:.3f} {buy_volume}股 {remark} ')
 
         if self.delegate.callback is not None:
             self.delegate.callback.record_order(

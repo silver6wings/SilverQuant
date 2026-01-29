@@ -35,9 +35,15 @@ class HardSeller(BaseSeller):
 
             if curr_price <= switch_lower:
                 self.order_sell(code, quote, sell_volume, f'跌{int((1 - self.risk_limit) * 100)}%硬止损')
+                logging.warning(f'[触发卖出]止损 '
+                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} ')
                 return True
             elif curr_price >= cost_price * self.earn_limit:
                 self.order_sell(code, quote, sell_volume, f'涨{int((self.earn_limit - 1) * 100)}%硬止盈')
+                logging.warning(f'[触发卖出]止盈 '
+                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} ')
                 return True
         return False
 
@@ -66,7 +72,12 @@ class SafeSeller(BaseSeller):
             stop_price = last_close * stop_rate
 
             if curr_price <= stop_price:
-                self.order_sell(code, quote, sell_volume, f'临跌停{int((1 - stop_rate) * 100)}%')
+                self.order_sell(code, quote, sell_volume, f'走低{int((1 - stop_rate) * 100)}%')
+
+                cost_price = position.open_price
+                logging.warning(f'[触发卖出]走低 '
+                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} ')
                 return True
         return False
 
@@ -95,6 +106,9 @@ class SwitchSeller(BaseSeller):
 
             if curr_price < switch_upper:  # 未满足盈利目标的仓位
                 self.order_sell(code, quote, sell_volume, f'{self.switch_hold_days}日换仓卖单')
+                logging.warning(f'[触发卖出]换仓 '
+                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} ')
                 return True
         return False
 
@@ -123,11 +137,12 @@ class FallSeller(BaseSeller):
                 for inc_min, inc_max, fall_threshold in self.fall_from_top:  # 逐级回落卖出
                     if (cost_price * inc_min <= max_price < cost_price * inc_max) \
                             and curr_price < max_price * (1 - fall_threshold):
-                        logging.warning(f'[Sell]'
-                                        f'cost_p:{cost_price} max_p:{max_price} '
-                                        f'inc_min:{inc_min} inc_max:{inc_max}')
                         self.order_sell(code, quote, sell_volume,
                                         f'涨{int((inc_min - 1) * 100)}%回落{int(fall_threshold * 100)}%')
+                        logging.warning(f'[触发卖出]回落 '
+                            f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                            f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                            f'最高:{max_price} 区间:{inc_min}-{inc_max} 回落阈值:{fall_threshold}')
                         return True
         return False
 
@@ -156,11 +171,12 @@ class ReturnSeller(BaseSeller):
                 for inc_min, inc_max, fall_percentage in self.return_of_profit:  # 逐级回落止盈
                     if (cost_price * inc_min <= max_price < cost_price * inc_max) \
                             and curr_price < max_price - (max_price - cost_price) * fall_percentage:
-                        logging.warning(f'[Sell]'
-                                        f'cost_p:{cost_price} max_p:{max_price} '
-                                        f'inc_min:{inc_min} inc_max:{inc_max}')
                         self.order_sell(code, quote, sell_volume,
                                         f'涨{int((inc_min - 1) * 100)}%回撤{int(fall_percentage * 100)}%')
+                        logging.warning(f'[触发卖出]回撤 '
+                            f'成本:{round(cost_price, 3)} 卖价:{round(curr_price, 3)} '
+                            f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                            f'最高:{max_price} 区间:{inc_min}-{inc_max} 回撤比值:{fall_percentage}')
                         return True
         return False
 
@@ -210,11 +226,16 @@ class OpenDaySeller(BaseSeller):
             if 0 < held_day < len(history):
                 sell_volume = position.can_use_volume
                 curr_price = quote['lastPrice']
+                cost_price = position.open_price
                 open_day_low = history['low'].values[-held_day] * self.open_low_rate
 
                 # 建仓日新低破掉卖
                 if curr_price < open_day_low:
                     self.order_sell(code, quote, sell_volume, '破开仓日新低')
+                    logging.warning(f'[触发卖出]开仓日最低 '
+                        f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                        f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                        f'开仓日最低价:{open_day_low} ')
                     return True
 
                 # 建仓日尾盘缩量卖出
@@ -224,6 +245,10 @@ class OpenDaySeller(BaseSeller):
                         open_day_volume = history['volume'].values[-held_day] * self.open_vol_rate
                         if curr_volume < open_day_volume:
                             self.order_sell(code, quote, sell_volume, '缩开仓日地量')
+                            logging.warning(f'[触发卖出]开仓日缩量 '
+                                f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                                f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                                f'建仓日成交量:{open_day_volume}')
                             return True
         return False
 
@@ -256,6 +281,11 @@ class MASeller(BaseSeller):
 
                 if curr_price <= ma_value - 0.01:
                     self.order_sell(code, quote, sell_volume, f'破{self.ma_above}日均{ma_value:.2f}')
+                    cost_price = position.open_price
+                    logging.warning(f'[触发卖出]破均线 '
+                        f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                        f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                        f'均线价格:{ma_value}')
                     return True
         return False
 
@@ -287,10 +317,23 @@ class CCISeller(BaseSeller):
 
                 if cci[0] > self.cci_lower > cci[1]:  # CCI 下穿
                     self.order_sell(code, quote, sell_volume, f'CCI高于{self.cci_lower}')
+
+                    curr_price = quote['lastPrice']
+                    cost_price = position.open_price
+                    logging.warning(f'[触发卖出]CCI '
+                        f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                        f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                        f'当前CCI下沿:{self.cci_lower}')
                     return True
 
                 if cci[0] < self.cci_upper < cci[1]:  # CCI 上穿
                     self.order_sell(code, quote, sell_volume, f'CCI低于{self.cci_upper}')
+                    curr_price = quote['lastPrice']
+                    cost_price = position.open_price
+                    logging.warning(f'[触发卖出]CCI '
+                        f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                        f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                        f'当前CCI上沿:{self.cci_upper}')
                     return True
         return False
 
@@ -321,6 +364,13 @@ class WRSeller(BaseSeller):
 
                 if wr[0] < self.wr_cross < wr[1]:  # WR 上穿
                     self.order_sell(code, quote, sell_volume, f'WR上穿{self.wr_cross}卖')
+                    curr_price = quote['lastPrice']
+                    cost_price = position.open_price
+                    logging.warning(f'[触发卖出]WR '
+                                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                                    f'当前WR阈值:{self.wr_cross}')
+
                     return True
         return False
 
@@ -356,6 +406,10 @@ class VolumeDropSeller(BaseSeller):
                 if curr_vol < open_vol * self.next_volume_dec_threshold \
                         and cost_price < curr_price < prev_close * self.next_volume_dec_limit:
                     self.order_sell(code, quote, sell_volume, '次日缩量')
+                    logging.warning(f'[触发卖出]次缩 '
+                                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                                    f'次缩阈值:{self.next_volume_dec_threshold}')
                     return True
         return False
 
@@ -394,6 +448,13 @@ class DropSeller(BaseSeller):
                                 and drop_price > last_close * drop_threshold:
                             self.order_sell(code, quote, sell_volume,
                                             f'高开{int((inc_min - 1) * 100)}跌{int(drop_threshold * 100)}%')
+
+                            curr_price = quote['lastPrice']
+                            cost_price = position.open_price
+                            logging.warning(f'[触发卖出]高开 '
+                                f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                                f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                                f'高开范围:{inc_min}-{inc_max} 下落:{drop_threshold}%')
                             return True
 
         return False
