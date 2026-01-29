@@ -113,9 +113,10 @@ class DailyReporter:
                 if open_price == 0.0 or curr_price is None:
                     continue
 
+                # 负成本不显示变化
+                total_change = curr_price - open_price if open_price > 0 else 0
+                ratio_change = curr_price / open_price - 1 if open_price > 0 else 0
                 vol = position.volume
-                total_change = curr_price - open_price
-                ratio_change = curr_price / open_price - 1
                 hold_count += 1
                 display_list.append([code, curr_price, open_price, vol, ratio_change, total_change])
 
