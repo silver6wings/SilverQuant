@@ -444,7 +444,7 @@ class HistorySubscriber(BaseSubscriber):
                     self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:'
                                                   f'历史{len(self.cache_history)}支')
 
-            if data_source == DataSource.TDXZIP and self.history_day_klines is None:
+            if data_source == DataSource.TDXZIP and (self.history_day_klines is None or len(self.history_day_klines) == 0):
                 self.history_day_klines = get_tdxzip_history(adjust=adjust)
 
         # ======== 预加载每日增量数据源 ========
