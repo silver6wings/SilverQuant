@@ -37,15 +37,21 @@ class StockNames:
             self.load_codes_and_names()
 
     def load_codes_and_names(self):
-        print('Loading codes and names started... ', end='')
+        print('[更新缓存] 正在加载股票代码和名称...')
         self._data = get_stock_codes_and_names()
-        print('Loading codes and names finished!')
+        print('[更新缓存] 加载完毕!')
 
     def get_code_list(self) -> list:
         return list(self._data.keys())
 
     def get_name_list(self) -> list:
         return list(self._data.values())
+
+    def add_name(self, code, name) -> bool:
+        if self._data is not None:
+            self._data[code] = name
+            return True
+        return False
 
     def get_name(self, code) -> str:
         if self._data is None:
@@ -350,7 +356,7 @@ def update_max_prices(
                 # 更新历史最低
                 low_price = quote['low']
                 if code in min_prices:
-                    if min_prices[code] < low_price:
+                    if min_prices[code] > low_price:
                         min_prices[code] = round(low_price, 3)
                         min_updated = True
                 else:
@@ -551,7 +557,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
         if curr_year <= trade_day_cache[trade_max_year_key]:  # 未过期
             ans = curr_date in trade_day_list
             trade_day_cache[curr_date] = ans
-            print(f'[文件缓存] {curr_date} is {ans} trade day')
+            print(f'[文件缓存] {curr_date} 为 {"" if ans else "非"}交易日')
             return ans
 
     # 网络缓存
@@ -563,7 +569,7 @@ def check_is_open_day_sina(curr_date: str) -> bool:
     if curr_year <= trade_day_cache[trade_max_year_key]:  # 未过期
         ans = curr_date in trade_day_list
         trade_day_cache[curr_date] = ans
-        print(f'[网络缓存] {curr_date} is {ans} trade day')
+        print(f'[网络缓存] {curr_date} 为 {"" if ans else "非"}交易日')
         return ans
 
     # 实在拿不到数据默认为True

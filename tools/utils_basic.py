@@ -4,11 +4,9 @@ import pandas as pd
 from decimal import Decimal, ROUND_HALF_UP
 
 
-IS_DEBUG = False
-
-
 def debug(*args, **kwargs):
-    if IS_DEBUG:
+    # 防御：某些脚本可能未定义 IS_DEBUG，此时默认视为 False
+    if globals().get("IS_DEBUG", False):
         print(*args, **kwargs)
 
 

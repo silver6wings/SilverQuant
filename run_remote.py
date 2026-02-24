@@ -34,7 +34,7 @@ PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
 PATH_INFO = PATH_BASE + '/tmp_{}.pkl'           # 用来缓存当天的指标信息
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
-cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
+cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 
 class PoolConf:

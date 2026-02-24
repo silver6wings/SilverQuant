@@ -8,7 +8,7 @@ from mytt.MyTT_advance import *
 def get_ma_index_indicator(
     symbol: str = '000985',
     period: int = 5,
-) -> (bool, dict):
+) -> tuple[bool, dict]:
     end_dt = datetime.datetime.now() - datetime.timedelta(days=0)
     start_dt = end_dt - datetime.timedelta(days=250)  # EMA 时间必须够长
     df = ak.index_zh_a_hist(
@@ -30,7 +30,7 @@ def get_macd_index_indicator(
     sp: int = 26,
     ap: int = 9,
     sa: int = 5,  # 斜率周期
-) -> (bool, dict):
+) -> tuple[bool, dict]:
     end_dt = datetime.datetime.now() - datetime.timedelta(days=0)
     start_dt = end_dt - datetime.timedelta(days=250)  # EMA 时间必须够长
     df = ak.index_zh_a_hist(

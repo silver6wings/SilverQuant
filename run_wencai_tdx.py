@@ -37,7 +37,7 @@ PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
-cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
+cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 
 class PoolConf:
@@ -107,8 +107,13 @@ def before_trade_day() -> None:
     # refresh_code_list() -> None:
     my_pool.refresh()
     positions = my_delegate.check_positions()
-    hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
-    my_suber.update_code_list(hold_list)
+    if positions is not None:
+        hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
+        my_suber.update_code_list(hold_list)
+    else:
+        held = load_json(PATH_HELD)
+        hold_list = [code for code in held if is_symbol(code)]
+        my_suber.update_code_list(hold_list)
 
 
 # ======== 买点 ========

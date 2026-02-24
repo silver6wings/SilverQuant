@@ -54,9 +54,9 @@ class HardSeller(BaseSeller):
 class SafeSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
-        print('临跌停卖点模块', end=' ')
+        print('走低卖点模块', end=' ')
         self.safe_time_range = parameters.hard_time_range
-        self.safe_rate = parameters.safe_rate   # 在跌停价上方百分之多少卖出，例：0.01 = 还有 1% 跌停时就开始挂卖单
+        self.safe_rate = parameters.safe_rate   # 当日开盘和最高下行百分之多少卖出，例：0.01 = 1% 走低时就开始挂卖单
 
     def check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,
@@ -65,19 +65,24 @@ class SafeSeller(BaseSeller):
     ) -> bool:
         if (held_day > 0) and (self.safe_time_range[0] <= curr_time < self.safe_time_range[1]):
             curr_price = quote['lastPrice']
+            open_price = quote['open']
+            high_price = quote['high']
             last_close = quote['lastClose']
             sell_volume = position.can_use_volume
 
-            stop_rate = get_limiting_down_rate(code) + self.safe_rate
-            stop_price = last_close * stop_rate
+            stop_price = max(last_close, high_price, open_price) * (1 - self.safe_rate)
 
             if curr_price <= stop_price:
-                self.order_sell(code, quote, sell_volume, f'走低{int((1 - stop_rate) * 100)}%')
+                self.order_sell(code, quote, sell_volume, f'走低{int(self.safe_rate * 100)}%')
 
                 cost_price = position.open_price
                 logging.warning(f'[触发卖出]走低 '
                     f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
-                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} ')
+                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                    f'开盘价:{round(open_price, 3)} '
+                    f'最高价:{round(high_price, 3)} '
+                    f'昨收价:{round(last_close, 3)} '
+                )
                 return True
         return False
 

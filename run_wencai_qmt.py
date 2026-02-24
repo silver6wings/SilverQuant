@@ -7,7 +7,7 @@ from credentials import (
     QMT_ACCOUNT_ID, QMT_CLIENT_PATH
 )
 from tools.utils_basic import logging_init, is_symbol, debug
-from tools.utils_cache import all_held_inc, update_max_prices
+from tools.utils_cache import all_held_inc, update_max_prices, load_json
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes
 
@@ -38,7 +38,7 @@ PATH_LOGS = PATH_BASE + '/logs.txt'             # 用来存储选股和委托操
 
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
 
-cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
+cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 
 class PoolConf:
@@ -107,8 +107,13 @@ def before_trade_day() -> None:
     # refresh_code_list() -> None:
     my_pool.refresh()
     positions = my_delegate.check_positions()
-    hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
-    my_suber.update_code_list(hold_list)
+    if positions is not None:
+        hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
+        my_suber.update_code_list(hold_list)
+    else:
+        held = load_json(PATH_HELD)
+        hold_list = [code for code in held if is_symbol(code)]
+        my_suber.update_code_list(hold_list)
 
 
 # ======== 买点 ========

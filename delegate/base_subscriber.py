@@ -18,6 +18,10 @@ from tools.utils_mootdx import get_tdxzip_history
 from tools.utils_remote import DataSource, ExitRight, get_daily_history
 
 
+def get_today() -> str:
+    return datetime.datetime.today().strftime('%Y-%m-%d')
+
+
 class BaseSubscriber:
     def __init__(
         self,
@@ -96,13 +100,14 @@ class BaseSubscriber:
         self.history_day_klines : Dict[str, pd.DataFrame] = {}
 
         self.code_list = []
-        self.curr_trade_date = ''
+        self.before_job_success_flag = ''
+        self.near_trade_success_flag = ''
 
     # -----------------------
     # 监测主策略执行
     # -----------------------
     def callback_run_no_quotes(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         now = datetime.datetime.now()
@@ -113,7 +118,7 @@ class BaseSubscriber:
         # 每分钟输出一行开头
         if self.cache_limits['prev_minutes'] != curr_time:
             self.cache_limits['prev_minutes'] = curr_time
-            print(f'\n[{curr_time}]', end='')
+            print(f'\n[{curr_date} {curr_time}]', end='')
 
         curr_seconds = now.strftime('%S')
         if self.cache_limits['prev_seconds'] != curr_seconds:
@@ -125,7 +130,7 @@ class BaseSubscriber:
                 self.execute_strategy(curr_date, curr_time, curr_seconds, {})
 
     def callback_open_no_quotes(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         if self.messager is not None:
@@ -137,7 +142,7 @@ class BaseSubscriber:
             threading.Thread(target=self.custom_begin_sub).start()
 
     def callback_close_no_quotes(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         print('\n[关闭策略]')
@@ -149,55 +154,81 @@ class BaseSubscriber:
             threading.Thread(target=self.custom_end_unsub).start()
 
     def update_code_list(self, code_list: list[str]):
+        print(f'[订阅列表]:{code_list}\n', end='')
         self.code_list = code_list
 
     # -----------------------
     # 任务接口
     # -----------------------
+    def clear_all(self):
+        self.history_day_klines.clear()
+
     def before_trade_day_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
+        self.clear_all()
+
         if self.before_trade_day is not None:
-            self.before_trade_day()
-            self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            print(f'[定时任务] 盘前任务开始')
+            try:
+                self.before_trade_day()
+                self.before_job_success_flag = get_today()
+                print(f'[定时任务] 盘前任务完成 {self.before_job_success_flag}\n', end='')
+            except Exception as e:
+                print(f'[定时任务] 盘前任务出错: {e}\n', end='')
 
     def near_trade_begin_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         if self.near_trade_begin is not None:
-            self.near_trade_begin()
-            if self.before_trade_day is None:  # 没有设置before_trade_day 情况
-                self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            print(f'今日盘前准备工作已完成')
+            print(f'[定时任务] 临盘任务开始')
+            try:
+                self.near_trade_begin()
+                self.near_trade_success_flag = get_today()
+                print(f'[定时任务] 临盘任务完成 {self.near_trade_success_flag}\n', end='')
+            except Exception as e:
+                print(f'[定时任务] 临盘任务出错: {e}\n', end='')
+
 
     def finish_trade_day_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         if self.finish_trade_day is not None:
-            self.finish_trade_day()
+            print(f'[定时任务] 盘后任务开始')
+            try:
+                self.finish_trade_day()
+                print(f'[定时任务] 盘后任务完成\n', end='')
+            except Exception as e:
+                print(f'[定时任务] 盘后任务出错: {e}\n', end='')
 
     def execute_call_end_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
-        print('[竞价结束回调]')
         if self.execute_call_end is not None:
+            print(f'[定时任务] 竞价任务开始')
             self.execute_call_end()
+            try:
+                print(f'[定时任务] 竞价任务完成\n', end='')
+            except Exception as e:
+                print(f'[定时任务] 竞价任务出错: {e}\n', end='')
 
     # 检查是否完成盘前准备
     def check_before_finished(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
-        if (self.before_trade_day is not None or self.near_trade_begin is not None) and \
-                (self.curr_trade_date != datetime.datetime.now().strftime("%Y-%m-%d")):
-            print('[ERROR]盘前准备未完成，尝试重新执行盘前函数')
+        if self.before_trade_day is not None and self.before_job_success_flag != get_today():
+            print('[定时任务] 重新执行盘前任务开始\n', end='')
             self.before_trade_day_wrapper()
+            print(f'[定时任务] 重新执行盘前任务完成\n', end='')
+        if self.near_trade_begin is not None and self.near_trade_success_flag != get_today():
+            print(f'[定时任务] 重新执行临盘任务开始\n', end='')
             self.near_trade_begin_wrapper()
-        print(f'当前交易日：[{self.curr_trade_date}]')
+            print(f'[定时任务] 重新执行临盘任务完成\n', end='')
 
     # -----------------------
     # 盘后报告总结
@@ -207,13 +238,14 @@ class BaseSubscriber:
         if not check_is_open_day(now.strftime('%Y-%m-%d')):
             return
 
+        print(f'[每日总结] 开始')
         curr_date = now.strftime('%Y-%m-%d')
 
         if self.open_today_deal_report:
             try:
                 self.daily_reporter.today_deal_report(today=curr_date)
             except Exception as e:
-                print('Report deal failed: ', e)
+                print('[每日总结] 交易报告出错: ', e)
                 traceback.print_exc()
 
         if self.open_today_hold_report:
@@ -222,9 +254,9 @@ class BaseSubscriber:
                     positions = self.delegate.check_positions()
                     self.daily_reporter.today_hold_report(today=curr_date, positions=positions)
                 else:
-                    print('Missing delegate to complete reporting!')
+                    print('[每日总结] 获取持仓信息必需 delegate')
             except Exception as e:
-                print('Report position failed: ', e)
+                print('[每日总结] 持仓报告出错: ', e)
                 traceback.print_exc()
 
         try:
@@ -232,8 +264,10 @@ class BaseSubscriber:
                 asset = self.delegate.check_asset()
                 self.daily_reporter.check_asset(today=curr_date, asset=asset, is_afternoon=(now.hour > 12))
         except Exception as e:
-            print('Report asset failed: ', e)
+            print('[每日总结] 账户报告出错: ', e)
             traceback.print_exc()
+
+        print(f'[每日总结] 结束')
 
     # -----------------------
     # 定时器
@@ -336,7 +370,7 @@ class BaseSubscriber:
         now = datetime.datetime.now()
         curr_date = now.strftime('%Y-%m-%d')
         curr_time = now.strftime('%H:%M')
-        print(f'[{curr_time}]', end='')
+        print(f'\n[{curr_date} {curr_time}]', end='')
         is_open_day = check_is_open_day(curr_date)
         if self.delegate is not None:
             self.delegate.is_open_day = is_open_day
@@ -384,7 +418,7 @@ class HistorySubscriber(BaseSubscriber):
         t1 = datetime.datetime.now()
         print(f'Prepared TIME COST: {t1 - t0}')
 
-    def _download_from_tdx(self, target_codes: list, start: str, end: str, adjust: str, columns: list[str]):
+    def _download_from_tdx(self, target_codes: list, start: str, end: str, adjust: ExitRight, columns: list[str]):
         print(f'Prepared time range: {start} - {end}')
         t0 = datetime.datetime.now()
 
@@ -466,7 +500,7 @@ class HistorySubscriber(BaseSubscriber):
 
     # 重新加载历史数据进内存
     def refresh_memory_history(self, code_list: list[str], start: str, end: str, data_source: DataSource):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+        if not check_is_open_day(get_today()):
             return
 
         hc = DailyHistoryCache()
