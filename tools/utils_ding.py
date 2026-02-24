@@ -5,7 +5,6 @@ import hmac
 import json
 import time
 import requests
-import traceback
 import urllib.parse
 import urllib.request
 
@@ -63,6 +62,7 @@ class DingMessager(BaseMessager):
         :param data: 发送的内容
         :return:
         """
+        ans = {'errmsg': 'ok'}
         try:
             if self.refresh_webhook():
                 header = {
@@ -75,8 +75,12 @@ class DingMessager(BaseMessager):
                 response = requests.post(url=self.webhook_url, data=send_data, headers=header)
                 return json.loads(response.text)
         except Exception as e:
-            traceback.print_exc()
-            return {'errmsg': str(e)}
+            ans = {'errmsg': str(e)}
+            # # For debugging
+            # import traceback
+            # traceback.print_exc()
+        return ans
+
 
     def send_text(self, text: str, output: str = '', alert: bool = False) -> bool:
         res = self.send_message(data={
