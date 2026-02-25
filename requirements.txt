@@ -1,5 +1,6 @@
 numpy==2.2.4
 pandas==2.2.3
+pyarrow==23.0.0
 APScheduler>=3.11.0
 akshare>=1.16.0
 mootdx>=0.11.7

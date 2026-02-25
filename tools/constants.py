@@ -1,3 +1,5 @@
+from enum import Enum
+
 
 MSG_INNER_SEPARATOR = '\n \n'
 MSG_OUTER_SEPARATOR = '\n\n '
@@ -7,7 +9,7 @@ DEFAULT_DAILY_COLUMNS = ['datetime', 'open', 'high', 'low', 'close', 'volume', '
 
 
 # 数据源常量
-class DataSource:
+class DataSource(str, Enum):
     AKSHARE = 'akshare'
     TUSHARE = 'tushare'
     MOOTDX = 'mootdx'
@@ -17,7 +19,7 @@ class DataSource:
 
 
 # 复权常量
-class ExitRight:
+class ExitRight(str, Enum):
     BFQ = ''     # 不复权
     QFQ = 'qfq'  # 前复权
     HFQ = 'hfq'  # 后复权
@@ -30,7 +32,7 @@ REPURCHASE_CODES = ['131810.SZ', '131811.SZ', '131800.SZ', '131809.SZ', '131801.
 
 
 # 指数常量
-class IndexSymbol:
+class IndexSymbol(str, Enum):
     INDEX_SH_ZS = '000001'      # 上证指数
     INDEX_SZ_CZ = '399001'      # 深证指数
     INDEX_SZ_50 = '399850'      # 深证50
@@ -51,6 +53,6 @@ class IndexSymbol:
 
 
 # 仓位项常量
-class InfoItem:
+class InfoItem(str, Enum):
     IncDate = '_inc_date'   # 执行所有持仓日+1操作的日期flag:'%Y-%m-%d'
     DayCount = 'day_count'  # 持仓时间（单位：天）

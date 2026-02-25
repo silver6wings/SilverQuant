@@ -1,5 +1,6 @@
 import os
 import csv
+import time
 
 import requests
 import threading
@@ -157,9 +158,15 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
     import pywencai
     result = set()
     for query in queries:
-        df = pywencai.get(query=query, perpage=100, loop=True)
+        df = None
+        try:
+            df = pywencai.get(query=query, perpage=100, loop=True)
+        except Exception as e:
+            print('获取wencai数据失败,请尝试降低获取频率:', e)
+
         if df is not None and type(df) != dict and df.shape[0] > 0:
             result.update(df['股票代码'].values)
+
     return list(result)
 
 
@@ -168,15 +175,19 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
 # ================
 
 
-def pull_stock_codes(prefix: str, host: str, auth: str) -> (Optional[list[str]], str):
+def pull_stock_codes(prefix: str, host: str, auth: str) -> tuple[Optional[list[str]], str]:
     key = f'{prefix}_{datetime.datetime.now().date().strftime("%Y%m%d")}'
-    response = requests.get(f'{host}/stocks/get_list/{key}?auth={auth}')
+    try:
+        response = requests.get(f'{host}/stocks/get_list/{key}?auth={auth}', timeout=10)
+    except requests.RequestException as e:
+        return None, str(e)
+
     if response.status_code == 200:
         return response.json(), ''
-    elif response.status_code == 404:
-        return None, response.json()['error']
-    else:
-        return None, 'Unknown Error'
+    if response.status_code == 404:
+        response_json = response.json()
+        return None, response_json.get('error', 'Not Found')
+    return None, f'HTTP {response.status_code}'
 
 
 # ================
@@ -185,13 +196,39 @@ def pull_stock_codes(prefix: str, host: str, auth: str) -> (Optional[list[str]],
 
 
 # 数组长度标准化防止quotes数据格式异常导致额外的bug，用以处理买卖五档数据
+def qmt_pad_list(xs, target_length: int, fill=0):
+    xs = list(xs) if isinstance(xs, (list, tuple)) else []
+    xs = xs[:target_length]
+    if len(xs) < target_length:
+        xs.extend([fill] * (target_length - len(xs)))
+    return xs
+
+
 def _adjust_list(input_list: list, target_length: int) -> list:
-    adjusted = input_list[:target_length]               # 截断超过目标长度的尾部
-    adjusted += [0] * (target_length - len(adjusted))   # 补0直到达到目标长度
-    return adjusted
+    # 兼容 input_list=None，并保持历史行为：默认补 0
+    return qmt_pad_list(input_list, target_length=target_length, fill=0)
 
 
 def qmt_quote_to_tick(quote: dict) -> dict:
+    # 统一做数据兜底：调用方不必再重复补字段
+    quote = dict(quote or {})
+
+    # 兼容字段：部分行情里昨收用 lastLose
+    if 'lastClose' not in quote:
+        quote['lastClose'] = quote.get('lastLose', 0) or 0
+
+    # 兜底基础字段（本函数使用 [] 访问，缺字段会 KeyError）
+    quote.setdefault('time', int(time.time() * 1000))
+    quote.setdefault('lastPrice', 0)
+    quote.setdefault('high', 0)
+    quote.setdefault('low', 0)
+    quote.setdefault('volume', 0)
+    quote.setdefault('amount', 0)
+    quote.setdefault('askPrice', [])
+    quote.setdefault('askVol', [])
+    quote.setdefault('bidPrice', [])
+    quote.setdefault('bidVol', [])
+
     ans = {
         'time': datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S'),
         'lastClose': quote['lastClose'],

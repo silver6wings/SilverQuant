@@ -1,6 +1,7 @@
 import sys
 import time
 import datetime
+import logging
 from threading import Thread
 from typing import List, Optional
 
@@ -59,9 +60,9 @@ class XtDelegate(BaseDelegate):
             # 保证QMT持续连接
             Thread(target=self.keep_connected, daemon=True).start()
 
-    def connect(self, callback: object) -> (XtQuantTrader, bool):
+    def connect(self, callback: object) -> tuple[Optional[XtQuantTrader], bool]:
         session_id = int(time.time())  # 生成session id 整数类型 同时运行的策略不能重复
-        print("[交易通道] 连接开始，临时 session_id: ", session_id)
+        print(f'[交易通道] 连接开始，临时 session_id: {session_id}\n', end='')
         self.xt_trader = XtQuantTrader(self.path, session_id)
 
         if callback is None:
@@ -87,24 +88,24 @@ class XtDelegate(BaseDelegate):
         subscribe_result = self.xt_trader.subscribe(self.account)
         print(f'返回值：{subscribe_result}...', end='')
         if subscribe_result != 0:
-            print('失败!')
+            print('失败!\n', end='')
             self.xt_trader = None
             return None, False
-        print('成功!')
+        print('成功!\n', end='')
 
-        print('[交易通道] 连接完毕！')
+        print('[交易通道] 连接完毕！\n', end='')
         return self.xt_trader, True
 
     def reconnect(self) -> None:
         if self.xt_trader is None and self.is_open_day:  # 仅在交易日重连
-            print('[交易通道] 开始重连交易接口')
+            print('[交易通道] 开始重连交易接口\n', end='')
             _, success = self.connect(self.callback)
             if success:
-                print('[交易通道] 交易接口重连成功')
+                print('[交易通道] 交易接口重连成功\n', end='')
                 if self.subscriber is not None:
                     self.subscriber.resubscribe_tick(True)
         # else:
-        #     print('无需重连交易接口')
+        #     print('无需重连交易接口\n', end='')
 
     def keep_connected(self) -> None:
         while True:
@@ -126,17 +127,22 @@ class XtDelegate(BaseDelegate):
         order_remark: str,
     ) -> bool:
         if self.xt_trader is not None:
-            self.xt_trader.order_stock(
-                account=self.account,
-                stock_code=stock_code,
-                order_type=order_type,
-                order_volume=order_volume,
-                price_type=price_type,
-                price=price,
-                strategy_name=strategy_name,
-                order_remark=order_remark,
-            )
-            return True
+            try:
+                self.xt_trader.order_stock(
+                    account=self.account,
+                    stock_code=stock_code,
+                    order_type=order_type,
+                    order_volume=order_volume,
+                    price_type=price_type,
+                    price=price,
+                    strategy_name=strategy_name,
+                    order_remark=order_remark,
+                )
+                return True
+            except Exception as e:
+                print(f'[交易通道] 下单失败: {e}')
+                logging.error('[交易通道] 下单失败: %s', stock_code, exc_info=True)
+                return False
         else:
             return False
 
@@ -151,17 +157,22 @@ class XtDelegate(BaseDelegate):
         order_remark: str,
     ) -> bool:
         if self.xt_trader is not None:
-            self.xt_trader.order_stock_async(
-                account=self.account,
-                stock_code=stock_code,
-                order_type=order_type,
-                order_volume=order_volume,
-                price_type=price_type,
-                price=price,
-                strategy_name=strategy_name,
-                order_remark=order_remark,
-            )
-            return True
+            try:
+                self.xt_trader.order_stock_async(
+                    account=self.account,
+                    stock_code=stock_code,
+                    order_type=order_type,
+                    order_volume=order_volume,
+                    price_type=price_type,
+                    price=price,
+                    strategy_name=strategy_name,
+                    order_remark=order_remark,
+                )
+                return True
+            except Exception as e:
+                print(f'[交易通道] 异步下单失败: {e}')
+                logging.error('[交易通道] 异步下单失败: %s', stock_code, exc_info=True)
+                return False
         else:
             return False
 
@@ -412,7 +423,7 @@ class XtDelegate(BaseDelegate):
                 'type': ipodata[code]['type'],
                 'issuePrice': issuePrice,
             }
-            self.stock_names._data[code] = ipodata[code]['name']  # 临时加入股票名称缓存
+            self.stock_names.add_name(code, ipodata[code]['name'])  # 临时加入股票名称缓存
             self.order_limit_open(code, issuePrice, volume, '新股申购')
             selections['code'] = selection
         return selections

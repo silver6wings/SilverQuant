@@ -3,6 +3,7 @@ import logging
 import io
 import datetime
 import json
+import ast
 import time
 import zipfile
 import numpy as np
@@ -532,8 +533,10 @@ def _fq_factor(code: str, method: str, ) -> pd.DataFrame:
         try:
             url = "https://finance.sina.com.cn/realstock/company/{}/{}.js"
             rsp = httpx.get(url.format(symbol, method), headers=headers)
-            res = pd.DataFrame(eval(rsp.text.split("=")[1].split("\n")[0])["data"])
-        except (SyntaxError, httpx.ConnectError) as ex:
+            payload_text = rsp.text.split("=", 1)[1].split("\n", 1)[0]
+            payload = ast.literal_eval(payload_text)
+            res = pd.DataFrame(payload["data"])
+        except (SyntaxError, ValueError, KeyError, IndexError, TypeError, httpx.RequestError) as ex:
             logging.error(ex)
             return pd.DataFrame(None)
 
@@ -948,7 +951,7 @@ def _get_stock_dividend(headers: dict, start_date: str, page: int = 0) -> pd.Dat
         # return divi_df, divi_count, has_more
 
 
-def get_dividend_code_from_baidu(date: str = "20241107") -> (pd.DataFrame, int):
+def get_dividend_code_from_baidu(date: str = "20241107") -> tuple[pd.DataFrame, int]:
     """
     #该接口返回的df中code实际上是symbol，注意转换
     from AKShare

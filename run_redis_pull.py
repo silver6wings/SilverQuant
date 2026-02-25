@@ -20,7 +20,9 @@ import redis
 REDIS_HOST = '192.168.1.6'
 REDIS_PORT = 6379
 REDIS_CHANNEL = 'quotes_data'
-my_redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0).pubsub()
+REDIS_LATEST_KEY = f'{REDIS_CHANNEL}:latest'
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+my_redis = redis_client.pubsub()
 
 STRATEGY_NAME = '数据接收'
 SELECT_PROMPT = get_prompt('')
@@ -36,7 +38,7 @@ PATH_MAXP = PATH_BASE + '/max_price.json'       # 记录建仓后历史最高
 PATH_MINP = PATH_BASE + '/min_price.json'       # 记录建仓后历史最低
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
-cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
+cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 
 class PoolConf:
@@ -184,6 +186,13 @@ def redis_subscribe():
         try:
             if message['type'] == 'message':
                 data = json.loads(message['data'])
+                # latest-only 兼容：频道只发 {key, ts}，真实 payload 在 key 里
+                if isinstance(data, dict) and 'curr_quotes' not in data:
+                    key = data.get('key') or REDIS_LATEST_KEY
+                    raw = redis_client.get(key)
+                    if not raw:
+                        continue
+                    data = json.loads(raw)
                 curr_date = data['curr_date']
                 curr_time = data['curr_time']
                 curr_seconds = data['curr_seconds']
