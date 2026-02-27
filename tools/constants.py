@@ -8,8 +8,13 @@ MSG_OUTER_SEPARATOR = '\n\n '
 DEFAULT_DAILY_COLUMNS = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']
 
 
+class StrValueEnum(str, Enum):
+    def __str__(self) -> str:
+        return self.value
+
+
 # 数据源常量
-class DataSource(str, Enum):
+class DataSource(StrValueEnum):
     AKSHARE = 'akshare'
     TUSHARE = 'tushare'
     MOOTDX = 'mootdx'
@@ -17,13 +22,11 @@ class DataSource(str, Enum):
     MINIQMT = 'miniqmt'
     BAOSTOCK = 'baostock'
 
-
 # 复权常量
-class ExitRight(str, Enum):
+class ExitRight(StrValueEnum):
     BFQ = ''     # 不复权
     QFQ = 'qfq'  # 前复权
     HFQ = 'hfq'  # 后复权
-
 
 # 逆回购常量
 REPURCHASE_CODES = ['131810.SZ', '131811.SZ', '131800.SZ', '131809.SZ', '131801.SZ', '131802.SZ',
@@ -32,7 +35,7 @@ REPURCHASE_CODES = ['131810.SZ', '131811.SZ', '131800.SZ', '131809.SZ', '131801.
 
 
 # 指数常量
-class IndexSymbol(str, Enum):
+class IndexSymbol(StrValueEnum):
     INDEX_SH_ZS = '000001'      # 上证指数
     INDEX_SZ_CZ = '399001'      # 深证指数
     INDEX_SZ_50 = '399850'      # 深证50
@@ -51,8 +54,8 @@ class IndexSymbol(str, Enum):
     INDEX_ZZ_A50 = '000050'     # 中证A50
     INDEX_ZZ_A500 = '000510'    # 中证A500
 
-
 # 仓位项常量
-class InfoItem(str, Enum):
+class InfoItem(StrValueEnum):
     IncDate = '_inc_date'   # 执行所有持仓日+1操作的日期flag:'%Y-%m-%d'
     DayCount = 'day_count'  # 持仓时间（单位：天）
+
