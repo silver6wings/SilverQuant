@@ -1,0 +1,42 @@
+fail_fast: false
+repos:
+- repo: local
+  hooks:
+  - id: system
+    name: Black
+    entry: black .
+    pass_filenames: false
+    language: system
+
+- repo: local
+  hooks:
+  - id: system
+    name: ruff
+    entry: ruff check .
+    args: [ --fix, --show-fixes ]
+    pass_filenames: false
+    language: system
+
+- repo: local
+  hooks:
+  - id: system
+    name: isort
+    entry: isort .
+    pass_filenames: false
+    language: system
+
+- repo: local
+  hooks:
+  - id: system
+    name: pylint
+    entry: pylint -d W1203,W1309,C0114,W0718,C0116,C0115 app
+    pass_filenames: false
+    language: system
+
+- repo: local
+  hooks:
+  - id: system
+    name: mypy
+    entry: mypy --ignore-missing-imports app
+    pass_filenames: false
+    language: system
