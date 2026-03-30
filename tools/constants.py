@@ -58,4 +58,3 @@ class IndexSymbol(StrValueEnum):
 class InfoItem(StrValueEnum):
     IncDate = '_inc_date'   # 执行所有持仓日+1操作的日期flag:'%Y-%m-%d'
     DayCount = 'day_count'  # 持仓时间（单位：天）
-
