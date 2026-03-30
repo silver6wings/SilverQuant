@@ -198,7 +198,8 @@ class DailyReporter:
                     text += f'银证转账: {cash_change_str}元'
 
         text += MSG_INNER_SEPARATOR
-        text += f'{"持仓" if is_afternoon else "浮动"}市值: {round(asset.market_value, 2)}元'
+        text += f'{"持仓" if is_afternoon else "浮动"}市值: {round(asset.market_value, 2)}元' \
+                f'({round(asset.market_value / asset.total_asset * 100, 2)} %)'
 
         text += MSG_INNER_SEPARATOR
         text += f'剩余现金: {round(asset.cash, 2)}元'
