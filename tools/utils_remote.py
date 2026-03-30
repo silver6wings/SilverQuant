@@ -491,6 +491,106 @@ def get_ts_stk_daily_history(
 
 # 复合版:通过返回dict的key区分不同的票，注意总共一次最多8000行会限制长度
 # https://tushare.pro/document/2?doc_id=27
+def _get_ts_daily_histories_by_batch(
+    codes: list[str],
+    start_date: str,
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
+) -> dict[str, pd.DataFrame]:
+    if len(codes) == 0:
+        return {}
+
+    from reader.tushare_agent import get_tushare_pro
+
+    try_times = 0
+    df = None
+    last_exception = None
+    while (df is None or len(df) <= 0) and try_times < 3:
+        try_times += 1
+        try:
+            # tushare的通用行情 SDK 有bug，改回去了！
+            if ACTIVE_TS_FQ:
+                import warnings
+                warnings.filterwarnings('ignore', category=FutureWarning,
+                    message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
+
+                import tushare as ts
+                _ = get_tushare_pro()
+                df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
+                df = df.drop_duplicates() if df is not None and len(df) > 0 else df
+            else:
+                pro = get_tushare_pro()
+                df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
+        except Exception as e:
+            last_exception = e
+            df = None
+            if try_times < 3:
+                time.sleep(0.5)
+
+    if last_exception is not None and df is None:
+        if len(codes) == 1:
+            print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: {last_exception}')
+            return {}
+
+        mid = len(codes) // 2
+        left_codes = codes[:mid]
+        right_codes = codes[mid:]
+        print(f'[TUSHARE] batch failed {len(codes)} codes {start_date}-{end_date}, split retry: {last_exception}')
+
+        ans = {}
+        ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+        ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+        return ans
+
+    ans = {}
+    if df is not None and len(df) > 0:
+        if 'ts_code' not in df.columns:
+            if len(codes) == 1:
+                print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: missing ts_code column')
+                return {}
+
+            mid = len(codes) // 2
+            left_codes = codes[:mid]
+            right_codes = codes[mid:]
+            print(f'[TUSHARE] batch malformed {len(codes)} codes {start_date}-{end_date}, split retry: missing ts_code column')
+
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+            return ans
+
+        returned_codes = set(df['ts_code'].dropna().unique())
+        for code in codes:
+            if code in returned_codes:
+                temp_df = df[df['ts_code'] == code]
+                temp_df = _ts_to_standard(temp_df)
+
+                if columns is None:
+                    ans[code] = temp_df
+                else:
+                    ans[code] = temp_df[columns]
+
+        if len(returned_codes) == 0:
+            if len(codes) == 1:
+                print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: no matched ts_code returned')
+                return {}
+
+            mid = len(codes) // 2
+            left_codes = codes[:mid]
+            right_codes = codes[mid:]
+            print(f'[TUSHARE] batch unmatched {len(codes)} codes {start_date}-{end_date}, split retry')
+
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+            return ans
+
+        missing_codes = [code for code in codes if code not in returned_codes]
+        if len(missing_codes) > 0:
+            print(f'[TUSHARE] partial result {len(returned_codes)}/{len(codes)} codes {start_date}-{end_date}, retry missing {len(missing_codes)} codes')
+            ans.update(_get_ts_daily_histories_by_batch(missing_codes, start_date, end_date, columns, adjust))
+    return ans
+
+
 def get_ts_daily_histories(
     codes: list[str],
     start_date: str,    # format: 20240101
@@ -503,38 +603,7 @@ def get_ts_daily_histories(
             print(f'存在不符合格式要求的code: {code}')
             return {}
 
-    from reader.tushare_agent import get_tushare_pro
-
-    try_times = 0
-    df = None
-    while (df is None or len(df) <= 0) and try_times < 3:
-        try_times += 1
-
-        # tushare的通用行情 SDK 有bug，改回去了！
-        if ACTIVE_TS_FQ:
-            import warnings
-            warnings.filterwarnings('ignore', category=FutureWarning,
-                message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
-
-            import tushare as ts
-            _ = get_tushare_pro()
-            df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
-            df = df.drop_duplicates() if df is not None and len(df) > 0 else df
-        else:
-            pro = get_tushare_pro()
-            df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
-
-    ans = {}
-    if df is not None and len(df) > 0:
-        for code in codes:
-            temp_df = df[df['ts_code'] == code]
-            temp_df = _ts_to_standard(temp_df)
-
-            if columns is None:
-                ans[code] = temp_df
-            else:
-                ans[code] = temp_df[columns]
-    return ans
+    return _get_ts_daily_histories_by_batch(codes, start_date, end_date, columns, adjust)
 
 
 # http://www.baostock.com

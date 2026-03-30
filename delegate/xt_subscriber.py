@@ -74,7 +74,7 @@ class XtSubscriber(HistorySubscriber):
         self.lock_quotes_update = threading.Lock()  # 聚合实时打点缓存的锁
 
         self.cache_quotes: Dict[str, Dict] = {}     # 记录实时的价格信息
-        self.sub_sequence: int = -1                 # 记录实时数据订阅号
+        self.sub_sequence: int | None = None        # 记录实时数据订阅号
 
         self.last_callback_time = datetime.datetime.now()       # 上次返回quotes 时间
 
@@ -187,7 +187,7 @@ class XtSubscriber(HistorySubscriber):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
-        if self.sub_sequence > 0:
+        if self.sub_sequence is not None:
             xtdata.unsubscribe_quote(self.sub_sequence)
             print(f'\n[结束行情订阅] 订阅数:{len(self.code_list)} 订阅号:{self.sub_sequence}\n', end='')
             if self.messager is not None:
@@ -195,15 +195,15 @@ class XtSubscriber(HistorySubscriber):
                     f'[{self.account_id}]{self.strategy_name}:{"暂停" if pause else "关闭"}',
                     output='[Message] END UNSUBSCRIBING\n')
 
-    def resubscribe_tick(self, notice: bool = False):
+    def resubscribe_tick(self, notice: bool = True):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
         prev_sub_sequence = None
-        if self.sub_sequence > 0:
+        if self.sub_sequence is not None:
             prev_sub_sequence = self.sub_sequence
             xtdata.unsubscribe_quote(self.sub_sequence)
-        xtdata.enable_hello = False
+
         self.sub_sequence = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
 
         if self.messager is not None and notice:
