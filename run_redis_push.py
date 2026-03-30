@@ -25,7 +25,7 @@ PATH_ASSETS = ''
 PATH_DEAL = ''
 PATH_LOGS = PATH_BASE + '/logs.txt'             # 记录策略的历史日志
 disk_lock = threading.Lock()                    # 操作磁盘文件缓存的锁
-cache_selected: Dict[str, Set] = {}             # 记录选股历史，去重
+cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 
 class PoolConf:
@@ -45,7 +45,7 @@ def before_trade_day() -> None:
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     # print(curr_date, curr_time, curr_seconds, curr_quotes)
     print(f'[{len(curr_quotes)}]', end='')
     messages = {

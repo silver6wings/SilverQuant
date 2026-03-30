@@ -310,16 +310,27 @@ def all_held_inc(lock: threading.Lock, path: str) -> bool:
             return False
 
 
+def is_in_continuous_auction(curr_time: str) -> bool:
+    return ('09:30' <= curr_time <= '11:30') or ('13:00' <= curr_time <= '14:57')
+
+
 # 更新持仓股买入开始最高价格
 def update_max_prices(
     lock: threading.Lock,
     quotes: dict,
     positions: list,
+    curr_time: str,
     path_max_prices: str,
     path_min_prices: str,
     path_held_info: str,
     ignore_open_day: bool = True,  # 是否忽略开仓日，从次日开始计算最高价
 ):
+    # 只有在连续竞价时间段内才更新最高价格和最低价格
+    if not is_in_continuous_auction(curr_time):
+        with lock:
+            max_prices = load_json(path_max_prices)
+        return max_prices, held_info
+
     held_info = load_json(path_held_info)
 
     with lock:

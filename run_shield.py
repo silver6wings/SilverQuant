@@ -1,6 +1,5 @@
 import logging
 import threading
-from typing import Dict, Set, List
 
 from credentials import (
     DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH,
@@ -92,15 +91,15 @@ def before_trade_day() -> None:
 # ======== 卖点 ========
 
 
-def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+def scan_sell(quotes: dict, curr_date: str, curr_time: str, positions: list) -> None:
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, curr_time, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:

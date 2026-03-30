@@ -12,7 +12,7 @@ from delegate.xt_subscriber import XtSubscriber, xt_get_ticks
 
 from trader.pools import StocksPoolBlackEmpty as Pool
 from trader.buyer import BaseBuyer as Buyer
-from trader.seller_groups import LTT2GroupSeller as Seller
+from trader.seller_groups import ClassicGroupSeller as Seller
 
 from tools.utils_remote import pull_stock_codes
 
@@ -57,37 +57,36 @@ class BuyConf:
 
 
 class SellConf:
-    time_ranges = [['09:30', '11:30'], ['13:00', '15:00']]
-    interval = 2
-    order_premium = 0.09            # 保证成功卖出成交的溢价
-
-    switch_time_range = ['14:30', '14:57']
-    switch_hold_days = 5            # 持仓天数
-    switch_demand_daily_up = 0.003  # 换仓上限乘数
+    time_ranges = [['09:31', '11:30'], ['13:00', '14:57']]
+    interval = 1                    # 扫描卖出间隔，60的约数：1-6, 10, 12, 15, 20, 30
+    order_premium = 0.02            # 保证市价单成交的溢价，单位（元）
 
     hard_time_range = ['09:31', '14:57']
     earn_limit = 9.999              # 硬性止盈率
-    risk_limit = 1 - 0.07           # 硬性止损率
+    risk_limit = 1 - 0.04           # 硬性止损率
     risk_tight = 0.002              # 硬性止损率每日上移
 
-    return_time_range = ['09:31', '14:57']
-    return_of_profit = [
-        (1.16, 9.99, 0.16),
-        (1.07, 1.16, 0.33),
-        (1.04, 1.07, 0.55),
-        (1.02, 1.04, 0.66),
+    switch_time_range = ['09:35', '14:57']
+    switch_hold_days = 1            # 持仓天数
+    switch_demand_daily_up = 0.01   # 换仓上限乘数
+
+    # 利润从最高点回落卖出
+    fall_time_range = ['09:31', '14:57']
+    fall_from_top = [
+        (1.08, 9.99, 0.03),
+        (1.02, 1.08, 0.05),
     ]
 
-    cci_time_range = ['09:31', '14:57']
-    cci_upper = 370.0               # CCI 高卖点阈值
-    cci_lower = -70.0               # CCI 低卖点阈值
-
-    opening_time_range = ['14:40', '14:57']
-    open_low_rate = 0.99            # 低于开仓日最低价比例
-    open_vol_rate = 0.30            # 低于开仓日成交量比例
-
-    ma_time_range = ['09:31', '14:57']
-    ma_above = 30
+    # 涨幅超过建仓价xA，并小于建仓价xB 时，回撤涨幅的C倍卖出
+    # (A, B, C)
+    return_time_range = ['09:31', '14:57']
+    return_of_profit = [
+        (1.20, 9.99, 0.300),
+        (1.08, 1.20, 0.400),
+        (1.05, 1.08, 0.500),
+        (1.03, 1.05, 0.600),
+        (1.02, 1.03, 0.700),
+    ]
 
 
 # ======== 盘前 ========
@@ -145,7 +144,7 @@ def near_trade_begin():
 # ======== 买点 ========
 
 
-def check_stock_codes(selected_codes: list[str], quotes: Dict) -> dict[str, dict]:
+def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict]:
     selections = {}
 
     for code in selected_codes:
@@ -180,7 +179,7 @@ def check_stock_codes(selected_codes: list[str], quotes: Dict) -> dict[str, dict
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
+def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
     selected_codes, err_msg = pull_stock_codes(SELECTION_ID, RECOMMEND_HOST, AUTHENTICATION)
     if selected_codes is None:
         print(f'[{err_msg}]', end='')
@@ -201,15 +200,15 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 # ======== 卖点 ========
 
 
-def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+def scan_sell(quotes: dict, curr_date: str, curr_time: str, positions: list) -> None:
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, curr_time, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:
