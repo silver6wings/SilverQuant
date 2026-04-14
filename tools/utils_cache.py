@@ -62,14 +62,15 @@ class StockNames:
         return '[Unknown]'
 
 
-def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
+def cache_with_path_ttl(path: str | Callable[..., str], ttl: int, dtype: dict) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            cache_path = path(*args, **kwargs) if callable(path) else path
             # 查找可用缓存
-            dir_name = os.path.dirname(path)
+            dir_name = os.path.dirname(cache_path)
             try:
-                with open(path, 'rb') as f:
+                with open(cache_path, 'rb') as f:
                     if datetime.datetime.now().timestamp() - os.fstat(f.fileno()).st_mtime < ttl:
                         return pd.read_csv(f, dtype=dtype)
             except FileNotFoundError:
@@ -77,7 +78,8 @@ def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
             # 如果没有缓存
             try:
                 data = func(*args, **kwargs)
-                data.to_csv(path, index=False)
+                if data is not None:
+                    data.to_csv(cache_path, index=False)
                 return data
             except Exception as e:
                 print('AKShare request failed: ', e)
@@ -108,6 +110,59 @@ class AKCache:
     @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
     def stock_zh_a_spot(cls):
         return cls._ak.stock_zh_a_spot()
+
+    @classmethod
+    @cache_with_path_ttl(path=lambda _cls, date: f'./_cache/_ak_stock_fhps_em_{date}.csv', ttl=60*60*23, dtype={'代码': str})
+    def stock_fhps_em(cls, date: str):
+        return cls._ak.stock_fhps_em(date=date)
+
+
+def get_recent_fhps_report_date(now: Optional[datetime.datetime] = None) -> str:
+    now = now or datetime.datetime.now()
+    year = now.year
+    month = now.month
+
+    # 只调用一次接口时，优先选择当前时点最可能覆盖最近除权事件的最近报告期。
+    if month <= 6:
+        return f'{year - 1}1231'
+    if month <= 9:
+        return f'{year}0630'
+    return f'{year}0930'
+
+
+def get_recent_exit_right_codes_from_fhps(
+    days: int,
+    now: Optional[datetime.datetime] = None,
+    report_date: Optional[str] = None,
+) -> List[str]:
+    if days <= 0:
+        return []
+
+    now = now or datetime.datetime.now()
+    report_date = report_date or get_recent_fhps_report_date(now)
+    df = AKCache.stock_fhps_em(date=report_date)
+    if df is None or len(df) == 0:
+        return []
+
+    if '代码' not in df.columns or '除权除息日' not in df.columns:
+        print(f'[分红送配] {report_date} 返回结果缺少关键列，跳过')
+        return []
+
+    target_dates = {
+        get_prev_trading_date(now, forward_day)
+        for forward_day in range(days - 1, -1, -1)
+    }
+
+    df = df.copy()
+    df['除权除息日'] = pd.to_datetime(df['除权除息日'], errors='coerce').dt.strftime('%Y%m%d')
+    df = df[df['除权除息日'].isin(target_dates)]
+
+    codes = [
+        symbol_to_code(symbol)
+        for symbol in df['代码'].astype(str).tolist()
+        if len(str(symbol)) == 6
+    ]
+    return sorted(set(codes))
 
 
 # 获取股票的中文名称
@@ -324,14 +379,14 @@ def update_max_prices(
     path_min_prices: str,
     path_held_info: str,
     ignore_open_day: bool = True,  # 是否忽略开仓日，从次日开始计算最高价
-):
+) -> tuple[dict, dict]:
+    held_info = load_json(path_held_info)
+
     # 只有在连续竞价时间段内才更新最高价格和最低价格
     if not is_in_continuous_auction(curr_time):
         with lock:
             max_prices = load_json(path_max_prices)
         return max_prices, held_info
-
-    held_info = load_json(path_held_info)
 
     with lock:
         max_prices = load_json(path_max_prices)

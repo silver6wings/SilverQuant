@@ -1,10 +1,11 @@
 import os
 import datetime
 import time
+import traceback
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
-from tools.utils_cache import AKCache, get_prev_trading_date
+from tools.utils_cache import AKCache, get_prev_trading_date, get_recent_exit_right_codes_from_fhps
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
@@ -302,8 +303,18 @@ class DailyHistory:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
 
-        self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
-        code_list = self.get_code_list()
+        try:
+            self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
+        except Exception as e:
+            print(f'[历史日线] _download_remote_missed 异常: {e}')
+            traceback.print_exc()
+
+        try:
+            code_list = self.get_code_list()
+        except Exception as e:
+            print(f'[历史日线] get_code_list 异常: {e}')
+            traceback.print_exc()
+            return
 
         # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍，所以加个缓存标记以防重复加载浪费时间
         if self.data_source == DataSource.TUSHARE:
@@ -316,14 +327,23 @@ class DailyHistory:
 
             for forward_day in range(days, forward_end, -1):
                 target_date = get_prev_trading_date(now, forward_day)
-                sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
-                all_updated_codes.update(sub_updated_codes)
+                try:
+                    sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
+                    all_updated_codes.update(sub_updated_codes)
+                except Exception as e:
+                    print(f'[历史日线] _update_codes_by_tushare({target_date}) 异常: {e}')
+                    traceback.print_exc()
         else:
-            ttl = self.since_last_update_datetime()
-            if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
-                return
+            try:
+                ttl = self.since_last_update_datetime()
+                if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+                    return
 
-            all_updated_codes = self._update_codes_one_by_one(days, code_list)
+                all_updated_codes = self._update_codes_one_by_one(days, code_list)
+            except Exception as e:
+                print(f'[历史日线] _update_codes_one_by_one({days}) 异常: {e}')
+                traceback.print_exc()
+                return
 
         # 排序存储所有更新过的数据
         print('[历史日线] Sorting and Saving all history data ', end='')
@@ -376,21 +396,20 @@ class DailyHistory:
 
     @staticmethod
     def get_recent_exit_right_codes(days: int) -> list[str]:
-        import akshare as ak
-        ans = []
-        now = datetime.datetime.now()
-        for i in range(days-1, -1, -1):
-            date_str = get_prev_trading_date(now, i)
-            df = ak.news_trade_notify_dividend_baidu(date=date_str)
-            if df is not None and len(df) > 0 and '股票代码' in df.columns:
-                codes = [symbol_to_code(symbol) for symbol in df['股票代码'].values if len(symbol) == 6]
-                ans += codes
-        return ans
+        return get_recent_exit_right_codes_from_fhps(days)
 
     def remove_recent_exit_right_histories(self, days: int) -> None:
-        codes = self.get_recent_exit_right_codes(days)
+        try:
+            codes = self.get_recent_exit_right_codes(days)
+        except Exception as e:
+            print(f'[历史日线] 获取最近 {days} 天除权列表异常，跳过清理: {e}')
+            return
+
         removed_count = 0
         for code in codes:
-            if self.remove_single_history(code):
-                removed_count += 1
+            try:
+                if self.remove_single_history(code):
+                    removed_count += 1
+            except Exception as e:
+                print(f'[历史日线] 删除 {code} 历史缓存失败: {e}')
         print(f'[历史日线] Removed {removed_count} histories with Exit Right announced')
