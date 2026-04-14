@@ -245,7 +245,7 @@ class MoveSeller(BaseSeller):
                     if (cost_price * inc_min <= max_price < cost_price * inc_max) \
                             and curr_price <= cost_price * keep_profit:
                         self.order_sell(code, quote, sell_volume,
-                                        f'涨{int((inc_min - 1) * 100)}%止盈到{int((keep_profit - 1) * 100)}%')
+                                        f'涨{int((inc_min - 1) * 100)}%止盈{int((keep_profit - 1) * 100)}%')
                         logging.warning(f'[触发卖出]移动止盈 '
                             f'成本:{round(cost_price, 3)} 卖价:{round(curr_price, 3)} '
                             f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
