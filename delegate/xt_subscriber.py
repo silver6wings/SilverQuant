@@ -8,7 +8,7 @@ from typing import Dict, Callable, Optional
 import pandas as pd
 from xtquant import xtdata
 
-from delegate.base_subscriber import HistorySubscriber
+from delegate.base_subscriber import HistorySubscriber, get_today
 from delegate.xt_delegate import XtDelegate
 from delegate.daily_reporter import DailyReporter
 
@@ -21,14 +21,14 @@ class XtSubscriber(HistorySubscriber):
     def __init__(
         self,
         # 基本信息
-        account_id: str,
-        delegate: Optional[XtDelegate],
-        strategy_name: str,
-        path_deal: str,
-        path_assets: str,
+        account_id: str,                    # 迅投账户
+        delegate: Optional[XtDelegate],     # 迅投代理
+        strategy_name: str,                 # 策略名称
+        path_deal: str,                     # 记录交易历史文件
+        path_assets: str,                   # 记录资产净值文件
         # 回调
-        execute_strategy: Callable,         # 策略回调函数
-        execute_call_end: Callable = None,  # 策略竞价结束回调
+        execute_strategy: Callable,         # 连续交易回调函数
+        execute_call_end: Callable = None,  # 竞价结束回调函数
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
@@ -43,8 +43,8 @@ class XtSubscriber(HistorySubscriber):
         open_today_hold_report: bool = False,   # 每日持仓记录报告
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
         # tick 缓存
-        open_tick_memory_cache: bool = False,
-        tick_memory_data_frame: bool = False,
+        open_tick_memory_cache: bool = False,   # 内存保留当日tick历史
+        tick_memory_data_frame: bool = False,   # 内存tick历史用df格式
     ):
         super().__init__(
             account_id=account_id,
@@ -100,8 +100,6 @@ class XtSubscriber(HistorySubscriber):
             + [f'askVol{i}' for i in range(1, 6)] \
             + [f'bidPrice{i}' for i in range(1, 6)] \
             + [f'bidVol{i}' for i in range(1, 6)]
-
-        self.curr_trade_date = '1990-12-19' #记录当前股票交易日期
 
     # -----------------------
     # 策略触发主函数
@@ -365,18 +363,7 @@ class XtSubscriber(HistorySubscriber):
         self.cache_quotes.clear()
         self.cache_history.clear()
         self.today_ticks.clear()
-
-    def before_trade_day_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
-
-        self.clear_all()
-        self.code_list = ['000001.SH'] + self.__extend_codes
-
-        if self.before_trade_day is not None:
-            self.before_trade_day()
-            self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            print(f'[定时任务] 盘前准备完成 {self.curr_trade_date}\n', end='')
+        self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
 
 
     def _start_qmt_scheduler(self):
