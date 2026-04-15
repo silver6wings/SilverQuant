@@ -1,3 +1,11 @@
+# SilverQuant
+
+[![Python 3.10](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-red?style=for-the-badge&logo=apache&logoColor=white)](https://www.apache.org/licenses/LICENSE-2.0)
+[![QMT Compatible](https://img.shields.io/badge/QMT-Compatible-orange?style=for-the-badge&logo=quantconnect&logoColor=white)](https://www.myquant.cn/)
+
+---
+
 > 成功的秘诀有三条：
 >
 > 第一，尽量避免风险，保住本金
