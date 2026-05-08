@@ -119,7 +119,7 @@ def before_trade_day() -> None:
 # ======== 买点 ========
 
 
-def pull_stock_codes() -> List[str]:
+def pull_stock_codes() -> list[str]:
     codes_wencai = get_wencai_codes([SELECT_PROMPT])
     codes_top = []
 
@@ -130,7 +130,7 @@ def pull_stock_codes() -> List[str]:
     return codes_top
 
 
-def check_stock_codes(selected_codes: list[str], quotes: Dict) -> dict[str, dict]:
+def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict]:
     selections = {}
 
     for code in selected_codes:
@@ -153,7 +153,7 @@ def check_stock_codes(selected_codes: list[str], quotes: Dict) -> dict[str, dict
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
+def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
     selected_codes = pull_stock_codes()
     print(selected_codes, quotes)
 
@@ -169,19 +169,19 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 # ======== 卖点 ========
 
 
-def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
+def scan_sell(quotes: dict, curr_date: str, curr_time: str, positions: list) -> None:
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
     tdx_quotes = get_mootdx_quotes(hold_list)
     print(f'[{hold_list}|{len(tdx_quotes.keys())}|{len(quotes)}]', end='')
 
-    max_prices, held_info = update_max_prices(disk_lock, tdx_quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+    max_prices, held_info = update_max_prices(disk_lock, tdx_quotes, positions, curr_time, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(tdx_quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:

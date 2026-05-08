@@ -1,16 +1,17 @@
 import os
 import csv
+import datetime
 import time
 
+import pandas as pd
 import requests
 import threading
 import atexit
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
-from tools.utils_basic import *
-from tools.utils_miniqmt import get_qmt_daily_history
-from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
+from tools.utils_basic import code_to_symbol, code_to_sina_symbol, code_to_tdxsymbol, \
+    is_fund_etf, is_stock, tdxsymbol_to_code
 
 
 class BaoStockInstance:
@@ -97,6 +98,8 @@ def get_tdx_zxg_code(file_name: str = None) -> list[str]:
 def get_mootdx_quotes(code_list: list[str]) -> dict[str, any]:
     if code_list is None or len(code_list) == 0:
         return {}
+
+    from tools.utils_mootdx import MootdxClientInstance
 
     symbol_list = [code.split('.')[0] for code in code_list]
 
@@ -491,6 +494,106 @@ def get_ts_stk_daily_history(
 
 # 复合版:通过返回dict的key区分不同的票，注意总共一次最多8000行会限制长度
 # https://tushare.pro/document/2?doc_id=27
+def _get_ts_daily_histories_by_batch(
+    codes: list[str],
+    start_date: str,
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    adjust: ExitRight = ExitRight.BFQ,
+) -> dict[str, pd.DataFrame]:
+    if len(codes) == 0:
+        return {}
+
+    from reader.tushare_agent import get_tushare_pro
+
+    try_times = 0
+    df = None
+    last_exception = None
+    while (df is None or len(df) <= 0) and try_times < 3:
+        try_times += 1
+        try:
+            # tushare的通用行情 SDK 有bug，改回去了！
+            if ACTIVE_TS_FQ:
+                import warnings
+                warnings.filterwarnings('ignore', category=FutureWarning,
+                    message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
+
+                import tushare as ts
+                _ = get_tushare_pro()
+                df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
+                df = df.drop_duplicates() if df is not None and len(df) > 0 else df
+            else:
+                pro = get_tushare_pro()
+                df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
+        except Exception as e:
+            last_exception = e
+            df = None
+            if try_times < 3:
+                time.sleep(0.5)
+
+    if last_exception is not None and df is None:
+        if len(codes) == 1:
+            print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: {last_exception}')
+            return {}
+
+        mid = len(codes) // 2
+        left_codes = codes[:mid]
+        right_codes = codes[mid:]
+        print(f'[TUSHARE] batch failed {len(codes)} codes {start_date}-{end_date}, split retry: {last_exception}')
+
+        ans = {}
+        ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+        ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+        return ans
+
+    ans = {}
+    if df is not None and len(df) > 0:
+        if 'ts_code' not in df.columns:
+            if len(codes) == 1:
+                print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: missing ts_code column')
+                return {}
+
+            mid = len(codes) // 2
+            left_codes = codes[:mid]
+            right_codes = codes[mid:]
+            print(f'[TUSHARE] batch malformed {len(codes)} codes {start_date}-{end_date}, split retry: missing ts_code column')
+
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+            return ans
+
+        returned_codes = set(df['ts_code'].dropna().unique())
+        for code in codes:
+            if code in returned_codes:
+                temp_df = df[df['ts_code'] == code]
+                temp_df = _ts_to_standard(temp_df)
+
+                if columns is None:
+                    ans[code] = temp_df
+                else:
+                    ans[code] = temp_df[columns]
+
+        if len(returned_codes) == 0:
+            if len(codes) == 1:
+                print(f'[TUSHARE] skip {codes[0]} {start_date}-{end_date}: no matched ts_code returned')
+                return {}
+
+            mid = len(codes) // 2
+            left_codes = codes[:mid]
+            right_codes = codes[mid:]
+            print(f'[TUSHARE] batch unmatched {len(codes)} codes {start_date}-{end_date}, split retry')
+
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, adjust))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, adjust))
+            return ans
+
+        missing_codes = [code for code in codes if code not in returned_codes]
+        if len(missing_codes) > 0:
+            print(f'[TUSHARE] partial result {len(returned_codes)}/{len(codes)} codes {start_date}-{end_date}, retry missing {len(missing_codes)} codes')
+            ans.update(_get_ts_daily_histories_by_batch(missing_codes, start_date, end_date, columns, adjust))
+    return ans
+
+
 def get_ts_daily_histories(
     codes: list[str],
     start_date: str,    # format: 20240101
@@ -503,38 +606,7 @@ def get_ts_daily_histories(
             print(f'存在不符合格式要求的code: {code}')
             return {}
 
-    from reader.tushare_agent import get_tushare_pro
-
-    try_times = 0
-    df = None
-    while (df is None or len(df) <= 0) and try_times < 3:
-        try_times += 1
-
-        # tushare的通用行情 SDK 有bug，改回去了！
-        if ACTIVE_TS_FQ:
-            import warnings
-            warnings.filterwarnings('ignore', category=FutureWarning,
-                message=".*Series.fillna with 'method' is deprecated.*")  # 用.*匹配任意字符，关掉tushare内部warning
-
-            import tushare as ts
-            _ = get_tushare_pro()
-            df = ts.pro_bar(ts_code=','.join(codes), start_date=start_date, end_date=end_date, adj=adjust)
-            df = df.drop_duplicates() if df is not None and len(df) > 0 else df
-        else:
-            pro = get_tushare_pro()
-            df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
-
-    ans = {}
-    if df is not None and len(df) > 0:
-        for code in codes:
-            temp_df = df[df['ts_code'] == code]
-            temp_df = _ts_to_standard(temp_df)
-
-            if columns is None:
-                ans[code] = temp_df
-            else:
-                ans[code] = temp_df[columns]
-    return ans
+    return _get_ts_daily_histories_by_batch(codes, start_date, end_date, columns, adjust)
 
 
 # http://www.baostock.com
@@ -606,6 +678,7 @@ def get_daily_history(
         # Mootdx 的复权是先截断数据然后复权，取三位小数
         # 暂时不支持 920xxx 的北交所股票数据
         # 其它北交所股票小部分有发行脏数据情况
+        from tools.utils_mootdx import get_mootdx_daily_history
         return get_mootdx_daily_history(code, start_date, end_date, columns, adjust)
     elif data_source == DataSource.AKSHARE:
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
@@ -615,4 +688,63 @@ def get_daily_history(
         return get_bao_daily_history(code, start_date, end_date, columns, adjust)
     else:
         # 默认使用免费的 miniqmt数据，但就是慢的一批
+        from tools.utils_miniqmt import get_qmt_daily_history
         return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
+
+
+# 同花顺概念板块排名
+THS_CONCEPT_KEYS = [
+    ['即时', '净额', '当日', '行业-涨跌幅'],
+    ['3日排行', '净额', '三日', '阶段涨跌幅'],
+    ['5日排行', '净额', '五日', '阶段涨跌幅'],
+    ['10日排行', '净额', '十日', '阶段涨跌幅'],
+    ['20日排行', '净额', '二十日', '阶段涨跌幅'],
+]
+
+
+def get_ths_concept_ranking_df(
+    *,
+    key_index: int = 0,
+    is_outflow: bool = False,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    key = THS_CONCEPT_KEYS[key_index]
+
+    df = ak.stock_fund_flow_concept(symbol=key[0])
+    df = df[df['公司家数'] <= 600]
+    df = df.sort_values(by='净额', ascending=is_outflow)
+
+    if key[0] != '即时':
+        df[key[1]] = df[key[3]].str.strip('%').astype(float)
+
+    return df.sort_values(by=key[1], ascending=is_outflow)
+
+
+def get_ths_concept_ranking_str(
+    *,
+    up_df: pd.DataFrame = None,
+    key_index: int = 0,
+    top_n: int = 10,
+    is_outflow: bool = False,
+) -> str:
+    if up_df is None:
+        up_df = get_ths_concept_ranking_df(key_index=key_index, is_outflow=is_outflow)
+    
+    key = THS_CONCEPT_KEYS[key_index]
+
+    direction_text = '流出' if is_outflow else '流入'
+    ans = f'同花顺{key[2]}净{direction_text}前{top_n}概念板块\n'
+
+    name = up_df.head(top_n)['行业'].values
+    rate = up_df.head(top_n)[[key[1]]].values
+    if len(name) == 0:
+        return ans
+
+    longest_name = len(max(name, key=len))
+    for i in range(len(name)):
+        ans += f'[{i}]\t{name[i]} ' \
+               f'{" " * ((longest_name - len(name[i])) * 1)}' \
+               f'\t{rate[i][0]}亿\n'
+
+    return ans

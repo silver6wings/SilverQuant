@@ -314,6 +314,11 @@ def map_num_to_chr(num):
         return '.'
 
 
+def is_in_continuous_auction(curr_time: str) -> bool:
+    """当前时刻是否处于沪深连续竞价（curr_time 为 HH:MM[:SS] 等可与字符串区间比较的时间串）。"""
+    return ('09:30' <= curr_time <= '11:30') or ('13:00' <= curr_time <= '14:57')
+
+
 # 获取当前时间在一天连续竞价交易时间的百分位
 def get_current_time_percentage(time: str) -> float:
     [hr, mn, sc] = time.split(':')

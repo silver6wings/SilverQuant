@@ -5,13 +5,18 @@ import pandas as pd
 
 from mytt.MyTT import MA, MACD, CCI, WR
 from xtquant.xttype import XtPosition
-from tools.utils_basic import get_limit_up_price, get_limiting_down_rate
+from tools.utils_basic import get_limit_up_price
 from tools.utils_remote import concat_ak_quote_dict
 from trader.seller import BaseSeller
 
 
 # --------------------------------
-# 根据建仓价的下跌比例严格绝对止损
+# 根据建仓价做硬止损/硬止盈，止损线可随持仓天数上移
+# 参数示例：
+# hard_time_range = ['09:31', '14:57']
+# earn_limit = 1.10
+# risk_limit = 0.95
+# risk_tight = 0.005
 # --------------------------------
 class HardSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -49,13 +54,16 @@ class HardSeller(BaseSeller):
 
 
 # --------------------------------
-# 临近跌停止损逻辑，第二个用以预防极端风险
+# 以开盘价/最高价/昨收价中的最大值为参考，回落一定比例即卖出
+# 参数示例：
+# safe_time_range = ['09:30', '14:57']
+# safe_rate = 0.02
 # --------------------------------
 class SafeSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
         BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('走低卖点模块', end=' ')
-        self.safe_time_range = parameters.hard_time_range
+        self.safe_time_range = parameters.safe_time_range
         self.safe_rate = parameters.safe_rate   # 当日开盘和最高下行百分之多少卖出，例：0.01 = 1% 走低时就开始挂卖单
 
     def check_sell(
@@ -88,7 +96,11 @@ class SafeSeller(BaseSeller):
 
 
 # --------------------------------
-# 盈利未达预期则卖出换仓
+# 持仓达到指定天数后，若涨幅仍未达到日均目标则换仓卖出
+# 参数示例：
+# switch_time_range = ['09:35', '14:57']
+# switch_hold_days = 2
+# switch_demand_daily_up = 0.03
 # --------------------------------
 class SwitchSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -119,7 +131,14 @@ class SwitchSeller(BaseSeller):
 
 
 # --------------------------------
-# 历史最高价回落比例止盈
+# 历史最高价回落止盈，按不同涨幅区间配置不同回落阈值
+# 参数示例：
+# fall_time_range = ['09:40', '14:57']
+# fall_from_top = [
+#     (1.08, 9.99, 0.05),
+#     (1.05, 1.08, 0.04),
+#     (1.03, 1.05, 0.03),
+# ]
 # --------------------------------
 class FallSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -153,7 +172,14 @@ class FallSeller(BaseSeller):
 
 
 # --------------------------------
-# 浮盈回撤百分止盈
+# 浮盈回撤止盈，按利润区间要求保留一部分已获得利润
+# 参数示例：
+# return_time_range = ['09:45', '14:57']
+# return_of_profit = [
+#     (1.08, 1.15, 0.40),
+#     (1.05, 1.08, 0.60),
+#     (1.03, 1.05, 0.70),
+# ]
 # --------------------------------
 class ReturnSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -173,7 +199,7 @@ class ReturnSeller(BaseSeller):
                 cost_price = position.open_price
                 sell_volume = position.can_use_volume
 
-                for inc_min, inc_max, fall_percentage in self.return_of_profit:  # 逐级回落止盈
+                for inc_min, inc_max, fall_percentage in self.return_of_profit:  # 逐级利润回撤止盈
                     if (cost_price * inc_min <= max_price < cost_price * inc_max) \
                             and curr_price < max_price - (max_price - cost_price) * fall_percentage:
                         self.order_sell(code, quote, sell_volume,
@@ -186,33 +212,54 @@ class ReturnSeller(BaseSeller):
         return False
 
 
-# # --------------------------------
-# # 尾盘涨停卖出（暂时先别用）
-# # --------------------------------
-# class TailCapSeller(BaseSeller):
-#     def __init__(self, strategy_name, delegate, parameters):
-#         BaseSeller.__init__(self, strategy_name, delegate, parameters)
-#         print('尾盘涨停卖点模块', end=' ')
-#         self.tail_time_range = parameters.tail_time_range
-#
-#     def check_sell(self, code: str, quote: Dict, curr_date: str, curr_time: str, position: XtPosition,
-#                    held_day: int, max_price: Optional[float], history: Optional[pd.DataFrame]) -> bool:
-#
-#         if history is not None:
-#             if (held_day > 0) and (self.tail_time_range[0] <= curr_time < self.tail_time_range[1]):
-#                 sell_volume = position.can_use_volume
-#                 curr_price = quote['lastPrice']
-#                 last_close = history['close'].values[-1]
-#
-#                 # TODO: 似乎有点bug，怎么判断是尾盘涨停？
-#                 if curr_price >= get_limit_up_price(code, last_close):
-#                     self.order_sell(code, quote, sell_volume, '尾盘涨停')
-#                     return True
-#         return False
+# --------------------------------
+# 分段移动止盈，达到某段最大涨幅后，回落到保底利润线即卖出
+# 例如 (1.03, 1.05, 1.01) 表示最大涨幅在3%~5%之间时，只保留1%利润
+# 参数示例：
+# move_time_range = ['09:45', '14:57']
+# move_profit = [
+#     (1.08, 9.99, 1.04),
+#     (1.05, 1.08, 1.02),
+#     (1.03, 1.05, 1.01),
+# ]
+# --------------------------------
+class MoveSeller(BaseSeller):
+    def __init__(self, strategy_name, delegate, parameters):
+        BaseSeller.__init__(self, strategy_name, delegate, parameters)
+        print('移动止盈卖点模块', end=' ')
+        self.move_time_range = parameters.move_time_range
+        self.move_profit = parameters.move_profit
+
+    def check_sell(
+            self, code: str, quote: Dict, curr_date: str, curr_time: str,
+            position: XtPosition, held_day: int, max_price: Optional[float],
+            history: Optional[pd.DataFrame], ticks: Optional[list[list]], extra: any,
+    ) -> bool:
+        if max_price is not None:
+            if (held_day > 0) and (self.move_time_range[0] <= curr_time < self.move_time_range[1]):
+                curr_price = quote['lastPrice']
+                cost_price = position.open_price
+                sell_volume = position.can_use_volume
+
+                for inc_min, inc_max, keep_profit in self.move_profit:  # 逐级锁定最低利润
+                    if (cost_price * inc_min <= max_price < cost_price * inc_max) \
+                            and curr_price <= cost_price * keep_profit:
+                        self.order_sell(code, quote, sell_volume,
+                                        f'涨{int((inc_min - 1) * 100)}%止盈{int((keep_profit - 1) * 100)}%')
+                        logging.warning(f'[触发卖出]移动止盈 '
+                            f'成本:{round(cost_price, 3)} 卖价:{round(curr_price, 3)} '
+                            f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                            f'最高:{max_price} 区间:{inc_min}-{inc_max} 保底收益:{keep_profit}')
+                        return True
+        return False
 
 
 # --------------------------------
-# 开仓日当天指标尾盘止损
+# 开仓日及之后，跌破开仓日低点或尾盘明显缩量时卖出
+# 参数示例：
+# opening_time_range = ['14:30', '14:57']
+# open_low_rate = 1.00
+# open_vol_rate = 0.70
 # --------------------------------
 class OpenDaySeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -259,7 +306,10 @@ class OpenDaySeller(BaseSeller):
 
 
 # --------------------------------
-# 跌破均线卖出
+# 跌破指定均线卖出，适合趋势票破位离场
+# 参数示例：
+# ma_time_range = ['09:35', '14:57']
+# ma_above = 5
 # --------------------------------
 class MASeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -296,7 +346,11 @@ class MASeller(BaseSeller):
 
 
 # --------------------------------
-# CCI 冲高回落卖出
+# 基于 CCI 指标的区间穿越卖出，每5分钟检查一次
+# 参数示例：
+# cci_time_range = ['09:35', '14:57']
+# cci_upper = 100
+# cci_lower = -100
 # --------------------------------
 class CCISeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -344,7 +398,10 @@ class CCISeller(BaseSeller):
 
 
 # --------------------------------
-# WR上穿卖出
+# WR 指标上穿阈值卖出，每5分钟检查一次
+# 参数示例：
+# wr_time_range = ['09:35', '14:57']
+# wr_cross = 80
 # --------------------------------
 class WRSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -381,7 +438,12 @@ class WRSeller(BaseSeller):
 
 
 # --------------------------------
-# 次日成交量萎缩卖出
+# 次日固定时刻检查缩量，若缩量且仍有利润则卖出
+# 参数示例：
+# next_time_range = ['09:30', '10:30']
+# vol_dec_thre = 0.60
+# vol_dec_time = '10:00'
+# vol_dec_limit = 1.095
 # --------------------------------
 class VolumeDropSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -420,7 +482,14 @@ class VolumeDropSeller(BaseSeller):
 
 
 # --------------------------------
-# 高开出货卖出
+# 高开后快速走弱卖出，按高开幅度分段配置允许的回落阈值
+# 参数示例：
+# drop_time_range = ['09:31', '10:30']
+# drop_out_limits = [
+#     (1.03, 1.05, 0.02),
+#     (1.05, 1.07, 0.025),
+#     (1.07, 9.99, 0.03),
+# ]
 # --------------------------------
 class DropSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -466,7 +535,8 @@ class DropSeller(BaseSeller):
 
 
 # --------------------------------
-# 上涨过程阻断器
+# 单根强势上涨形态阻断器，命中后返回 True 以阻止其他 Seller 卖出
+# 参数示例：无需额外参数
 # --------------------------------
 class IncBlocker(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
@@ -487,7 +557,8 @@ class IncBlocker(BaseSeller):
 
 
 # --------------------------------
-# 双涨趋势阻断器
+# 趋势上行阻断器，MACD 与价格同步上行时阻止其他 Seller 卖出
+# 参数示例：无需额外参数
 # --------------------------------
 class UppingBlocker(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):

@@ -1,11 +1,7 @@
 import logging
 import threading
-from typing import Dict, Set, List
 
-from credentials import (
-    DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH,
-    QMT_ACCOUNT_ID, QMT_CLIENT_PATH
-)
+from credentials import DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH, QMT_ACCOUNT_ID, QMT_CLIENT_PATH
 from tools.utils_basic import logging_init, is_symbol, debug
 from tools.utils_cache import all_held_inc, update_max_prices, load_json
 from tools.utils_ding import DingMessager
@@ -119,7 +115,7 @@ def before_trade_day() -> None:
 # ======== 买点 ========
 
 
-def pull_stock_codes() -> List[str]:
+def pull_stock_codes() -> list[str]:
     codes_wencai = get_wencai_codes([SELECT_PROMPT])
     codes_top = []
 
@@ -159,7 +155,7 @@ def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
+def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
     selected_codes = pull_stock_codes()
     debug(f'[{len(selected_codes)}]', end='')
 
@@ -175,15 +171,15 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 # ======== 卖点 ========
 
 
-def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+def scan_sell(quotes: dict, curr_date: str, curr_time: str, positions: list) -> None:
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, curr_time, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:

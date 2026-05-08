@@ -5,20 +5,18 @@ import pickle
 import threading
 import datetime
 import functools
-from typing import List, Dict, Set, Optional, Callable, Any
+from typing import List, Dict, Set, Optional
 
 import numpy as np
 import pandas as pd
-import akshare as ak
 
-from tools.constants import *
-from tools.utils_basic import symbol_to_code
+from tools.constants import InfoItem, REPURCHASE_CODES
+from tools.utils_basic import symbol_to_code, is_in_continuous_auction
+from tools.utils_cache_ak import AKCache, AKCacheProtected, TRADE_DAY_CACHE_PATH
+
 
 trade_day_cache = {}
 trade_max_year_key = 'max_year'
-
-TRADE_DAY_CACHE_PATH = './_cache/_open_day_list_sina.csv'
-CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
 
 # 查询股票名称
@@ -62,55 +60,13 @@ class StockNames:
         return '[Unknown]'
 
 
-def cache_with_path_ttl(path: str, ttl: int, dtype: dict) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # 查找可用缓存
-            dir_name = os.path.dirname(path)
-            try:
-                with open(path, 'rb') as f:
-                    if datetime.datetime.now().timestamp() - os.fstat(f.fileno()).st_mtime < ttl:
-                        return pd.read_csv(f, dtype=dtype)
-            except FileNotFoundError:
-                os.makedirs(dir_name, exist_ok=True) if dir_name else None
-            # 如果没有缓存
-            try:
-                data = func(*args, **kwargs)
-                data.to_csv(path, index=False)
-                return data
-            except Exception as e:
-                print('AKShare request failed: ', e)
-                return None
-        return wrapper
-    return decorator
-
-
-class AKCache:
-    import akshare as _ak
-
-    @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_stock_info_a_code_name.csv', ttl=60*60*23, dtype={'code': str})
-    def stock_info_a_code_name(cls):
-        return cls._ak.stock_info_a_code_name()
-
-    @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_fund_etf_spot_em.csv', ttl=60*60*23, dtype={'代码': str})
-    def fund_etf_spot_em(cls):
-        return cls._ak.fund_etf_spot_em()
-
-    @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot_em.csv', ttl=5, dtype={'代码': str})
-    def stock_zh_a_spot_em(cls):
-        return cls._ak.stock_zh_a_spot_em()
-
-    @classmethod
-    @cache_with_path_ttl(path='./_cache/_ak_stock_zh_a_spot.csv', ttl=5, dtype={'代码': str})
-    def stock_zh_a_spot(cls):
-        return cls._ak.stock_zh_a_spot()
-
-
+# ===============
 # 获取股票的中文名称
+# ===============
+
+CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
+
+
 def load_stock_code_and_names(retention_day: int = 1):
     cache_available = False
     df = pd.DataFrame(columns=['代码', '名称', '日期'])
@@ -181,9 +137,9 @@ def get_stock_codes_and_names() -> Dict[str, str]:
     return ans
 
 
-# ==========
-# 本地磁盘缓存
-# ==========
+# ================
+#  本地磁盘缓存
+# ================
 
 
 def delete_file(path: str) -> None:
@@ -315,12 +271,19 @@ def update_max_prices(
     lock: threading.Lock,
     quotes: dict,
     positions: list,
+    curr_time: str,
     path_max_prices: str,
     path_min_prices: str,
     path_held_info: str,
     ignore_open_day: bool = True,  # 是否忽略开仓日，从次日开始计算最高价
-):
+) -> tuple[dict, dict]:
     held_info = load_json(path_held_info)
+
+    # 只有在连续竞价时间段内才更新最高价格和最低价格
+    if not is_in_continuous_auction(curr_time):
+        with lock:
+            max_prices = load_json(path_max_prices)
+        return max_prices, held_info
 
     with lock:
         max_prices = load_json(path_max_prices)
@@ -418,9 +381,9 @@ def record_deal(
             ])
 
 
-# ==========
-# 交易日缓存
-# ==========
+# ================
+#  交易日历缓存
+# ================
 
 
 # 获取磁盘缓存的交易日列表
@@ -494,6 +457,7 @@ def get_next_trading_date_str(today: str, count: int, basic_format: bool = True)
         else:
             return trading_day_list[-1]
 
+
 # 获取前n个交易日列表，返回格式 %Y-%m-%d
 @functools.cache
 def get_prev_trading_date_list(today: str, count: int) -> list:
@@ -509,7 +473,7 @@ def get_prev_trading_date_list(today: str, count: int) -> list:
     return trading_day_list[trading_index - count : trading_index]
 
 
-#获取从start_day到end_day的交易日列表，返回列表，其中日期格式 %Y-%m-%d
+# 获取从 start_day 到 end_day 的交易日列表，返回列表，其中日期格式 %Y-%m-%d
 @functools.cache
 def get_trading_date_list(start_date: str, end_date: str) -> list:
     if start_date == end_date:
@@ -539,6 +503,7 @@ def get_trading_date_list(start_date: str, end_date: str) -> list:
         print('[CACHE] 找不到目标，默认返回已知最晚的交易日')
         return trading_day_list[start_trading_index : -1]
 
+
 # 检查当日是否是交易日，使用sina数据源
 def check_is_open_day_sina(curr_date: str) -> bool:
     """
@@ -560,9 +525,11 @@ def check_is_open_day_sina(curr_date: str) -> bool:
             print(f'[文件缓存] {curr_date} 为 {"" if ans else "非"}交易日')
             return ans
 
-    # 网络缓存
-    df = ak.tool_trade_date_hist_sina()
-    df.to_csv(TRADE_DAY_CACHE_PATH)
+    # 网络缓存（ttl=0 的 AK 封装：每次尝试拉取，失败则读 TRADE_DAY_CACHE_PATH 过期 CSV）
+    df = AKCache.tool_trade_date_hist_sina()
+    if df is None or len(df) == 0:
+        print('[网络缓存] 交易日历拉取失败且无可用缓存')
+        return True
     print(f'[网络缓存] 更新交易日历 {curr_year} - {int(curr_year) + 1} 已存入 {TRADE_DAY_CACHE_PATH}.')
 
     trade_day_list = get_disk_trade_day_list_and_update_max_year()
@@ -584,34 +551,49 @@ def check_is_open_day(curr_date: str) -> bool:
     return check_is_open_day_sina(curr_date)
 
 
-# ==========
-# 远程数据缓存
-# ==========
+# 装饰器：检查是否是交易日，非交易日不执行函数
+def check_open_day(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return func(*args, **kwargs)    # 开放日正常执行
+    return wrapper
+
+
+# ================
+#  远程数据缓存
+# ================
+
+
+def _index_constituent_df_ok(df: Optional[pd.DataFrame]) -> bool:
+    if df is None or not isinstance(df, pd.DataFrame) or len(df) == 0:
+        return False
+    return '品种代码' in df.columns or '成分券代码' in df.columns
+
+
+def _load_legacy_index_constituent_pkl(index_symbol: str) -> Optional[pd.DataFrame]:
+    legacy = f'./_cache/_index_{index_symbol}.pkl'
+    if not os.path.exists(legacy):
+        return None
+    try:
+        return pd.read_pickle(legacy)
+    except Exception:
+        return None
 
 
 # 获取指数成份symbol
 def get_index_constituent_symbols(index_symbol: str) -> list[str]:
     if index_symbol[:2] in ['00', '93', '89']:
-        # 中证指数接口
-        index_file = f'./_cache/_index_{index_symbol}.pkl'
-        if not os.path.exists(index_file) or \
-                (datetime.datetime.now().timestamp() - os.path.getmtime(index_file) > 23 * 60 * 60):
-            try:
-                df = ak.index_stock_cons_csindex(symbol=index_symbol)
-                df.to_pickle(index_file)
-            except Exception as e:
-                # 很难遇到的情况就是中证网站维护不可用
-                if os.path.exists(index_file):
-                    df = pd.read_pickle(index_file)
-                else:
-                    # 实在不行用一些会出现重复不全问题的接口作为 fallback
-                    df = ak.index_stock_cons(symbol=index_symbol)
-                    print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！', e)
-        else:
-            df = pd.read_pickle(index_file)
+        df = AKCache.index_stock_cons_csindex(symbol=index_symbol)
+        if not _index_constituent_df_ok(df):
+            legacy = _load_legacy_index_constituent_pkl(index_symbol)
+            if _index_constituent_df_ok(legacy):
+                df = legacy
+        if not _index_constituent_df_ok(df):
+            df = AKCache.index_stock_cons(symbol=index_symbol)
+            print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
     else:
-        # 普通指数接口：有重复不全，需要注意
-        df = ak.index_stock_cons(symbol=index_symbol)
+        df = AKCache.index_stock_cons(symbol=index_symbol)
         print('警告：指数成份使用备用数据，监控股池可能不完整，请注意！')
 
     if '品种代码' in df.columns:
@@ -650,12 +632,13 @@ def _filter_none_st_out(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# 以下三处单独使用 AKCacheProtected：AK 故障时用过期 CSV 兜底，避免选股/白名单股池为空（其余逻辑仍用 AKCache）
 # 根据两位数前缀获取股票列表
 def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[str]:
     """
     prefixes: 六位数的两位数前缀
     """
-    df = AKCache.stock_info_a_code_name()
+    df = AKCacheProtected.stock_info_a_code_name()
     if none_st:
         df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values if symbol[:2] in prefixes]
@@ -663,7 +646,7 @@ def get_prefixes_stock_codes(prefixes: Set[str], none_st: bool = False) -> List[
 
 
 def get_none_st_codes() -> list[str]:
-    df = AKCache.stock_info_a_code_name()
+    df = AKCacheProtected.stock_info_a_code_name()
     df = _filter_none_st_out(df)
     codes = [symbol_to_code(symbol) for symbol in df['code'].values]
     return list(set(codes))
@@ -671,16 +654,60 @@ def get_none_st_codes() -> list[str]:
 
 # 获取流通市值，单位（元）
 def get_stock_codes_and_circulation_mv() -> Dict[str, int]:
-    df = AKCache.stock_zh_a_spot_em()
+    df = AKCacheProtected.stock_zh_a_spot_em()
     df['代码'] = df['代码'].apply(lambda x: symbol_to_code(x))
     df = df[['代码', '流通市值']].dropna()
     return dict(zip(df['代码'], df['流通市值']))
 
 
-# 装饰器：检查是否是交易日，非交易日不执行函数
-def check_open_day(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        if check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return func(*args, **kwargs)    # 开放日正常执行
-    return wrapper
+# ===============
+# 获取股票的分红配送
+# ===============
+
+
+def _get_recent_fhps_report_date(now: Optional[datetime.datetime] = None) -> str:
+    now = now or datetime.datetime.now()
+    year = now.year
+    month = now.month
+
+    # 只调用一次接口时，优先选择当前时点最可能覆盖最近除权事件的最近报告期。
+    if month <= 6:
+        return f'{year - 1}1231'
+    if month <= 9:
+        return f'{year}0630'
+    return f'{year}0930'
+
+
+def get_recent_exit_right_codes_from_fhps(
+    days: int,
+    now: Optional[datetime.datetime] = None,
+    report_date: Optional[str] = None,
+) -> List[str]:
+    if days <= 0:
+        return []
+
+    now = now or datetime.datetime.now()
+    report_date = report_date or _get_recent_fhps_report_date(now)
+    df = AKCache.stock_fhps_em(date=report_date)
+    if df is None or len(df) == 0:
+        return []
+
+    if '代码' not in df.columns or '除权除息日' not in df.columns:
+        print(f'[分红送配] {report_date} 返回结果缺少关键列，跳过')
+        return []
+
+    target_dates = {
+        get_prev_trading_date(now, forward_day)
+        for forward_day in range(days - 1, -1, -1)
+    }
+
+    df = df.copy()
+    df['除权除息日'] = pd.to_datetime(df['除权除息日'], errors='coerce').dt.strftime('%Y%m%d')
+    df = df[df['除权除息日'].isin(target_dates)]
+
+    codes = [
+        symbol_to_code(symbol)
+        for symbol in df['代码'].astype(str).tolist()
+        if len(str(symbol)) == 6
+    ]
+    return sorted(set(codes))

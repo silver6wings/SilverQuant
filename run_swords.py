@@ -1,12 +1,8 @@
 import logging
 import threading
 import datetime
-from typing import Dict, Set, List
 
-from credentials import (
-    DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH,
-    QMT_ACCOUNT_ID, QMT_CLIENT_PATH
-)
+from credentials import DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH, QMT_ACCOUNT_ID, QMT_CLIENT_PATH
 from tools.utils_basic import logging_init, is_symbol, time_diff_seconds
 from tools.utils_cache import all_held_inc
 from tools.utils_ding import DingMessager
@@ -141,7 +137,7 @@ def check_block_ticks(
 
 
 def select_stocks(
-    quotes: Dict,
+    quotes: dict,
     curr_time: str,
     curr_seconds: str,
 ) -> dict[str, dict]:
@@ -178,7 +174,7 @@ def select_stocks(
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, curr_time: str, curr_seconds: str, positions: List) -> None:
+def scan_buy(quotes: dict, curr_date: str, curr_time: str, curr_seconds: str, positions: list) -> None:
     selections = select_stocks(quotes, curr_time, curr_seconds)
     # debug(f'本次扫描:{len(quotes)}, 选股{selections})
 
@@ -189,7 +185,7 @@ def scan_buy(quotes: Dict, curr_date: str, curr_time: str, curr_seconds: str, po
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in BuyConf.time_ranges:

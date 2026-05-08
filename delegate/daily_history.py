@@ -1,10 +1,11 @@
 import os
 import datetime
 import time
+import traceback
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
-from tools.utils_cache import AKCache, get_prev_trading_date
+from tools.utils_cache import AKCacheProtected, get_prev_trading_date, get_recent_exit_right_codes_from_fhps
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
@@ -60,6 +61,18 @@ class DailyHistory:
             self.cache_history[item] = pd.DataFrame(columns=self.default_columns)
         return self.cache_history[item]
 
+    def _has_datetime_column(self, df: pd.DataFrame, code: str, stage: str) -> bool:
+        if df is None:
+            print(f'[历史日线] {stage} {code} skipped: dataframe is None')
+            return False
+        if not isinstance(df, pd.DataFrame):
+            print(f'[历史日线] {stage} {code} skipped: invalid dataframe type {type(df)}')
+            return False
+        if 'datetime' not in df.columns:
+            print(f'[历史日线] {stage} {code} skipped: missing datetime column')
+            return False
+        return True
+
     # 获取数据副本
     def get_subset_copy(self, codes: list[str], days: int) -> dict[str, pd.DataFrame]:
         if codes is None:
@@ -80,9 +93,8 @@ class DailyHistory:
 
         # 获取远程所有股票代码列表，目前只支持 akshare
         if force_download:
-            import akshare as ak
             try:
-                df = AKCache.stock_info_a_code_name()
+                df = AKCacheProtected.stock_info_a_code_name()
                 df.to_csv(code_list_path, index=False)
             except Exception as e:
                 print('[历史日线] Download code list failed! ', e)
@@ -102,7 +114,7 @@ class DailyHistory:
     #  内部下载代码
     # ==============
 
-    def _download_codes(self, code_list: list[str], day_count: int) -> None:
+    def _download_codes(self, code_list: list[str], day_count: int, interval: int = 5) -> None:
         now = datetime.datetime.now()
         forward_day = 1  # 不算今天
         start_date = get_prev_trading_date(now, forward_day + day_count)
@@ -116,15 +128,23 @@ class DailyHistory:
             group_codes = [sub_code for sub_code in code_list[i:i + group_size]]
 
             for code in group_codes:
-                df = get_daily_history(
-                    code=code,
-                    start_date=start_date,
-                    end_date=end_date,
-                    columns=self.default_columns,
-                    adjust=ExitRight.QFQ,
-                    data_source=self.data_source,
-                )
-                time.sleep(5)
+                try_limit = 2
+                try_count = 0
+                df = None
+                while try_count < try_limit:
+                    try_count += 1
+                    try:
+                        df = get_daily_history(
+                            code=code,
+                            start_date=start_date,
+                            end_date=end_date,
+                            columns=self.default_columns,
+                            adjust=ExitRight.QFQ,
+                            data_source=self.data_source,
+                        )
+                        time.sleep(interval)
+                    except Exception:
+                        pass
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue
@@ -184,16 +204,19 @@ class DailyHistory:
             path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             try:
                 df = pd.read_csv(path, dtype={'datetime': int})
+                if not self._has_datetime_column(df, code, 'load'):
+                    error_count += 1
+                    continue
                 self.cache_history[code] = df
             except Exception as e:
                 print(code, e)
                 error_count += 1
         print(f'\n[历史日线] Loading finished with {error_count}/{i} errors')
 
-    def download_all_to_disk(self, renew_code_list: bool = True) -> None:
+    def download_all_to_disk(self, renew_code_list: bool = True, interval: int = 5) -> None:
         code_list = self.get_code_list(force_download=renew_code_list)
         print(f'[历史日线] Downloading all {len(code_list)} codes data of {self.init_day_count} days...')
-        self._download_codes(code_list, self.init_day_count)
+        self._download_codes(code_list, self.init_day_count, interval=interval)
 
     # ==============
     #  部分更新逻辑
@@ -206,7 +229,11 @@ class DailyHistory:
 
         loss_list = []  # 找到缺失当天数据的codes
         for code in code_list:
-            if not (self[code]['datetime'] == target_date_int).any():
+            cache_df = self[code]
+            if not self._has_datetime_column(cache_df, code, 'cache check'):
+                self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                cache_df = self[code]
+            if not (cache_df['datetime'] == target_date_int).any():
                 loss_list.append(code)
 
         updated_codes = set()
@@ -227,7 +254,13 @@ class DailyHistory:
             # 填补缺失的日期
             for code in dfs:
                 df = dfs[code]
-                if len(df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
+                if not self._has_datetime_column(df, code, 'tushare update'):
+                    continue
+                cache_df = self[code]
+                if not self._has_datetime_column(cache_df, code, 'cache append'):
+                    self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                    cache_df = self[code]
+                if len(df) == 1 and (not (cache_df['datetime'] == target_date_int).any()):
                     updated_codes.add(code)
                     updated_count += 1
                     if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
@@ -261,17 +294,25 @@ class DailyHistory:
                     data_source=self.data_source,
                 )
                 if df is not None and len(df) > 0:
+                    if not self._has_datetime_column(df, code, 'history update'):
+                        print('x', end='')
+                        continue
+                    cache_df = self[code]
+                    if not self._has_datetime_column(cache_df, code, 'cache append'):
+                        self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                        cache_df = self[code]
                     updated = False
                     for forward_day in range(days, 0, -1):
                         target_date_int = int(get_prev_trading_date(now, forward_day))
                         target_date_df = df[df['datetime'] == target_date_int]
-                        if len(target_date_df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
+                        if len(target_date_df) == 1 and (not (cache_df['datetime'] == target_date_int).any()):
                             updated = True
                             if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
                                 self.cache_history[code] = target_date_df  # concat len = 0 的 df 会报 warning
                             else:
                                 self.cache_history[code] = pd.concat(
                                     [self.cache_history[code], target_date_df], ignore_index=True)
+                                cache_df = self.cache_history[code]
                     if updated:
                         updated_codes.add(code)
                         updated_count += 1
@@ -293,6 +334,8 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
+            if not self._has_datetime_column(self[code], code, 'save'):
+                continue
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[历史日线] Finished with {i} files updated')
@@ -302,8 +345,18 @@ class DailyHistory:
         if len(self.cache_history) == 0:
             self.load_history_from_disk_to_memory()
 
-        self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
-        code_list = self.get_code_list()
+        try:
+            self._download_remote_missed()  # 先把之前的历史更新上，可能会有长度不够的问题
+        except Exception as e:
+            print(f'[历史日线] _download_remote_missed 异常: {e}')
+            traceback.print_exc()
+
+        try:
+            code_list = self.get_code_list()
+        except Exception as e:
+            print(f'[历史日线] get_code_list 异常: {e}')
+            traceback.print_exc()
+            return
 
         # TUSHARE 支持一次下载多个票，AKSHARE & MOOTDX 只能全部扫描一遍，所以加个缓存标记以防重复加载浪费时间
         if self.data_source == DataSource.TUSHARE:
@@ -316,14 +369,23 @@ class DailyHistory:
 
             for forward_day in range(days, forward_end, -1):
                 target_date = get_prev_trading_date(now, forward_day)
-                sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
-                all_updated_codes.update(sub_updated_codes)
+                try:
+                    sub_updated_codes = self._update_codes_by_tushare(target_date, code_list)
+                    all_updated_codes.update(sub_updated_codes)
+                except Exception as e:
+                    print(f'[历史日线] _update_codes_by_tushare({target_date}) 异常: {e}')
+                    traceback.print_exc()
         else:
-            ttl = self.since_last_update_datetime()
-            if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
-                return
+            try:
+                ttl = self.since_last_update_datetime()
+                if ttl is not None and ttl < 12 * 3600:   # 上次更新时间太近就不重复执行
+                    return
 
-            all_updated_codes = self._update_codes_one_by_one(days, code_list)
+                all_updated_codes = self._update_codes_one_by_one(days, code_list)
+            except Exception as e:
+                print(f'[历史日线] _update_codes_one_by_one({days}) 异常: {e}')
+                traceback.print_exc()
+                return
 
         # 排序存储所有更新过的数据
         print('[历史日线] Sorting and Saving all history data ', end='')
@@ -332,6 +394,8 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
+            if not self._has_datetime_column(self[code], code, 'save'):
+                continue
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[历史日线] Finished with {i} files updated')
@@ -376,21 +440,20 @@ class DailyHistory:
 
     @staticmethod
     def get_recent_exit_right_codes(days: int) -> list[str]:
-        import akshare as ak
-        ans = []
-        now = datetime.datetime.now()
-        for i in range(days-1, -1, -1):
-            date_str = get_prev_trading_date(now, i)
-            df = ak.news_trade_notify_dividend_baidu(date=date_str)
-            if df is not None and len(df) > 0 and '股票代码' in df.columns:
-                codes = [symbol_to_code(symbol) for symbol in df['股票代码'].values if len(symbol) == 6]
-                ans += codes
-        return ans
+        return get_recent_exit_right_codes_from_fhps(days)
 
     def remove_recent_exit_right_histories(self, days: int) -> None:
-        codes = self.get_recent_exit_right_codes(days)
+        try:
+            codes = self.get_recent_exit_right_codes(days)
+        except Exception as e:
+            print(f'[历史日线] 获取最近 {days} 天除权列表异常，跳过清理: {e}')
+            return
+
         removed_count = 0
         for code in codes:
-            if self.remove_single_history(code):
-                removed_count += 1
+            try:
+                if self.remove_single_history(code):
+                    removed_count += 1
+            except Exception as e:
+                print(f'[历史日线] 删除 {code} 历史缓存失败: {e}')
         print(f'[历史日线] Removed {removed_count} histories with Exit Right announced')

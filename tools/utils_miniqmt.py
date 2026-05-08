@@ -1,7 +1,7 @@
 import threading
 import pandas as pd
 
-from tools.constants import *
+from tools.constants import ExitRight
 
 
 def _run_with_timeout(target_func, args=(), timeout=1) -> any:

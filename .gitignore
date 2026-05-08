@@ -164,14 +164,17 @@ cython_debug/
 
 # cache
 _cache/_daily*
-_cache/_sector_*
-_cache/_tmp_*
+_cache/_sector*
+_cache/_tmp*
+
 _cache/_index_*
 _cache/_ak_*
+_cache/_api_*
 
 _cache/debug/
-_cache/prod_pwc/
-_cache/staging_pwc/
-_cache/test_pwc/
+_cache/prod_*
+_cache/test_*
+_cache/tick_*
+_cache/_code_names.csv
 
 credentials.py

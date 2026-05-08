@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import datetime
 import random
@@ -7,8 +8,9 @@ from typing import Dict, Callable, Optional
 
 import pandas as pd
 from xtquant import xtdata
+from credentials import QMT_CLIENT_PATH
 
-from delegate.base_subscriber import HistorySubscriber
+from delegate.base_subscriber import HistorySubscriber, get_today
 from delegate.xt_delegate import XtDelegate
 from delegate.daily_reporter import DailyReporter
 
@@ -21,14 +23,14 @@ class XtSubscriber(HistorySubscriber):
     def __init__(
         self,
         # 基本信息
-        account_id: str,
-        delegate: Optional[XtDelegate],
-        strategy_name: str,
-        path_deal: str,
-        path_assets: str,
+        account_id: str,                    # 迅投账户
+        delegate: Optional[XtDelegate],     # 迅投代理
+        strategy_name: str,                 # 策略名称
+        path_deal: str,                     # 记录交易历史文件
+        path_assets: str,                   # 记录资产净值文件
         # 回调
-        execute_strategy: Callable,         # 策略回调函数
-        execute_call_end: Callable = None,  # 策略竞价结束回调
+        execute_strategy: Callable,         # 连续交易回调函数
+        execute_call_end: Callable = None,  # 竞价结束回调函数
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
@@ -43,8 +45,8 @@ class XtSubscriber(HistorySubscriber):
         open_today_hold_report: bool = False,   # 每日持仓记录报告
         today_report_show_bank: bool = False,   # 是否显示银行流水（国金QMT会卡死所以默认关闭）
         # tick 缓存
-        open_tick_memory_cache: bool = False,
-        tick_memory_data_frame: bool = False,
+        open_tick_memory_cache: bool = False,   # 内存保留当日tick历史
+        tick_memory_data_frame: bool = False,   # 内存tick历史用df格式
     ):
         super().__init__(
             account_id=account_id,
@@ -74,7 +76,7 @@ class XtSubscriber(HistorySubscriber):
         self.lock_quotes_update = threading.Lock()  # 聚合实时打点缓存的锁
 
         self.cache_quotes: Dict[str, Dict] = {}     # 记录实时的价格信息
-        self.sub_sequence: int = -1                 # 记录实时数据订阅号
+        self.sub_sequence: int | None = None        # 记录实时数据订阅号
 
         self.last_callback_time = datetime.datetime.now()       # 上次返回quotes 时间
 
@@ -100,8 +102,6 @@ class XtSubscriber(HistorySubscriber):
             + [f'askVol{i}' for i in range(1, 6)] \
             + [f'bidPrice{i}' for i in range(1, 6)] \
             + [f'bidVol{i}' for i in range(1, 6)]
-
-        self.curr_trade_date = '1990-12-19' #记录当前股票交易日期
 
     # -----------------------
     # 策略触发主函数
@@ -187,7 +187,7 @@ class XtSubscriber(HistorySubscriber):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
-        if self.sub_sequence > 0:
+        if self.sub_sequence is not None:
             xtdata.unsubscribe_quote(self.sub_sequence)
             print(f'\n[结束行情订阅] 订阅数:{len(self.code_list)} 订阅号:{self.sub_sequence}\n', end='')
             if self.messager is not None:
@@ -195,25 +195,25 @@ class XtSubscriber(HistorySubscriber):
                     f'[{self.account_id}]{self.strategy_name}:{"暂停" if pause else "关闭"}',
                     output='[Message] END UNSUBSCRIBING\n')
 
-    def resubscribe_tick(self, notice: bool = False):
+    def resubscribe_tick(self, notice: bool = True):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
         prev_sub_sequence = None
-        if self.sub_sequence > 0:
+        if self.sub_sequence is not None:
             prev_sub_sequence = self.sub_sequence
             xtdata.unsubscribe_quote(self.sub_sequence)
-        xtdata.enable_hello = False
+
         self.sub_sequence = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
 
         if self.messager is not None and notice:
             self.messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name}:重启 {len(self.code_list)}支',
-                output='[Message] FINISH RESUBSCRIBING\n')
+                output='\n[Message] FINISH RESUBSCRIBING')
         print(f'\n[重启行情订阅] 订阅数:{len(self.code_list)} 订阅号:{prev_sub_sequence} -> {self.sub_sequence}', end='')
 
     def update_code_list(self, code_list: list[str]):
-        print(f'[订阅更新]:{code_list}\n', end='')
+        print(f'[订阅更新] {code_list}\n', end='')
         # 加上证指数防止没数据不打点
         self.code_list = ['000001.SH'] + code_list
         extend = 10 - len(self.code_list)
@@ -365,18 +365,34 @@ class XtSubscriber(HistorySubscriber):
         self.cache_quotes.clear()
         self.cache_history.clear()
         self.today_ticks.clear()
+        self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
 
-    def before_trade_day_wrapper(self):
-        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
-            return
+        self.clean_qmt_datadir_contents()
 
-        self.clear_all()
-        self.code_list = ['000001.SH'] + self.__extend_codes
+    def clean_qmt_datadir_contents(self):
+        clear_dirs = [
+            os.path.join(QMT_CLIENT_PATH, 'datadir', market)
+            for market in ('SZ', 'SH', 'BJ')
+        ]
 
-        if self.before_trade_day is not None:
-            self.before_trade_day()
-            self.curr_trade_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            print(f'[定时任务] 盘前准备完成 {self.curr_trade_date}\n', end='')
+        for folder in clear_dirs:
+            if not os.path.isdir(folder):
+                continue
+
+            clear_count = 0
+            fail_count = 0
+            for entry in os.scandir(folder):
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        shutil.rmtree(entry.path)
+                    else:
+                        os.unlink(entry.path)
+                    clear_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    print(f'[提示] 清理QMT缓存失败: {entry.path} {e}')
+
+            print(f'[提示] 已清理QMT缓存目录: {folder} 项数:{clear_count} 失败:{fail_count}')
 
 
     def _start_qmt_scheduler(self):
@@ -406,9 +422,6 @@ class XtSubscriber(HistorySubscriber):
             finish_time = f'16:{random.randint(0, 10) + 5}'  # 16:05 ~ 16:15
             cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
 
-        if self.execute_call_end is not None:
-            cron_jobs.append(['09:26', self.execute_call_end_wrapper, None])
-
         if self.open_middle_end_report:
             cron_jobs.append(['11:32', self.daily_summary, None])
 
@@ -420,8 +433,11 @@ class XtSubscriber(HistorySubscriber):
             else:
                 self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
 
-        # 尝试重新订阅 tick 数据，减少30分时无数据返回机率
-        self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30)
+        if self.execute_call_end is not None:
+            self.scheduler.add_job(self.execute_call_end_wrapper, 'cron', hour=9, minute=25, second=45)
+
+        # 集合竞价结束后重拉订阅，缓解首笔成交/行情推送偏晚
+        self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=25, second=30)
 
         # 数据源中断检查时间点
         monitor_time_list = [

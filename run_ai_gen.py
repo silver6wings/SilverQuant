@@ -2,6 +2,7 @@ import logging
 
 from credentials import *
 
+from tools.constants import IndexSymbol
 from tools.utils_basic import logging_init, is_symbol, debug
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
@@ -147,7 +148,7 @@ def near_trade_begin():
 # ======== 买点 ========
 
 
-def check_stock(code: str, quote: Dict, curr_date: str) -> bool:
+def check_stock(code: str, quote: dict, curr_date: str) -> bool:
     df = concat_ak_quote_dict(my_suber.cache_history[code], quote, curr_date)
 
     result_df = select(df, code, quote)
@@ -205,7 +206,7 @@ def select_stocks(quotes: dict, curr_date: str) -> dict[str, dict]:
     return selections
 
 
-def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
+def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
     selections = select_stocks(quotes, curr_date)
     debug(len(quotes), selections)
 
@@ -216,15 +217,15 @@ def scan_buy(quotes: Dict, curr_date: str, positions: List) -> None:
 # ======== 卖点 ========
 
 
-def scan_sell(quotes: Dict, curr_date: str, curr_time: str, positions: List) -> None:
-    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, PATH_MAXP, PATH_MINP, PATH_HELD)
+def scan_sell(quotes: dict, curr_date: str, curr_time: str, positions: list) -> None:
+    max_prices, held_info = update_max_prices(disk_lock, quotes, positions, curr_time, PATH_MAXP, PATH_MINP, PATH_HELD)
     my_seller.execute_sell(quotes, curr_date, curr_time, positions, held_info, max_prices, my_suber.cache_history)
 
 
 # ======== 框架 ========
 
 
-def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: Dict) -> bool:
+def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quotes: dict) -> bool:
     positions = my_delegate.check_positions()
 
     for time_range in SellConf.time_ranges:
