@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import datetime
 import random
@@ -7,6 +8,7 @@ from typing import Dict, Callable, Optional
 
 import pandas as pd
 from xtquant import xtdata
+from credentials import QMT_CLIENT_PATH
 
 from delegate.base_subscriber import HistorySubscriber, get_today
 from delegate.xt_delegate import XtDelegate
@@ -207,11 +209,11 @@ class XtSubscriber(HistorySubscriber):
         if self.messager is not None and notice:
             self.messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name}:重启 {len(self.code_list)}支',
-                output='[Message] FINISH RESUBSCRIBING\n')
+                output='\n[Message] FINISH RESUBSCRIBING')
         print(f'\n[重启行情订阅] 订阅数:{len(self.code_list)} 订阅号:{prev_sub_sequence} -> {self.sub_sequence}', end='')
 
     def update_code_list(self, code_list: list[str]):
-        print(f'[订阅更新]:{code_list}\n', end='')
+        print(f'[订阅更新] {code_list}\n', end='')
         # 加上证指数防止没数据不打点
         self.code_list = ['000001.SH'] + code_list
         extend = 10 - len(self.code_list)
@@ -365,6 +367,33 @@ class XtSubscriber(HistorySubscriber):
         self.today_ticks.clear()
         self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
 
+        self.clean_qmt_datadir_contents()
+
+    def clean_qmt_datadir_contents(self):
+        clear_dirs = [
+            os.path.join(QMT_CLIENT_PATH, 'datadir', market)
+            for market in ('SZ', 'SH', 'BJ')
+        ]
+
+        for folder in clear_dirs:
+            if not os.path.isdir(folder):
+                continue
+
+            clear_count = 0
+            fail_count = 0
+            for entry in os.scandir(folder):
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        shutil.rmtree(entry.path)
+                    else:
+                        os.unlink(entry.path)
+                    clear_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    print(f'[提示] 清理QMT缓存失败: {entry.path} {e}')
+
+            print(f'[提示] 已清理QMT缓存目录: {folder} 项数:{clear_count} 失败:{fail_count}')
+
 
     def _start_qmt_scheduler(self):
         # 默认定时任务列表
@@ -393,9 +422,6 @@ class XtSubscriber(HistorySubscriber):
             finish_time = f'16:{random.randint(0, 10) + 5}'  # 16:05 ~ 16:15
             cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
 
-        if self.execute_call_end is not None:
-            cron_jobs.append(['09:26', self.execute_call_end_wrapper, None])
-
         if self.open_middle_end_report:
             cron_jobs.append(['11:32', self.daily_summary, None])
 
@@ -407,8 +433,11 @@ class XtSubscriber(HistorySubscriber):
             else:
                 self.scheduler.add_job(cron_job[1], 'cron', hour=hr, minute=mn, args=list(cron_job[2]))
 
-        # 尝试重新订阅 tick 数据，减少30分时无数据返回机率
-        self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30)
+        if self.execute_call_end is not None:
+            self.scheduler.add_job(self.execute_call_end_wrapper, 'cron', hour=9, minute=25, second=45)
+
+        # 集合竞价结束后重拉订阅，缓解首笔成交/行情推送偏晚
+        self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=25, second=30)
 
         # 数据源中断检查时间点
         monitor_time_list = [

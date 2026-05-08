@@ -155,7 +155,7 @@ class BaseSubscriber:
             threading.Thread(target=self.custom_end_unsub).start()
 
     def update_code_list(self, code_list: list[str]):
-        print(f'[订阅列表]:{code_list}\n', end='')
+        print(f'[订阅列表] {code_list}\n', end='')
         self.code_list = code_list
 
     # -----------------------
@@ -312,7 +312,7 @@ class BaseSubscriber:
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
 
         if self.execute_call_end is not None:
-            self.scheduler.add_job(self.execute_call_end_wrapper(), 'cron', hour=9, minute=25, second=30)
+            self.scheduler.add_job(self.execute_call_end_wrapper, 'cron', hour=9, minute=25, second=45)
 
         if self.open_middle_end_report:
             self.scheduler.add_job(self.daily_summary, 'cron', hour=11, minute=32)

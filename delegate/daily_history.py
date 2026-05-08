@@ -5,7 +5,7 @@ import traceback
 import pandas as pd
 
 from tools.utils_basic import symbol_to_code
-from tools.utils_cache import AKCache, get_prev_trading_date, get_recent_exit_right_codes_from_fhps
+from tools.utils_cache import AKCacheProtected, get_prev_trading_date, get_recent_exit_right_codes_from_fhps
 from tools.utils_remote import DataSource, ExitRight, get_daily_history, get_ts_daily_histories
 
 
@@ -61,6 +61,18 @@ class DailyHistory:
             self.cache_history[item] = pd.DataFrame(columns=self.default_columns)
         return self.cache_history[item]
 
+    def _has_datetime_column(self, df: pd.DataFrame, code: str, stage: str) -> bool:
+        if df is None:
+            print(f'[历史日线] {stage} {code} skipped: dataframe is None')
+            return False
+        if not isinstance(df, pd.DataFrame):
+            print(f'[历史日线] {stage} {code} skipped: invalid dataframe type {type(df)}')
+            return False
+        if 'datetime' not in df.columns:
+            print(f'[历史日线] {stage} {code} skipped: missing datetime column')
+            return False
+        return True
+
     # 获取数据副本
     def get_subset_copy(self, codes: list[str], days: int) -> dict[str, pd.DataFrame]:
         if codes is None:
@@ -81,9 +93,8 @@ class DailyHistory:
 
         # 获取远程所有股票代码列表，目前只支持 akshare
         if force_download:
-            import akshare as ak
             try:
-                df = AKCache.stock_info_a_code_name()
+                df = AKCacheProtected.stock_info_a_code_name()
                 df.to_csv(code_list_path, index=False)
             except Exception as e:
                 print('[历史日线] Download code list failed! ', e)
@@ -103,7 +114,7 @@ class DailyHistory:
     #  内部下载代码
     # ==============
 
-    def _download_codes(self, code_list: list[str], day_count: int) -> None:
+    def _download_codes(self, code_list: list[str], day_count: int, interval: int = 5) -> None:
         now = datetime.datetime.now()
         forward_day = 1  # 不算今天
         start_date = get_prev_trading_date(now, forward_day + day_count)
@@ -117,15 +128,23 @@ class DailyHistory:
             group_codes = [sub_code for sub_code in code_list[i:i + group_size]]
 
             for code in group_codes:
-                df = get_daily_history(
-                    code=code,
-                    start_date=start_date,
-                    end_date=end_date,
-                    columns=self.default_columns,
-                    adjust=ExitRight.QFQ,
-                    data_source=self.data_source,
-                )
-                time.sleep(5)
+                try_limit = 2
+                try_count = 0
+                df = None
+                while try_count < try_limit:
+                    try_count += 1
+                    try:
+                        df = get_daily_history(
+                            code=code,
+                            start_date=start_date,
+                            end_date=end_date,
+                            columns=self.default_columns,
+                            adjust=ExitRight.QFQ,
+                            data_source=self.data_source,
+                        )
+                        time.sleep(interval)
+                    except Exception:
+                        pass
                 if df is None or len(df) == 0:
                     download_failure.append(code)
                     continue
@@ -185,16 +204,19 @@ class DailyHistory:
             path = f'{self.root_path}/{self.default_kline_folder}/{code}.csv'
             try:
                 df = pd.read_csv(path, dtype={'datetime': int})
+                if not self._has_datetime_column(df, code, 'load'):
+                    error_count += 1
+                    continue
                 self.cache_history[code] = df
             except Exception as e:
                 print(code, e)
                 error_count += 1
         print(f'\n[历史日线] Loading finished with {error_count}/{i} errors')
 
-    def download_all_to_disk(self, renew_code_list: bool = True) -> None:
+    def download_all_to_disk(self, renew_code_list: bool = True, interval: int = 5) -> None:
         code_list = self.get_code_list(force_download=renew_code_list)
         print(f'[历史日线] Downloading all {len(code_list)} codes data of {self.init_day_count} days...')
-        self._download_codes(code_list, self.init_day_count)
+        self._download_codes(code_list, self.init_day_count, interval=interval)
 
     # ==============
     #  部分更新逻辑
@@ -207,7 +229,11 @@ class DailyHistory:
 
         loss_list = []  # 找到缺失当天数据的codes
         for code in code_list:
-            if not (self[code]['datetime'] == target_date_int).any():
+            cache_df = self[code]
+            if not self._has_datetime_column(cache_df, code, 'cache check'):
+                self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                cache_df = self[code]
+            if not (cache_df['datetime'] == target_date_int).any():
                 loss_list.append(code)
 
         updated_codes = set()
@@ -228,7 +254,13 @@ class DailyHistory:
             # 填补缺失的日期
             for code in dfs:
                 df = dfs[code]
-                if len(df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
+                if not self._has_datetime_column(df, code, 'tushare update'):
+                    continue
+                cache_df = self[code]
+                if not self._has_datetime_column(cache_df, code, 'cache append'):
+                    self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                    cache_df = self[code]
+                if len(df) == 1 and (not (cache_df['datetime'] == target_date_int).any()):
                     updated_codes.add(code)
                     updated_count += 1
                     if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
@@ -262,17 +294,25 @@ class DailyHistory:
                     data_source=self.data_source,
                 )
                 if df is not None and len(df) > 0:
+                    if not self._has_datetime_column(df, code, 'history update'):
+                        print('x', end='')
+                        continue
+                    cache_df = self[code]
+                    if not self._has_datetime_column(cache_df, code, 'cache append'):
+                        self.cache_history[code] = pd.DataFrame(columns=self.default_columns)
+                        cache_df = self[code]
                     updated = False
                     for forward_day in range(days, 0, -1):
                         target_date_int = int(get_prev_trading_date(now, forward_day))
                         target_date_df = df[df['datetime'] == target_date_int]
-                        if len(target_date_df) == 1 and (not (self[code]['datetime'] == target_date_int).any()):
+                        if len(target_date_df) == 1 and (not (cache_df['datetime'] == target_date_int).any()):
                             updated = True
                             if self.cache_history[code] is None or len(self.cache_history[code]) == 0:
                                 self.cache_history[code] = target_date_df  # concat len = 0 的 df 会报 warning
                             else:
                                 self.cache_history[code] = pd.concat(
                                     [self.cache_history[code], target_date_df], ignore_index=True)
+                                cache_df = self.cache_history[code]
                     if updated:
                         updated_codes.add(code)
                         updated_count += 1
@@ -294,6 +334,8 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
+            if not self._has_datetime_column(self[code], code, 'save'):
+                continue
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[历史日线] Finished with {i} files updated')
@@ -352,6 +394,8 @@ class DailyHistory:
             i += 1
             if i % 1000 == 0:
                 print('.', end='')
+            if not self._has_datetime_column(self[code], code, 'save'):
+                continue
             self.cache_history[code] = self[code].sort_values(by='datetime')
             self.cache_history[code].to_csv(f'{self.root_path}/{self.default_kline_folder}/{code}.csv', index=False)
         print(f'\n[历史日线] Finished with {i} files updated')

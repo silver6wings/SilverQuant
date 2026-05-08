@@ -1,16 +1,17 @@
 import os
 import csv
+import datetime
 import time
 
+import pandas as pd
 import requests
 import threading
 import atexit
 from typing import Optional
 
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
-from tools.utils_basic import *
-from tools.utils_miniqmt import get_qmt_daily_history
-from tools.utils_mootdx import MootdxClientInstance, get_mootdx_daily_history
+from tools.utils_basic import code_to_symbol, code_to_sina_symbol, code_to_tdxsymbol, \
+    is_fund_etf, is_stock, tdxsymbol_to_code
 
 
 class BaoStockInstance:
@@ -97,6 +98,8 @@ def get_tdx_zxg_code(file_name: str = None) -> list[str]:
 def get_mootdx_quotes(code_list: list[str]) -> dict[str, any]:
     if code_list is None or len(code_list) == 0:
         return {}
+
+    from tools.utils_mootdx import MootdxClientInstance
 
     symbol_list = [code.split('.')[0] for code in code_list]
 
@@ -675,6 +678,7 @@ def get_daily_history(
         # Mootdx 的复权是先截断数据然后复权，取三位小数
         # 暂时不支持 920xxx 的北交所股票数据
         # 其它北交所股票小部分有发行脏数据情况
+        from tools.utils_mootdx import get_mootdx_daily_history
         return get_mootdx_daily_history(code, start_date, end_date, columns, adjust)
     elif data_source == DataSource.AKSHARE:
         # AkShare 的复权是针对全部历史复权后截取，取两位小数
@@ -684,4 +688,63 @@ def get_daily_history(
         return get_bao_daily_history(code, start_date, end_date, columns, adjust)
     else:
         # 默认使用免费的 miniqmt数据，但就是慢的一批
+        from tools.utils_miniqmt import get_qmt_daily_history
         return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
+
+
+# 同花顺概念板块排名
+THS_CONCEPT_KEYS = [
+    ['即时', '净额', '当日', '行业-涨跌幅'],
+    ['3日排行', '净额', '三日', '阶段涨跌幅'],
+    ['5日排行', '净额', '五日', '阶段涨跌幅'],
+    ['10日排行', '净额', '十日', '阶段涨跌幅'],
+    ['20日排行', '净额', '二十日', '阶段涨跌幅'],
+]
+
+
+def get_ths_concept_ranking_df(
+    *,
+    key_index: int = 0,
+    is_outflow: bool = False,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    key = THS_CONCEPT_KEYS[key_index]
+
+    df = ak.stock_fund_flow_concept(symbol=key[0])
+    df = df[df['公司家数'] <= 600]
+    df = df.sort_values(by='净额', ascending=is_outflow)
+
+    if key[0] != '即时':
+        df[key[1]] = df[key[3]].str.strip('%').astype(float)
+
+    return df.sort_values(by=key[1], ascending=is_outflow)
+
+
+def get_ths_concept_ranking_str(
+    *,
+    up_df: pd.DataFrame = None,
+    key_index: int = 0,
+    top_n: int = 10,
+    is_outflow: bool = False,
+) -> str:
+    if up_df is None:
+        up_df = get_ths_concept_ranking_df(key_index=key_index, is_outflow=is_outflow)
+    
+    key = THS_CONCEPT_KEYS[key_index]
+
+    direction_text = '流出' if is_outflow else '流入'
+    ans = f'同花顺{key[2]}净{direction_text}前{top_n}概念板块\n'
+
+    name = up_df.head(top_n)['行业'].values
+    rate = up_df.head(top_n)[[key[1]]].values
+    if len(name) == 0:
+        return ans
+
+    longest_name = len(max(name, key=len))
+    for i in range(len(name)):
+        ans += f'[{i}]\t{name[i]} ' \
+               f'{" " * ((longest_name - len(name[i])) * 1)}' \
+               f'\t{rate[i][0]}亿\n'
+
+    return ans
