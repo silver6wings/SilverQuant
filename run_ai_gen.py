@@ -2,6 +2,7 @@ import logging
 
 from credentials import *
 
+from tools.constants import IndexSymbol
 from tools.utils_basic import logging_init, is_symbol, debug
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager

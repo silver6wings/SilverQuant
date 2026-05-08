@@ -22,11 +22,13 @@ class DataSource(StrValueEnum):
     MINIQMT = 'miniqmt'
     BAOSTOCK = 'baostock'
 
+
 # 复权常量
 class ExitRight(StrValueEnum):
     BFQ = ''     # 不复权
     QFQ = 'qfq'  # 前复权
     HFQ = 'hfq'  # 后复权
+
 
 # 逆回购常量
 REPURCHASE_CODES = ['131810.SZ', '131811.SZ', '131800.SZ', '131809.SZ', '131801.SZ', '131802.SZ',
@@ -53,6 +55,7 @@ class IndexSymbol(StrValueEnum):
     INDEX_ZX_100 = '399005'     # 中小100
     INDEX_ZZ_A50 = '000050'     # 中证A50
     INDEX_ZZ_A500 = '000510'    # 中证A500
+
 
 # 仓位项常量
 class InfoItem(StrValueEnum):
