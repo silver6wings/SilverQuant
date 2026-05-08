@@ -3,31 +3,12 @@ import datetime
 
 import pytest
 
-from tools import utils_cache
 from tools.utils_cache import (
     get_next_trading_date,
     get_next_trading_date_str,
     get_prev_trading_date_list,
     get_trading_date_list,
 )
-
-
-def _clear_trade_day_caches():
-    for fn in (
-        utils_cache.get_next_trading_date_str,
-        utils_cache.get_prev_trading_date_str,
-        utils_cache.get_prev_trading_date_list,
-        utils_cache.get_trading_date_list,
-    ):
-        fn.cache_clear()
-    utils_cache.trade_day_cache.clear()
-
-
-@pytest.fixture(autouse=True)
-def _clear_trade_day_caches_around_tests():
-    _clear_trade_day_caches()
-    yield
-    _clear_trade_day_caches()
 
 
 @pytest.mark.parametrize(

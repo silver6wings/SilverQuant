@@ -1,0 +1,1 @@
+AKShare API CSV caches (AKCache / AKCacheProtected); see tools.utils_cache_ak.AKSHARE_API_CACHE_DIR.

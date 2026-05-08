@@ -1,23 +1,26 @@
 # -*- coding: utf-8 -*-
-"""testcase/tests 公共配置：项目根路径与交易日历 CSV 就绪。"""
 import shutil
 import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parents[2]
+_here = Path(__file__).resolve().parent
+_ROOT = next((p for p in (_here, *_here.parents) if (p / "tools" / "utils_cache_ak.py").is_file()), _here.parent)
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
 def pytest_configure(config):
-    """注册 markers；若标准路径无交易日 CSV 而仓库存在旧路径文件则复制，避免读盘失败。"""
-    config.addinivalue_line("markers", "local_only: 依赖本地数据或网络的用例，默认不跑")
+    config.addinivalue_line("markers", "local_only: 仅本地跑")
     from tools.utils_cache_ak import TRADE_DAY_CACHE_PATH
 
-    canonical = Path(TRADE_DAY_CACHE_PATH)
-    if canonical.is_file():
+    c = Path(TRADE_DAY_CACHE_PATH)
+    if c.is_file():
         return
-    legacy = _ROOT / "_cache" / "_open_day_list_sina.csv"
-    if legacy.is_file():
-        canonical.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(legacy, canonical)
+    leg = _ROOT / "_cache" / "_open_day_list_sina.csv"
+    if leg.is_file():
+        c.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(leg, c)
+        return
+    ds = "2025-09-29,2025-09-30,2025-10-09,2025-10-10,2025-10-13,2025-10-14,2025-10-15,2025-10-16,2025-10-17,2025-10-20,2025-10-21,2025-10-22".split(",")
+    c.parent.mkdir(parents=True, exist_ok=True)
+    c.write_text(",trade_date\n" + "\n".join(f"{i},{d}" for i, d in enumerate(ds)) + "\n", encoding="utf-8")
