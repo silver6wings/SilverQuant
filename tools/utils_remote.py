@@ -257,6 +257,73 @@ def qmt_quote_to_tick(quote: dict) -> dict:
     return ans
 
 
+QMT_TICK_DF_COLS = ['local', 'time', 'price', 'high', 'low', 'lastClose', 'volume', 'amount'] \
+    + [f'askPrice{i}' for i in range(1, 6)] \
+    + [f'askVol{i}' for i in range(1, 6)] \
+    + [f'bidPrice{i}' for i in range(1, 6)] \
+    + [f'bidVol{i}' for i in range(1, 6)]
+
+
+def qmt_quote_to_tick_row(quote: dict, local_time: str) -> list:
+    tick = qmt_quote_to_tick(quote)
+    ask_price = [tick.get(f'askPrice{i}', 0.0) for i in range(1, 6)]
+    ask_vol = [tick.get(f'askVol{i}', 0) for i in range(1, 6)]
+    bid_price = [tick.get(f'bidPrice{i}', 0.0) for i in range(1, 6)]
+    bid_vol = [tick.get(f'bidVol{i}', 0) for i in range(1, 6)]
+    return [
+        tick['time'],                                             # 成交时间，格式：%H:%M:%S
+        round(float(tick.get('price', 0) or 0), 3),               # 成交价格
+        round(float(tick.get('high', 0) or 0), 3),                # 成交最高价
+        round(float(tick.get('low', 0) or 0), 3),                 # 成交最低价
+        round(float(tick.get('lastClose', 0) or 0), 3),           # 昨日收盘价
+        int(tick.get('volume', 0) or 0),                          # 累计成交量（手）
+        round(float(tick.get('amount', 0) or 0), 3),              # 累计成交额（元）
+        [round(float(p or 0.0), 3) for p in ask_price],           # 卖价
+        [int(v or 0) for v in ask_vol],                           # 卖量
+        [round(float(p or 0.0), 3) for p in bid_price],           # 买价
+        [int(v or 0) for v in bid_vol],                           # 买量
+        local_time,                                               # 本机记录时间（local）
+    ]
+
+
+def qmt_tick_rows_to_records(ticks: list) -> list[dict]:
+    records: list[dict] = []
+    err = []
+    for t in ticks:
+        # t: [time, price, high, low, lastClose, volume, amount, askPrice(list5), askVol(list5), bidPrice(list5), bidVol(list5), local]
+        try:
+            ask_p = list(t[7]) if isinstance(t[7], (list, tuple)) else []
+            ask_v = list(t[8]) if isinstance(t[8], (list, tuple)) else []
+            bid_p = list(t[9]) if isinstance(t[9], (list, tuple)) else []
+            bid_v = list(t[10]) if isinstance(t[10], (list, tuple)) else []
+        except Exception as e:
+            err.append([str(t[0]), str(e)])
+            ask_p, ask_v, bid_p, bid_v = [], [], [], []
+
+        # list 模式新结构：末尾追加 local（本机记录时间）；旧结构缺失时退化为与 time 相同
+        local = t[11] if (hasattr(t, "__len__") and len(t) > 11) else t[0]
+        rec = {
+            'local': local,
+            'time': t[0],
+            'price': t[1],
+            'high': t[2],
+            'low': t[3],
+            'lastClose': t[4],
+            'volume': t[5],
+            'amount': t[6],
+        }
+        for i in range(5):
+            rec[f'askPrice{i+1}'] = ask_p[i] if i < len(ask_p) else 0.0
+            rec[f'askVol{i+1}'] = ask_v[i] if i < len(ask_v) else 0
+            rec[f'bidPrice{i+1}'] = bid_p[i] if i < len(bid_p) else 0.0
+            rec[f'bidVol{i+1}'] = bid_v[i] if i < len(bid_v) else 0
+        records.append(rec)
+
+    if len(err) > 0:
+        print(f'[提示] tick 本地持久化时报错：{err}')
+    return records
+
+
 def qmt_quote_to_day_kline(quote: dict, curr_date: str) -> dict:
     return {
         'datetime': curr_date,
