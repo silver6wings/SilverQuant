@@ -223,9 +223,9 @@ class DailyHistory:
     # ==============
 
     # 下载具体某天的数据 TUSHARE
-    def _update_codes_by_tushare(self, target_date: str, code_list: list[str]) -> set[str]:
+    def _update_codes_by_tushare(self, target_date: str, code_list: list[str], interval: int = 1) -> set[str]:
         target_date_int = int(target_date)
-        print(f'[历史日线] Updating {target_date} ', end='')
+        print(f'[历史日线] Updating {target_date}')
 
         loss_list = []  # 找到缺失当天数据的codes
         for code in code_list:
@@ -240,7 +240,7 @@ class DailyHistory:
         updated_count = 0
         group_size = 400
         for i in range(0, len(loss_list), group_size):
-            time.sleep(0.5)
+            time.sleep(interval)
             group_codes = [sub_code for sub_code in loss_list[i:i + group_size]]
 
             dfs = get_ts_daily_histories(

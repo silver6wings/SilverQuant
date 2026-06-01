@@ -307,6 +307,11 @@ class BaseSubscriber:
             random_minute = random.randint(0, 59)
             self.scheduler.add_job(self.before_trade_day_wrapper, 'cron', hour=random_hour, minute=random_minute)
 
+        if self.check_before_finished is not None:
+            # random 时间为了跑多个策略时防止补跑任务同时挤兑数据源
+            random_minute = random.randint(0, 59)
+            self.scheduler.add_job(self.check_before_finished, 'cron', hour=8, minute=random_minute)
+
         if self.finish_trade_day is not None:   # 16:05 ~ 16:15
             random_minute = random.randint(0, 10) + 5
             self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
@@ -318,7 +323,6 @@ class BaseSubscriber:
             self.scheduler.add_job(self.daily_summary, 'cron', hour=11, minute=32)
 
         self.scheduler.add_job(self.prev_check_open_day, 'cron', hour=1, minute=0)
-        self.scheduler.add_job(self.check_before_finished, 'cron', hour=8, minute=55) # 检查当天是否完成准备
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=9, minute=14, second=30)
         self.scheduler.add_job(self.callback_close_no_quotes, 'cron', hour=11, minute=30, second=30)
         self.scheduler.add_job(self.callback_open_no_quotes, 'cron', hour=12, minute=59, second=30)
