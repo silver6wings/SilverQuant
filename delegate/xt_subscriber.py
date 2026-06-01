@@ -132,14 +132,14 @@ class XtSubscriber(HistorySubscriber):
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
                 if self.open_tick and (not self.quick_ticks):
-                    self.record_tick_to_memory(quotes)   # 只记录本次推送，避免 cache_quotes 未清空时重复写入
+                    self.record_tick_to_memory(self.cache_quotes)
 
                 # str(%Y-%m-%d) str(%H:%M) str(%S) dict(code: quotes)
                 is_clear = self.execute_strategy(curr_date, curr_time, curr_seconds, self.cache_quotes)
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(quotes)   # 只记录本次推送，避免 cache_quotes 未清空时重复写入
+                    self.record_tick_to_memory(self.cache_quotes)
 
                 if is_clear:
                     with self.lock_quotes_update:
@@ -232,7 +232,8 @@ class XtSubscriber(HistorySubscriber):
                 tick['local'] = local_time
                 if code not in self.today_ticks:
                     self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
-                self.today_ticks[code].loc[len(self.today_ticks[code])] = tick
+                tick_df = self.today_ticks[code]
+                tick_df.loc[len(tick_df)] = tick
         else:
             for code, quote in quotes.items():
                 if code not in self.today_ticks:
@@ -367,7 +368,6 @@ class XtSubscriber(HistorySubscriber):
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
             ['08:30', self.near_trade_begin_wrapper, None],
-            ['08:55', self.check_before_finished, None],
             ['09:14', self.subscribe_tick, None],
             ['11:31', self.unsubscribe_tick, (True, )],
             ['12:59', self.subscribe_tick, (True, )],
@@ -383,6 +383,11 @@ class XtSubscriber(HistorySubscriber):
             # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
             before_time = f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}'  # 03:00 ~ 06:59
             cron_jobs.append([before_time, self.before_trade_day_wrapper, None])
+
+        if self.check_before_finished is not None:
+            # random 时间为了跑多个策略时防止补跑任务同时挤兑数据源
+            check_before_time = f'08:{random.randint(0, 59)}'  # 08:00 ~ 08:59
+            cron_jobs.append([check_before_time, self.check_before_finished, None])
 
         if self.finish_trade_day is not None:
             # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
