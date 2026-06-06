@@ -56,7 +56,7 @@ def _download_and_fetch_qmt_daily(code_list: list[str], start_time: str, end_tim
     # 除权类型 "none" "front" "back" "front_ratio" "back_ratio"
     if adjust == ExitRight.QFQ:
         dividend_type = 'front'
-    elif adjust == ExitRight.QFQ:
+    elif adjust == ExitRight.HFQ:
         dividend_type = 'back'
     else:
         dividend_type = 'none'
