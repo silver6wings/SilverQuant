@@ -20,8 +20,8 @@ from trader.seller import BaseSeller
 # --------------------------------
 class HardSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('硬性卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.hard_time_range = parameters.hard_time_range
         self.earn_limit = parameters.earn_limit
         self.risk_limit = parameters.risk_limit
@@ -61,8 +61,8 @@ class HardSeller(BaseSeller):
 # --------------------------------
 class SafeSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('走低卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.safe_time_range = parameters.safe_time_range
         self.safe_rate = parameters.safe_rate   # 当日开盘和最高下行百分之多少卖出，例：0.01 = 1% 走低时就开始挂卖单
 
@@ -104,8 +104,8 @@ class SafeSeller(BaseSeller):
 # --------------------------------
 class SwitchSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('换仓卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.switch_time_range = parameters.switch_time_range
         self.switch_hold_days = parameters.switch_hold_days
         self.switch_demand_daily_up = parameters.switch_demand_daily_up
@@ -142,8 +142,8 @@ class SwitchSeller(BaseSeller):
 # --------------------------------
 class FallSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('回落卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.fall_time_range = parameters.fall_time_range
         self.fall_from_top = parameters.fall_from_top
 
@@ -183,8 +183,8 @@ class FallSeller(BaseSeller):
 # --------------------------------
 class ReturnSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('回撤卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.return_time_range = parameters.return_time_range
         self.return_of_profit = parameters.return_of_profit
 
@@ -225,8 +225,8 @@ class ReturnSeller(BaseSeller):
 # --------------------------------
 class MoveSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('移动止盈卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.move_time_range = parameters.move_time_range
         self.move_profit = parameters.move_profit
 
@@ -263,8 +263,8 @@ class MoveSeller(BaseSeller):
 # --------------------------------
 class OpenDaySeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('开仓日指标止损策略', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.opening_time_range = parameters.opening_time_range
         self.open_low_rate = parameters.open_low_rate
         self.open_vol_rate = parameters.open_vol_rate
@@ -313,8 +313,8 @@ class OpenDaySeller(BaseSeller):
 # --------------------------------
 class MASeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print(f'跌破{parameters.ma_above}日均线卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.ma_time_range = parameters.ma_time_range
         self.ma_above = parameters.ma_above
 
@@ -354,8 +354,8 @@ class MASeller(BaseSeller):
 # --------------------------------
 class CCISeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('CCI卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.cci_time_range = parameters.cci_time_range
         self.cci_upper = parameters.cci_upper
         self.cci_lower = parameters.cci_lower
@@ -405,8 +405,8 @@ class CCISeller(BaseSeller):
 # --------------------------------
 class WRSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('WR上穿卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.wr_time_range = parameters.wr_time_range
         self.wr_cross = parameters.wr_cross
 
@@ -447,8 +447,8 @@ class WRSeller(BaseSeller):
 # --------------------------------
 class VolumeDropSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('次缩卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.next_time_range = parameters.next_time_range
         self.next_volume_dec_threshold = parameters.vol_dec_thre
         self.next_volume_dec_minute = parameters.vol_dec_time
@@ -493,8 +493,8 @@ class VolumeDropSeller(BaseSeller):
 # --------------------------------
 class DropSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('高开出货卖点模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
         self.drop_time_range = parameters.drop_time_range
         self.drop_out_limits = parameters.drop_out_limits
 
@@ -540,8 +540,8 @@ class DropSeller(BaseSeller):
 # --------------------------------
 class IncBlocker(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('上涨过程禁卖模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
 
     def check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,
@@ -562,8 +562,8 @@ class IncBlocker(BaseSeller):
 # --------------------------------
 class UppingBlocker(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
-        BaseSeller.__init__(self, strategy_name, delegate, parameters)
         print('上行趋势禁卖模块', end=' ')
+        super().__init__(strategy_name, delegate, parameters)
 
     def check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,
