@@ -2,7 +2,8 @@ import logging
 
 from credentials import *
 
-from tools.utils_basic import logging_init, is_symbol
+from tools.utils_basic import is_symbol
+from tools.utils_logger import setup_logging
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource
@@ -147,7 +148,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 
 if __name__ == '__main__':
-    logging_init(path=PATH_LOGS, level=logging.INFO)
+    setup_logging(path=PATH_LOGS, level=logging.INFO)
     STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + "(测)"
     print(f'正在启动 {STRATEGY_NAME}...')
     if IS_PROD:

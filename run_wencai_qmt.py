@@ -2,7 +2,8 @@ import logging
 import threading
 
 from credentials import DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH, QMT_ACCOUNT_ID, QMT_CLIENT_PATH
-from tools.utils_basic import logging_init, is_symbol, debug
+from tools.utils_basic import is_symbol, debug
+from tools.utils_logger import setup_logging
 from tools.utils_cache import all_held_inc, update_max_prices, load_json
 from tools.utils_ding import DingMessager
 from tools.utils_remote import get_wencai_codes
@@ -197,7 +198,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 
 if __name__ == '__main__':
-    logging_init(path=PATH_LOGS, level=logging.INFO)
+    setup_logging(path=PATH_LOGS, level=logging.INFO)
     STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + '[测]'
     print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:
