@@ -163,15 +163,15 @@ class XtCustomCallback(XtBaseCallback):
         return
 
     def on_order_stock_async_response(self, res: XtOrderResponse):
-        log = f'异步下单委托 {res.order_id} msg:{res.error_msg} remark:{res.order_remark}',
+        log = f'异步下单委托 {res.order_id} msg:{res.error_msg} remark:{res.order_remark}'
         logging.warning(log)
 
     def on_order_error(self, err: XtOrderError):
-        log = f'异步下单出错 {err.order_id} msg:{err.error_msg} remark:{err.order_remark} '
+        log = f'异步下单出错 {err.order_id} msg:{err.error_msg} remark:{err.order_remark}'
         logging.warning(log)
 
     def on_cancel_order_stock_async_response(self, res: XtCancelOrderResponse):
-        log = f'异步撤单委托 {res.order_id} msg:{res.error_msg} result:{res.cancel_result} ',
+        log = f'异步撤单委托 {res.order_id} msg:{res.error_msg} result:{res.cancel_result}'
         logging.warning(log)
         if self.ding_messager is not None:
             self.ding_messager.send_text_as_md(
@@ -180,5 +180,5 @@ class XtCustomCallback(XtBaseCallback):
                 '[CANCEL]')
 
     def on_cancel_error(self, cancel_error: XtCancelError):
-        log = f'异步撤单出错 {cancel_error.order_id} msg:{cancel_error.error_msg}',
+        log = f'异步撤单出错 {cancel_error.order_id} msg:{cancel_error.error_msg}'
         logging.warning(log)

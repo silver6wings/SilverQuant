@@ -1,7 +1,8 @@
 import datetime
-import logging
 import pandas as pd
 from decimal import Decimal, ROUND_HALF_UP
+
+from tools.utils_logger import setup_logging as logging_init  # 兼容旧引用
 
 
 def debug(*args, **kwargs):
@@ -20,29 +21,6 @@ def pd_show_all() -> None:
     pd.set_option('display.unicode.ambiguous_as_wide', True)
     pd.set_option('display.unicode.east_asian_width', True)
     pd.set_option('display.float_format', lambda x: f'{x:.3f}')
-
-
-# 多文件 logger的配置
-def logger_init(path=None, name='default') -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    # 移除已存在的处理器
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
-
-    if path is None:
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.DEBUG)
-    else:
-        handler = logging.FileHandler(path)
-        handler.setLevel(logging.DEBUG)
-
-        formatter = logging.Formatter('%(asctime)s|%(message)s')
-        handler.setFormatter(formatter)
-
-    logger.addHandler(handler)
-    return logger
 
 
 # 六位数symbol代码转换成带交易所后缀code格式
@@ -376,7 +354,11 @@ def time_diff_seconds(later_time: datetime.datetime.time, early_time: datetime.d
     return diff_seconds
 
 
+# ==========
 # 迅投相关数据
+# ==========
+
+
 # past_seconds 当日交易日已经过去多少秒，计算量比这类指标需要
 def hms_to_past_seconds(hour: int, minute: int, second: int) -> int:
     time_int = hour * 100 + minute

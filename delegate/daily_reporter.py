@@ -3,7 +3,6 @@ import datetime
 from typing import Optional
 
 import pandas as pd
-from xtquant import xtdata
 
 from delegate.base_delegate import BaseDelegate
 
@@ -30,12 +29,12 @@ def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float
         df = pd.read_csv(path_assets)               # 读取
         prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
         df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
-        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+        if datetime.datetime.now().hour > 12:       # 防止中午提前记录
             df.to_csv(path_assets, index=False)     # 存储
         return curr_asset - prev_asset
     else:
         df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
-        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+        if datetime.datetime.now().hour > 12:       # 防止中午提前记录
             df.to_csv(path_assets, index=False)
         return None
 
@@ -103,6 +102,7 @@ class DailyReporter:
                     from tools.utils_remote import get_mootdx_quotes
                     quotes = get_mootdx_quotes([code])
                 else:
+                    from xtquant import xtdata
                     quotes = xtdata.get_full_tick([code])
 
                 curr_price = None
@@ -149,7 +149,7 @@ class DailyReporter:
             self.messager.send_text_as_md(text)
 
     def check_asset(self, today: str, asset, is_afternoon: bool = True):
-        title = f'[{self.account_id}]{self.strategy_name} {"午盘" if is_afternoon else "早盘"}清点'
+        title = f'[{self.account_id}]{self.strategy_name} {"收盘" if is_afternoon else "午盘"}清点'
         text = title
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)
