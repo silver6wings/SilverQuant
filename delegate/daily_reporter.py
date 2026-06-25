@@ -3,7 +3,6 @@ import datetime
 from typing import Optional
 
 import pandas as pd
-from xtquant import xtdata
 
 from delegate.base_delegate import BaseDelegate
 
@@ -30,12 +29,12 @@ def get_total_asset_increase(path_assets: str, curr_date: str, curr_asset: float
         df = pd.read_csv(path_assets)               # 读取
         prev_asset = df.tail(1)['asset'].values[0]  # 获取最近的日期资产
         df.loc[len(df)] = [curr_date, curr_asset]   # 添加最新的日期资产
-        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+        if datetime.datetime.now().hour > 12:       # 防止中午提前记录
             df.to_csv(path_assets, index=False)     # 存储
         return curr_asset - prev_asset
     else:
         df = pd.DataFrame({'date': [curr_date], 'asset': [curr_asset]})
-        if datetime.datetime.now().hour > 12:       # 防止午盘重写
+        if datetime.datetime.now().hour > 12:       # 防止中午提前记录
             df.to_csv(path_assets, index=False)
         return None
 
@@ -63,17 +62,18 @@ class DailyReporter:
         self.today_report_show_bank = today_report_show_bank
         self.stock_names = StockNames()
 
-    def today_deal_report(self, today: str):
+    def today_deal_report(self, today: str, is_afternoon: bool = True):
+        period = '当日委托' if is_afternoon else '半日委托'
         if not os.path.exists(self.path_deal):
             print('Missing deal record file!')
-            title = f'[{self.account_id}]{self.strategy_name} 未找到记录'
+            title = f'[{self.account_id}]{self.strategy_name} {period}'
             text = f'{title}\n\n[{today}] 未交易'
         else:
             df = pd.read_csv(self.path_deal, encoding='gbk')
             if '日期' in df.columns:
                 df = df[df['日期'] == today]
 
-            title = f'[{self.account_id}]{self.strategy_name} 委托统计'
+            title = f'[{self.account_id}]{self.strategy_name} {period}'
             text = f'{title}\n\n[{today}] 交易{len(df)}单'
 
             if len(df) > 0:
@@ -87,7 +87,7 @@ class DailyReporter:
         if self.messager is not None:
             self.messager.send_text_as_md(text)
 
-    def today_hold_report(self, today: str, positions):
+    def today_hold_report(self, today: str, positions: list, is_afternoon: bool = True):
         text = ''
         hold_count = 0
         display_list = []
@@ -103,6 +103,7 @@ class DailyReporter:
                     from tools.utils_remote import get_mootdx_quotes
                     quotes = get_mootdx_quotes([code])
                 else:
+                    from xtquant import xtdata
                     quotes = xtdata.get_full_tick([code])
 
                 curr_price = None
@@ -142,14 +143,14 @@ class DailyReporter:
             text += MSG_INNER_SEPARATOR
             text += f'成本 {open_price:.3f} 浮 {total_change} ({ratio_change})'
 
-        title = f'[{self.account_id}]{self.strategy_name} 持仓统计'
+        title = f'[{self.account_id}]{self.strategy_name} {"收盘" if is_afternoon else "午盘"}持仓'
         text = f'{title}\n\n[{today}] 持仓{hold_count}支\n{text}'
 
         if self.messager is not None:
             self.messager.send_text_as_md(text)
 
     def check_asset(self, today: str, asset, is_afternoon: bool = True):
-        title = f'[{self.account_id}]{self.strategy_name} {"午盘" if is_afternoon else "早盘"}清点'
+        title = f'[{self.account_id}]{self.strategy_name} {"收盘" if is_afternoon else "午盘"}清点'
         text = title
 
         increase = get_total_asset_increase(self.path_assets, today, asset.total_asset)

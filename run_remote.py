@@ -2,7 +2,8 @@ import logging
 
 from credentials import *
 
-from tools.utils_basic import logging_init, is_symbol, debug
+from tools.utils_basic import is_symbol, debug
+from tools.utils_logger import setup_logging
 from tools.utils_cache import *
 from tools.utils_ding import DingMessager
 from tools.utils_remote import DataSource, ExitRight
@@ -14,7 +15,7 @@ from trader.pools import StocksPoolBlackEmpty as Pool
 from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ClassicGroupSeller as Seller
 
-from tools.utils_remote import pull_stock_codes
+from tools.utils_remote_sv import pull_stock_today_codes
 
 data_source = DataSource.AKSHARE
 
@@ -180,7 +181,7 @@ def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict
 
 
 def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
-    selected_codes, err_msg = pull_stock_codes(SELECTION_ID, RECOMMEND_HOST, AUTHENTICATION)
+    selected_codes, err_msg = pull_stock_today_codes(SELECTION_ID, RECOMMEND_HOST, AUTHENTICATION)
     if selected_codes is None:
         print(f'[{err_msg}]', end='')
         return
@@ -226,7 +227,7 @@ def execute_strategy(curr_date: str, curr_time: str, curr_seconds: str, curr_quo
 
 
 if __name__ == '__main__':
-    logging_init(path=PATH_LOGS, level=logging.INFO)
+    setup_logging(path=PATH_LOGS, level=logging.INFO)
     STRATEGY_NAME = STRATEGY_NAME if IS_PROD else STRATEGY_NAME + '[测]'
     print(f'[正在启动] {STRATEGY_NAME}')
     if IS_PROD:

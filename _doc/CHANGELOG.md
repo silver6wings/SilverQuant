@@ -6,7 +6,23 @@
 
 - LimitSeller 逻辑优化
 
+
+## [ 4.7.0 ] 2026-06-25
+
+### 添加
+- utils_logger 允许单独定义logger
+- utils_remote_sv 单独处理 Service 推票服务接口
+
+### 修改
+- 修复gm_callback的 'elegate' 问题
+- 修复BaseSeller重复加载问题
+- 部分文案优化
+- `run_shield.py` 添加移动止盈
+
 ## [ 4.6.0 ] 2026-05-08
+
+### 添加
+- 移动止盈卖出模块 MoveSeller
 
 ### 修改
 - 优化AKShare远程数据缓存逻辑强，加入Fallback机制

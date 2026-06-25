@@ -10,7 +10,7 @@ import pandas as pd
 from xtquant import xtdata
 from credentials import QMT_CLIENT_PATH
 
-from delegate.base_subscriber import HistorySubscriber, get_today
+from delegate.base_subscriber import HistorySubscriber
 from delegate.xt_delegate import XtDelegate
 from delegate.daily_reporter import DailyReporter
 
@@ -132,14 +132,14 @@ class XtSubscriber(HistorySubscriber):
             if int(curr_seconds) % self.execute_interval == 0:
                 # 更全（默认：先记录再执行）
                 if self.open_tick and (not self.quick_ticks):
-                    self.record_tick_to_memory(self.cache_quotes)   # 这里用 cache_quotes 是防止积压导致丢数据
+                    self.record_tick_to_memory(self.cache_quotes)
 
                 # str(%Y-%m-%d) str(%H:%M) str(%S) dict(code: quotes)
                 is_clear = self.execute_strategy(curr_date, curr_time, curr_seconds, self.cache_quotes)
 
                 # 更快（先执行再记录）
                 if self.open_tick and self.quick_ticks:
-                    self.record_tick_to_memory(self.cache_quotes)   # 这里用 cache_quotes 是防止积压导致丢数据
+                    self.record_tick_to_memory(self.cache_quotes)
 
                 if is_clear:
                     with self.lock_quotes_update:
@@ -227,25 +227,19 @@ class XtSubscriber(HistorySubscriber):
         # 记录 tick 历史到内存
         local_time = datetime.datetime.now().strftime('%H:%M:%S')
         if self.is_ticks_df:
-            for code in quotes:
-                tick = qmt_quote_to_tick(quotes[code])
+            for code, quote in quotes.items():
+                tick = qmt_quote_to_tick(quote)
                 tick['local'] = local_time
-                new_tick_df = pd.DataFrame([tick], columns=self.tick_df_cols)
                 if code not in self.today_ticks:
-                    self.today_ticks[code] = new_tick_df
-                else:
-                    self.today_ticks[code] = pd.concat([self.today_ticks[code], new_tick_df], ignore_index=True)
+                    self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
+                tick_df = self.today_ticks[code]
+                tick_df.loc[len(tick_df)] = tick
         else:
-            for code in quotes:
+            for code, quote in quotes.items():
                 if code not in self.today_ticks:
                     self.today_ticks[code] = []
 
-                quote = quotes[code]
-
-                # 昨收：QMT字段历史上出现过 lastLose / lastClose 两种写法，这里做兼容，避免 KeyError
                 last_close = quote.get('lastClose', None)
-                if last_close is None:
-                    last_close = quote.get('lastLose', 0) or 0
                 last_close = float(last_close or 0.0)
 
                 tick_ts_ms = quote.get('time', None)
@@ -367,40 +361,13 @@ class XtSubscriber(HistorySubscriber):
         self.today_ticks.clear()
         self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
 
-        self.clean_qmt_datadir_contents()
-
-    def clean_qmt_datadir_contents(self):
-        clear_dirs = [
-            os.path.join(QMT_CLIENT_PATH, 'datadir', market)
-            for market in ('SZ', 'SH', 'BJ')
-        ]
-
-        for folder in clear_dirs:
-            if not os.path.isdir(folder):
-                continue
-
-            clear_count = 0
-            fail_count = 0
-            for entry in os.scandir(folder):
-                try:
-                    if entry.is_dir(follow_symlinks=False):
-                        shutil.rmtree(entry.path)
-                    else:
-                        os.unlink(entry.path)
-                    clear_count += 1
-                except Exception as e:
-                    fail_count += 1
-                    print(f'[提示] 清理QMT缓存失败: {entry.path} {e}')
-
-            print(f'[提示] 已清理QMT缓存目录: {folder} 项数:{clear_count} 失败:{fail_count}')
-
+        clean_qmt_datadir_contents()
 
     def _start_qmt_scheduler(self):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
             ['08:30', self.near_trade_begin_wrapper, None],
-            ['08:55', self.check_before_finished, None],
             ['09:14', self.subscribe_tick, None],
             ['11:31', self.unsubscribe_tick, (True, )],
             ['12:59', self.subscribe_tick, (True, )],
@@ -417,9 +384,14 @@ class XtSubscriber(HistorySubscriber):
             before_time = f'0{random.randint(0, 3) + 3}:{random.randint(0, 59)}'  # 03:00 ~ 06:59
             cron_jobs.append([before_time, self.before_trade_day_wrapper, None])
 
+        if self.check_before_finished is not None:
+            # random 时间为了跑多个策略时防止补跑任务同时挤兑数据源
+            check_before_time = f'08:{random.randint(0, 59)}'  # 08:00 ~ 08:59
+            cron_jobs.append([check_before_time, self.check_before_finished, None])
+
         if self.finish_trade_day is not None:
             # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
-            finish_time = f'16:{random.randint(0, 10) + 5}'  # 16:05 ~ 16:15
+            finish_time = f'15:{random.randint(0, 10) + 15}'  # 15:15 ~ 15:25
             cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
 
         if self.open_middle_end_report:
@@ -492,3 +464,32 @@ class XtSubscriber(HistorySubscriber):
 def xt_get_ticks(code_list: list[str]) -> dict[str, dict]:
     # http://docs.thinktrader.net/pages/36f5df/#%E8%8E%B7%E5%8F%96%E5%85%A8%E6%8E%A8%E6%95%B0%E6%8D%AE
     return xtdata.get_full_tick(code_list)
+
+
+# -----------------------
+# 清理qmt安装目录缓存
+# -----------------------
+def clean_qmt_datadir_contents():
+    clear_dirs = [
+        os.path.join(QMT_CLIENT_PATH, 'datadir', market)
+        for market in ('SZ', 'SH', 'BJ')
+    ]
+
+    for folder in clear_dirs:
+        if not os.path.isdir(folder):
+            continue
+
+        clear_count = 0
+        fail_count = 0
+        for entry in os.scandir(folder):
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    shutil.rmtree(entry.path)
+                else:
+                    os.unlink(entry.path)
+                clear_count += 1
+            except Exception as e:
+                fail_count += 1
+                print(f'[提示] 清理QMT缓存失败: {entry.path} {e}')
+
+        print(f'[提示] 已清理QMT缓存目录: {folder} 项数:{clear_count} 失败:{fail_count}')

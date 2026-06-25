@@ -1,4 +1,5 @@
 import datetime
+import os
 import threading
 from typing import Optional
 
@@ -41,33 +42,53 @@ class GmCallback:
 
     @staticmethod
     def register_callback():
-        file_name = 'delegate.gm_callback.py'
+        # gmtrade SDK 在 Windows 下会把 delegate/ 路径首字母 d 误判为 D: 盘符 → No module named 'elegate'
+        # 回调入口见 tools/utils_gm.py，须从项目根目录启动策略
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_name = os.path.relpath(
+            os.path.join(project_root, 'tools', 'utils_gm.py'),
+            os.getcwd(),
+        ).replace('\\', '/')
         try:
             status = start(filename=file_name)
             if status == 0:
                 print(f'[掘金信息] 使用 {file_name} 订阅回调成功\n', end='')
-            else:
-                print(f'[掘金信息] 使用 {file_name} 订阅回调失败，状态码：{status}\n', end='')
+                return
+            print(f'[掘金信息] 使用 {file_name} 订阅回调失败，状态码：{status}\n', end='')
         except Exception as e0:
             print(f'[掘金信息] 使用 {file_name} 订阅回调异常：{e0}\n', end='')
-            try:
-                # 直接使用当前模块进行注册，不使用filename参数
-                status = start(filename='__main__')
-                if status == 0:
-                    print(f'[掘金信息] 使用 __main__ 订阅回调成功\n', end='')
-                else:
-                    print(f'[掘金信息] 使用 __main__ 订阅回调失败，状态码：{status}\n', end='')
-            except Exception as e1:
-                print(f'[掘金信息] 使用 __main__ 订阅回调异常：{e1}\n', end='')
-                try:
-                    # 如果start()不带参数失败，尝试使用空参数
-                    status = start()
-                    if status == 0:
-                        print(f'[掘金信息] 订阅回调成功\n', end='')
-                    else:
-                        print(f'[掘金信息] 订阅回调失败，状态码：{status}\n', end='')
-                except Exception as e2:
-                    print(f'[掘金信息] 使用空参数订阅回调也失败：{e2}\n', end='')
+
+        try:
+            # 兜底：把回调函数挂到 __main__ 再注册
+            import sys
+            from delegate import gm_callback as _cb
+
+            _main = sys.modules['__main__']
+            for _name in (
+                'on_execution_report',
+                'on_order_status',
+                'on_trade_data_connected',
+                'on_trade_data_disconnected',
+                'on_account_status',
+                'on_error',
+            ):
+                setattr(_main, _name, getattr(_cb, _name))
+            status = start(filename='__main__')
+            if status == 0:
+                print(f'[掘金信息] 使用 __main__ 订阅回调成功\n', end='')
+                return
+            print(f'[掘金信息] 使用 __main__ 订阅回调失败，状态码：{status}\n', end='')
+        except Exception as e1:
+            print(f'[掘金信息] 使用 __main__ 订阅回调异常：{e1}\n', end='')
+
+        try:
+            status = start()
+            if status == 0:
+                print(f'[掘金信息] 订阅回调成功\n', end='')
+            else:
+                print(f'[掘金信息] 订阅回调失败，状态码：{status}\n', end='')
+        except Exception as e2:
+            print(f'[掘金信息] 使用空参数订阅回调也失败：{e2}\n', end='')
 
     @staticmethod
     def unregister_callback():

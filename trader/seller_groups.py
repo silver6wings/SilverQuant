@@ -7,9 +7,15 @@ class GroupSellers:
 
     def group_init(self, strategy_name, delegate, parameters):
         print('[卖出策略] ', end='')
-        for parent in self.__class__.__bases__:
-            if parent.__name__ != 'GroupSellers':
-                parent.__init__(self, strategy_name, delegate, parameters)
+        mro = self.__class__.__mro__
+        start_idx = None
+        for i, cls in enumerate(mro):
+            if cls is GroupSellers:
+                start_idx = i + 1
+                break
+        if start_idx is not None and start_idx < len(mro):
+            first = mro[start_idx]
+            first.__init__(self, strategy_name, delegate, parameters)
         print('>> 组合完成')
 
     def group_check_sell(
@@ -52,7 +58,7 @@ class ClassicMAGroupSeller(GroupSellers, HardSeller, FallSeller, ReturnSeller, M
 
 
 # 监控卖出
-class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller):
+class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller, MoveSeller):
     def __init__(self, strategy_name, delegate, parameters):
         super().__init__()
         self.group_init(strategy_name, delegate, parameters)
