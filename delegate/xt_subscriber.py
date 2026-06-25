@@ -391,7 +391,7 @@ class XtSubscriber(HistorySubscriber):
 
         if self.finish_trade_day is not None:
             # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
-            finish_time = f'16:{random.randint(0, 10) + 5}'  # 16:05 ~ 16:15
+            finish_time = f'15:{random.randint(0, 10) + 15}'  # 15:15 ~ 15:25
             cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
 
         if self.open_middle_end_report:

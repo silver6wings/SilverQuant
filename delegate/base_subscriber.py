@@ -239,12 +239,14 @@ class BaseSubscriber:
         if not check_is_open_day(now.strftime('%Y-%m-%d')):
             return
 
+        is_afternoon = (now.hour > 12)
+
         print(f'[每日总结] 开始')
         curr_date = now.strftime('%Y-%m-%d')
 
         if self.open_today_deal_report:
             try:
-                self.daily_reporter.today_deal_report(today=curr_date)
+                self.daily_reporter.today_deal_report(today=curr_date, is_afternoon=is_afternoon)
             except Exception as e:
                 print('[每日总结] 交易报告出错: ', e)
                 traceback.print_exc()
@@ -253,7 +255,10 @@ class BaseSubscriber:
             try:
                 if self.delegate is not None:
                     positions = self.delegate.check_positions()
-                    self.daily_reporter.today_hold_report(today=curr_date, positions=positions)
+                    self.daily_reporter.today_hold_report(
+                        today=curr_date,
+                        positions=positions,
+                        is_afternoon=is_afternoon)
                 else:
                     print('[每日总结] 获取持仓信息必需 delegate')
             except Exception as e:
@@ -263,7 +268,7 @@ class BaseSubscriber:
         try:
             if self.delegate is not None:
                 asset = self.delegate.check_asset()
-                self.daily_reporter.check_asset(today=curr_date, asset=asset, is_afternoon=(now.hour > 12))
+                self.daily_reporter.check_asset(today=curr_date, asset=asset, is_afternoon=is_afternoon)
         except Exception as e:
             print('[每日总结] 账户报告出错: ', e)
             traceback.print_exc()

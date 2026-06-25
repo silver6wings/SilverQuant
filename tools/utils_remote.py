@@ -12,7 +12,9 @@ from typing import Optional
 from tools.constants import DataSource, ExitRight, DEFAULT_DAILY_COLUMNS
 from tools.utils_basic import code_to_symbol, code_to_sina_symbol, code_to_tdxsymbol, \
     is_fund_etf, is_stock, tdxsymbol_to_code
+
 from tools.utils_remote_ts import get_ts_daily_histories, get_ts_daily_history, get_ts_stk_daily_history
+from tools.utils_remote_sv import pull_stock_today_codes, push_stock_today_codes
 
 
 class BaoStockInstance:
@@ -172,26 +174,6 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
             result.update(df['股票代码'].values)
 
     return list(result)
-
-
-# ================
-# Service
-# ================
-
-
-def pull_stock_codes(prefix: str, host: str, auth: str) -> tuple[Optional[list[str]], str]:
-    key = f'{prefix}_{datetime.datetime.now().date().strftime("%Y%m%d")}'
-    try:
-        response = requests.get(f'{host}/stocks/get_list/{key}?auth={auth}', timeout=10)
-    except requests.RequestException as e:
-        return None, str(e)
-
-    if response.status_code == 200:
-        return response.json(), ''
-    if response.status_code == 404:
-        response_json = response.json()
-        return None, response_json.get('error', 'Not Found')
-    return None, f'HTTP {response.status_code}'
 
 
 # ================

@@ -15,7 +15,7 @@ from trader.pools import StocksPoolBlackEmpty as Pool
 from trader.buyer import BaseBuyer as Buyer
 from trader.seller_groups import ClassicGroupSeller as Seller
 
-from tools.utils_remote import pull_stock_codes
+from tools.utils_remote_sv import pull_stock_today_codes
 
 data_source = DataSource.AKSHARE
 
@@ -181,7 +181,7 @@ def check_stock_codes(selected_codes: list[str], quotes: dict) -> dict[str, dict
 
 
 def scan_buy(quotes: dict, curr_date: str, positions: list) -> None:
-    selected_codes, err_msg = pull_stock_codes(SELECTION_ID, RECOMMEND_HOST, AUTHENTICATION)
+    selected_codes, err_msg = pull_stock_today_codes(SELECTION_ID, RECOMMEND_HOST, AUTHENTICATION)
     if selected_codes is None:
         print(f'[{err_msg}]', end='')
         return
