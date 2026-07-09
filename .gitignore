@@ -163,7 +163,7 @@ cython_debug/
 *.dmp
 
 # cache
-#_cache/_daily*
+_cache/_daily*
 _cache/_sector*
 _cache/_tmp*
 
