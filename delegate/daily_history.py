@@ -29,7 +29,11 @@ class DailyHistoryCache:
     def set_data_source(self, data_source: DataSource, init_day_count: int = DEFAULT_INIT_DAY_COUNT):
         if self.daily_history is None or self.data_source != data_source:
             self.data_source = data_source
-            self.daily_history = DailyHistory(data_source=self.data_source, init_day_count=init_day_count)
+            if self.data_source == DataSource.MINIQMT:
+                from delegate.daily_history_xt import DailyHistoryXT
+                self.daily_history = DailyHistoryXT(init_day_count=init_day_count)
+            else:
+                self.daily_history = DailyHistory(data_source=self.data_source, init_day_count=init_day_count)
             self.daily_history.load_history_from_disk_to_memory()
 
 

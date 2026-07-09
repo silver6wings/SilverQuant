@@ -40,14 +40,10 @@ cache_selected: dict[str, set] = {}             # 记录选股历史，去重
 
 class PoolConf:
     white_prefixes = {'00', '60', '30'}
-    white_index_symbol = IndexSymbol.INDEX_ZZ_ALL
     white_ma_above_period = 10
+    white_none_st = True
+    black_prompts = ['近一周大股东减持']
 
-    black_prompts = [
-        'ST',
-        '退市',
-        '近一周大股东减持',
-    ]
     day_count = 200                 # 200个足够算出周期为120的均线数据
     price_adjust = ExitRight.QFQ    # 历史价格复权
     columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount']

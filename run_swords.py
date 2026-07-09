@@ -4,6 +4,7 @@ import datetime
 
 from credentials import DING_SECRET, DING_TOKENS, CACHE_PROD_PATH, CACHE_TEST_PATH, QMT_ACCOUNT_ID, QMT_CLIENT_PATH
 from tools.utils_basic import is_symbol, time_diff_seconds
+from tools.utils_remote import tick_list_row_price, tick_list_row_time
 from tools.utils_logger import setup_logging
 from tools.utils_cache import all_held_inc
 from tools.utils_ding import DingMessager
@@ -123,10 +124,10 @@ def check_block_ticks(
     i = len(ticks) - 1
     now_seconds = datetime.datetime.strptime(f'{curr_time}:{curr_seconds}', '%H:%M:%S')
     while i >= 0:
-        i_seconds = datetime.datetime.strptime(ticks[i][0], '%H:%M:%S')
+        i_seconds = datetime.datetime.strptime(tick_list_row_time(ticks[i]), '%H:%M:%S')
         if time_diff_seconds(now_seconds, i_seconds) > BuyConf.block_seconds:
             break
-        i_price = ticks[i][1]
+        i_price = tick_list_row_price(ticks[i])
         if i_price < max_price:  # 保证时间段内的价格都是最大
             return False
 
