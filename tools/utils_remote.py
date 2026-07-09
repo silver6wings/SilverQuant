@@ -177,8 +177,55 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
 
 
 # ================
-# 数据格式处理
+# QMT Quote 数据格式处理
 # ================
+
+
+# tick 统一列定义（list 行 / DataFrame / parquet 共用，改列只改此处）
+QMT_TICK_DF_COLS: tuple[str, ...] = (
+    ['local', 'time', 'price', 'high', 'low', 'lastClose', 'volume', 'amount']
+    + [f'askPrice{i}' for i in range(1, 6)]
+    + [f'askVol{i}' for i in range(1, 6)]
+    + [f'bidPrice{i}' for i in range(1, 6)]
+    + [f'bidVol{i}' for i in range(1, 6)]
+)
+
+TICK_LIST_LEN = len(QMT_TICK_DF_COLS)
+TICK_LIST_COL_LOCAL = QMT_TICK_DF_COLS.index('local')
+TICK_LIST_COL_TIME = QMT_TICK_DF_COLS.index('time')
+TICK_LIST_COL_PRICE = QMT_TICK_DF_COLS.index('price')
+
+
+def tick_list_row_time(row) -> str:
+    return row[TICK_LIST_COL_TIME]
+
+
+def tick_list_row_price(row) -> float:
+    return row[TICK_LIST_COL_PRICE]
+
+
+def _normalize_qmt_quote(quote: dict) -> dict:
+    quote = dict(quote or {})
+    if 'lastClose' not in quote:
+        quote['lastClose'] = quote.get('lastLose', 0) or 0
+    quote.setdefault('time', int(time.time() * 1000))
+    quote.setdefault('lastPrice', 0)
+    quote.setdefault('high', 0)
+    quote.setdefault('low', 0)
+    quote.setdefault('volume', 0)
+    quote.setdefault('amount', 0)
+    quote.setdefault('askPrice', [])
+    quote.setdefault('askVol', [])
+    quote.setdefault('bidPrice', [])
+    quote.setdefault('bidVol', [])
+    return quote
+
+
+def _quote_tick_time_hms(quote: dict, fallback: str) -> str:
+    tick_ts_ms = quote.get('time')
+    if isinstance(tick_ts_ms, (int, float)) and tick_ts_ms > 0:
+        return datetime.datetime.fromtimestamp(tick_ts_ms / 1000).strftime('%H:%M:%S')
+    return fallback
 
 
 # 数组长度标准化防止quotes数据格式异常导致额外的bug，用以处理买卖五档数据
@@ -190,54 +237,50 @@ def qmt_pad_list(xs, target_length: int, fill=0):
     return xs
 
 
-def _adjust_list(input_list: list, target_length: int) -> list:
-    # 兼容 input_list=None，并保持历史行为：默认补 0
-    return qmt_pad_list(input_list, target_length=target_length, fill=0)
+def _qmt_quote_to_tick_record(quote: dict, local_time: Optional[str] = None) -> dict:
+    """QMT quote -> 标准 tick 字典（键与 QMT_TICK_DF_COLS 一致）。"""
+    local_time = local_time or datetime.datetime.now().strftime('%H:%M:%S')
+    quote = _normalize_qmt_quote(quote)
+    tick_time = _quote_tick_time_hms(quote, local_time)
+
+    ask_price = qmt_pad_list(quote.get('askPrice', []), target_length=5, fill=0.0)
+    ask_vol = qmt_pad_list(quote.get('askVol', []), target_length=5, fill=0)
+    bid_price = qmt_pad_list(quote.get('bidPrice', []), target_length=5, fill=0.0)
+    bid_vol = qmt_pad_list(quote.get('bidVol', []), target_length=5, fill=0)
+
+    rec = {
+        'local': local_time,
+        'time': tick_time,
+        'price': round(float(quote.get('lastPrice', 0) or 0), 3),
+        'high': round(float(quote.get('high', 0) or 0), 3),
+        'low': round(float(quote.get('low', 0) or 0), 3),
+        'lastClose': round(float(quote.get('lastClose', 0) or 0), 3),
+        'volume': int(quote.get('volume', 0) or 0),
+        'amount': round(float(quote.get('amount', 0) or 0), 3),
+    }
+    for i in range(5):
+        rec[f'askPrice{i + 1}'] = round(float(ask_price[i] or 0.0), 3)
+        rec[f'askVol{i + 1}'] = int(ask_vol[i] or 0)
+        rec[f'bidPrice{i + 1}'] = round(float(bid_price[i] or 0.0), 3)
+        rec[f'bidVol{i + 1}'] = int(bid_vol[i] or 0)
+    return rec
+
+
+def qmt_quote_to_tick_list_row(quote: dict, local_time: Optional[str] = None) -> list:
+    """QMT quote -> 拍平 tick 行（列序与 QMT_TICK_DF_COLS 一致）。"""
+    rec = _qmt_quote_to_tick_record(quote, local_time=local_time)
+    return [rec[col] for col in QMT_TICK_DF_COLS]
+
+
+def tick_list_row_to_record(row) -> dict:
+    """拍平 tick 行 -> 标准 tick 字典。"""
+    return dict(zip(QMT_TICK_DF_COLS, row))
 
 
 def qmt_quote_to_tick(quote: dict) -> dict:
-    # 统一做数据兜底：调用方不必再重复补字段
-    quote = dict(quote or {})
-
-    # 兼容字段：部分行情里昨收用 lastLose
-    if 'lastClose' not in quote:
-        quote['lastClose'] = quote.get('lastLose', 0) or 0
-
-    # 兜底基础字段（本函数使用 [] 访问，缺字段会 KeyError）
-    quote.setdefault('time', int(time.time() * 1000))
-    quote.setdefault('lastPrice', 0)
-    quote.setdefault('high', 0)
-    quote.setdefault('low', 0)
-    quote.setdefault('volume', 0)
-    quote.setdefault('amount', 0)
-    quote.setdefault('askPrice', [])
-    quote.setdefault('askVol', [])
-    quote.setdefault('bidPrice', [])
-    quote.setdefault('bidVol', [])
-
-    ans = {
-        'time': datetime.datetime.fromtimestamp(quote['time'] / 1000).strftime('%H:%M:%S'),
-        'lastClose': quote['lastClose'],
-        'price': quote['lastPrice'],
-        'high': quote['high'],
-        'low': quote['low'],
-        'volume': quote['volume'],
-        'amount': quote['amount'],
-    }
-
-    ap = _adjust_list(quote['askPrice'], 5)
-    ans.update({f"askPrice{i+1}": ap[i] for i in range(min(5, len(ap)))})
-
-    av = _adjust_list(quote['askVol'], 5)
-    ans.update({f"askVol{i+1}": av[i] for i in range(min(5, len(av)))})
-
-    bp = _adjust_list(quote['bidPrice'], 5)
-    ans.update({f"bidPrice{i+1}": bp[i] for i in range(min(5, len(bp)))})
-
-    bv = _adjust_list(quote['bidVol'], 5)
-    ans.update({f"bidVol{i+1}": bv[i] for i in range(min(5, len(bv)))})
-
-    return ans
+    """QMT quote -> tick 字典（不含 local，供 am_subscriber 等写入时自行追加）。"""
+    rec = _qmt_quote_to_tick_record(quote)
+    return {col: rec[col] for col in QMT_TICK_DF_COLS if col != 'local'}
 
 
 def qmt_quote_to_day_kline(quote: dict, curr_date: str) -> dict:
@@ -439,7 +482,7 @@ def get_daily_history(
         return get_bao_daily_history(code, start_date, end_date, columns, adjust)
     else:
         # 默认使用免费的 miniqmt数据，但就是慢的一批
-        from tools.utils_miniqmt import get_qmt_daily_history
+        from tools.utils_remote_xt import get_qmt_daily_history
         return get_qmt_daily_history(code, start_date, end_date, columns, adjust)
 
 

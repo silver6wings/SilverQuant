@@ -1,5 +1,6 @@
 """
-https://sim.myquant.cn/sim/help/Python.html
+掘金官方 gmtrade 开发文档：
+https://www.myquant.cn/docs2/sdk/
 """
 import datetime
 from typing import List
@@ -18,7 +19,7 @@ from tools.utils_cache import StockNames
 from tools.utils_ding import BaseMessager
 
 
-DEFAULT_GM_SERVER_HOST = 'api.myquant.cn:9000'
+DEFAULT_GM_SERVER_HOST = 'localhost:7001'
 DEFAULT_GM_STRATEGY_NAME = '模拟策略'
 
 
@@ -53,6 +54,14 @@ class GmPosition:
         self.market_value = position.amount
 
 
+def init_token():
+    set_token(GM_CLIENT_TOKEN)
+
+
+def init_endpoint():
+    set_endpoint()
+
+
 class GmDelegate(BaseDelegate):
     def __init__(
         self,
@@ -64,10 +73,9 @@ class GmDelegate(BaseDelegate):
         self.ding_messager = ding_messager
         self.stock_names = StockNames()
 
+        init_token()
+        init_endpoint()
         self.account_id = '**' + str(account_id)[-4:]
-
-        set_endpoint(DEFAULT_GM_SERVER_HOST)
-        set_token(GM_CLIENT_TOKEN)
 
         self.account = account(account_id=GM_ACCOUNT_ID, account_alias='')
         login(self.account)

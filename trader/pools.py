@@ -244,6 +244,10 @@ class StocksPoolWhitePrefixesMA(StocksPoolBlackWencai):
         self.white_prefixes = parameters.white_prefixes
         self.white_index_symbol = parameters.white_index_symbol         # 指数名称（默认中证全指000985）
         self.white_ma_above_period = parameters.white_ma_above_period   # 均线周期（默认五日均线）
+        if hasattr(parameters, 'white_none_st'):
+            self.white_none_st = parameters.white_none_st
+        else:
+            self.white_none_st = False
 
     def refresh_white(self):
         super().refresh_white()
@@ -253,7 +257,7 @@ class StocksPoolWhitePrefixesMA(StocksPoolBlackWencai):
             period=self.white_ma_above_period,
         )
         if allow:
-            t_white_codes = get_prefixes_stock_codes(self.white_prefixes)
+            t_white_codes = get_prefixes_stock_codes(self.white_prefixes, self.white_none_st)
             self.cache_whitelist.update(t_white_codes)
 
 

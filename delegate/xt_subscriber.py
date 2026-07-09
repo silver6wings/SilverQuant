@@ -16,7 +16,7 @@ from delegate.daily_reporter import DailyReporter
 
 from tools.utils_cache import check_is_open_day
 from tools.utils_ding import BaseMessager
-from tools.utils_remote import qmt_quote_to_tick, qmt_pad_list
+from tools.utils_remote import qmt_quote_to_tick, qmt_quote_to_tick_list_row, tick_list_row_to_record, QMT_TICK_DF_COLS
 
 
 class XtSubscriber(HistorySubscriber):
@@ -35,8 +35,9 @@ class XtSubscriber(HistorySubscriber):
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
         finish_trade_day: Callable = None,  # 盘后函数
+        finish_call_hour: int = 15,         # 盘后执行小时（方便延迟事件应对特殊情况）
         # 订阅
-        use_ap_scheduler: bool = True,     # （已弃用）默认使用旧版 schedule
+        use_ap_scheduler: bool = True,      # （已弃用）默认使用旧版 schedule
         # 通知
         ding_messager: BaseMessager = None,
         # 日报
@@ -60,6 +61,7 @@ class XtSubscriber(HistorySubscriber):
             before_trade_day=before_trade_day,
             near_trade_begin=near_trade_begin,
             finish_trade_day=finish_trade_day,
+            finish_call_hour=finish_call_hour,
             open_middle_end_report=open_middle_end_report,
             open_today_deal_report=open_today_deal_report,
             open_today_hold_report=open_today_hold_report,
@@ -73,6 +75,8 @@ class XtSubscriber(HistorySubscriber):
         self.is_ticks_df = tick_memory_data_frame
         self.quick_ticks: bool = False                          # 是否开启quick tick模式
         self.today_ticks: Dict[str, list | pd.DataFrame] = {}   # 记录tick的历史信息
+        self._tick_n: Dict[str, int] = {}                       # df 模式：各 code 已写入行数
+        self._TICK_DF_INIT = 4096                                 # df 模式：预分配行数
         self.lock_quotes_update = threading.Lock()  # 聚合实时打点缓存的锁
 
         self.cache_quotes: Dict[str, Dict] = {}     # 记录实时的价格信息
@@ -96,12 +100,7 @@ class XtSubscriber(HistorySubscriber):
             today_report_show_bank=self.today_report_show_bank,
         )
 
-        # parquet/df 输出的统一列结构（无论 tick_memory_data_frame 开关如何，都需要用于落盘）
-        self.tick_df_cols = ['local', 'time', 'price', 'high', 'low', 'lastClose', 'volume', 'amount'] \
-            + [f'askPrice{i}' for i in range(1, 6)] \
-            + [f'askVol{i}' for i in range(1, 6)] \
-            + [f'bidPrice{i}' for i in range(1, 6)] \
-            + [f'bidVol{i}' for i in range(1, 6)]
+        self.tick_df_cols = list(QMT_TICK_DF_COLS)
 
     # -----------------------
     # 策略触发主函数
@@ -223,6 +222,44 @@ class XtSubscriber(HistorySubscriber):
     # -----------------------
     # 盘中实时的 tick 历史
     # -----------------------
+    def get_tick_df(self, code: str) -> pd.DataFrame:
+        empty = pd.DataFrame(columns=self.tick_df_cols)
+        val = self.today_ticks.get(code)
+        if val is None:
+            return empty
+
+        if self.is_ticks_df:
+            n = self._tick_n.get(code, 0)
+            if n <= 0:
+                return empty
+            return val.iloc[:n]
+
+        if len(val) > 0:
+            records = [tick_list_row_to_record(t) for t in val]
+            return pd.DataFrame.from_records(records, columns=self.tick_df_cols)
+        return empty
+
+    def _tick_df_buf(self, code: str) -> pd.DataFrame:
+        df = self.today_ticks.get(code)
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(index=range(self._TICK_DF_INIT), columns=self.tick_df_cols, dtype=object)
+            self.today_ticks[code] = df
+            self._tick_n[code] = 0
+        return df
+
+    def _append_tick_df(self, code: str, tick: dict) -> None:
+        df = self._tick_df_buf(code)
+        i = self._tick_n[code]
+        if i >= len(df):
+            grow = len(df) * 2
+            self.today_ticks[code] = pd.concat([
+                df,
+                pd.DataFrame(index=range(len(df), grow), columns=df.columns, dtype=object),
+            ], ignore_index=True)
+            df = self.today_ticks[code]
+        df.iloc[i] = tick
+        self._tick_n[code] = i + 1
+
     def record_tick_to_memory(self, quotes):
         # 记录 tick 历史到内存
         local_time = datetime.datetime.now().strftime('%H:%M:%S')
@@ -230,42 +267,12 @@ class XtSubscriber(HistorySubscriber):
             for code, quote in quotes.items():
                 tick = qmt_quote_to_tick(quote)
                 tick['local'] = local_time
-                if code not in self.today_ticks:
-                    self.today_ticks[code] = pd.DataFrame(columns=self.tick_df_cols)
-                tick_df = self.today_ticks[code]
-                tick_df.loc[len(tick_df)] = tick
+                self._append_tick_df(code, tick)
         else:
             for code, quote in quotes.items():
                 if code not in self.today_ticks:
                     self.today_ticks[code] = []
-
-                last_close = quote.get('lastClose', None)
-                last_close = float(last_close or 0.0)
-
-                tick_ts_ms = quote.get('time', None)
-                if isinstance(tick_ts_ms, (int, float)) and tick_ts_ms > 0:
-                    tick_time = datetime.datetime.fromtimestamp(tick_ts_ms / 1000).strftime('%H:%M:%S')
-                else:
-                    tick_time = datetime.datetime.now().strftime('%H:%M:%S')
-
-                ask_price = qmt_pad_list(quote.get('askPrice', []), target_length=5, fill=0.0)
-                ask_vol = qmt_pad_list(quote.get('askVol', []), target_length=5, fill=0)
-                bid_price = qmt_pad_list(quote.get('bidPrice', []), target_length=5, fill=0.0)
-                bid_vol = qmt_pad_list(quote.get('bidVol', []), target_length=5, fill=0)
-                self.today_ticks[code].append([
-                    tick_time,                                          # 成交时间，格式：%H:%M:%S
-                    round(float(quote.get('lastPrice', 0) or 0), 3),    # 成交价格
-                    round(float(quote.get('high', 0) or 0), 3),         # 成交最高价
-                    round(float(quote.get('low', 0) or 0), 3),          # 成交最低价
-                    round(last_close, 3),                               # 昨日收盘价
-                    int(quote.get('volume', 0) or 0),                   # 累计成交量（手）
-                    round(float(quote.get('amount', 0) or 0), 3),       # 累计成交额（元）
-                    [round(float(p or 0.0), 3) for p in ask_price],     # 卖价
-                    [int(v or 0) for v in ask_vol],                     # 卖量
-                    [round(float(p or 0.0), 3) for p in bid_price],     # 买价
-                    [int(v or 0) for v in bid_vol],                     # 买量
-                    local_time,                                         # 本机记录时间（local）
-                ])
+                self.today_ticks[code].append(qmt_quote_to_tick_list_row(quote, local_time=local_time))
 
     def clean_ticks_history(self):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -273,6 +280,7 @@ class XtSubscriber(HistorySubscriber):
 
         self.today_ticks.clear()
         self.today_ticks = {}
+        self._tick_n.clear()
         print(f"[提示] 已清除tick缓存")
 
     def save_tick_history(self):
@@ -286,9 +294,10 @@ class XtSubscriber(HistorySubscriber):
         frames: list[pd.DataFrame] = []
         if self.is_ticks_df:
             for code, df in (self.today_ticks or {}).items():
-                if df is None or len(df) == 0:
+                n = self._tick_n.get(code, 0)
+                if not isinstance(df, pd.DataFrame) or n <= 0:
                     continue
-                code_df = df.copy()
+                code_df = df.iloc[:n].copy()
                 code_df.insert(0, 'code', code)
                 frames.append(code_df)
         else:
@@ -296,38 +305,13 @@ class XtSubscriber(HistorySubscriber):
                 if not isinstance(ticks, list) or len(ticks) == 0:
                     continue
 
-                # list 模式也拍平为与 df 模式一致的列结构（包含盘口 1~5 档），方便统一读写
                 records: list[dict] = []
                 err = []
                 for t in ticks:
-                    # t: [time, price, high, low, lastClose, volume, amount, askPrice(list5), askVol(list5), bidPrice(list5), bidVol(list5), local]
                     try:
-                        ask_p = list(t[7]) if isinstance(t[7], (list, tuple)) else []
-                        ask_v = list(t[8]) if isinstance(t[8], (list, tuple)) else []
-                        bid_p = list(t[9]) if isinstance(t[9], (list, tuple)) else []
-                        bid_v = list(t[10]) if isinstance(t[10], (list, tuple)) else []
+                        records.append(tick_list_row_to_record(t))
                     except Exception as e:
-                        err.append([str(t[0]), str(e)])
-                        ask_p, ask_v, bid_p, bid_v = [], [], [], []
-
-                    # list 模式新结构：末尾追加 local（本机记录时间）；旧结构缺失时退化为与 time 相同
-                    local = t[11] if (hasattr(t, "__len__") and len(t) > 11) else t[0]
-                    rec = {
-                        'local': local,
-                        'time': t[0],
-                        'price': t[1],
-                        'high': t[2],
-                        'low': t[3],
-                        'lastClose': t[4],
-                        'volume': t[5],
-                        'amount': t[6],
-                    }
-                    for i in range(5):
-                        rec[f'askPrice{i+1}'] = ask_p[i] if i < len(ask_p) else 0.0
-                        rec[f'askVol{i+1}'] = ask_v[i] if i < len(ask_v) else 0
-                        rec[f'bidPrice{i+1}'] = bid_p[i] if i < len(bid_p) else 0.0
-                        rec[f'bidVol{i+1}'] = bid_v[i] if i < len(bid_v) else 0
-                    records.append(rec)
+                        err.append([str(t), str(e)])
 
                 if len(err) > 0:
                     print(f'[提示] {code} 的 tick 本地持久化时报错：{err}')
@@ -359,6 +343,7 @@ class XtSubscriber(HistorySubscriber):
         self.cache_quotes.clear()
         self.cache_history.clear()
         self.today_ticks.clear()
+        self._tick_n.clear()
         self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
 
         clean_qmt_datadir_contents()
@@ -391,7 +376,7 @@ class XtSubscriber(HistorySubscriber):
 
         if self.finish_trade_day is not None:
             # random 时间为了跑多个策略时防止短期预加载数据流量压力过大
-            finish_time = f'15:{random.randint(0, 10) + 15}'  # 15:15 ~ 15:25
+            finish_time = f'{self.finish_call_hour}:{random.randint(0, 10) + 15}'
             cron_jobs.append([finish_time, self.finish_trade_day_wrapper, None])
 
         if self.open_middle_end_report:
@@ -410,6 +395,7 @@ class XtSubscriber(HistorySubscriber):
 
         # 集合竞价结束后重拉订阅，缓解首笔成交/行情推送偏晚
         self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=25, second=30)
+        self.scheduler.add_job(self.resubscribe_tick, 'cron', hour=9, minute=29, second=30)
 
         # 数据源中断检查时间点
         monitor_time_list = [

@@ -38,6 +38,7 @@ class BaseSubscriber:
         before_trade_day: Callable = None,  # 盘前函数
         near_trade_begin: Callable = None,  # 盘后函数
         finish_trade_day: Callable = None,  # 盘后函数
+        finish_call_hour: int = 15,         # 盘后执行小时
         # 非QMT
         custom_sub_begin: Callable = None,  # 使用外部数据时的自定义启动
         custom_unsub_end: Callable = None,  # 使用外部数据时的自定义关闭
@@ -64,6 +65,7 @@ class BaseSubscriber:
         self.before_trade_day = before_trade_day    # 提前准备某些耗时长的任务
         self.near_trade_begin = near_trade_begin    # 有些数据临近开盘才更新，这里保证内存里的数据正确
         self.finish_trade_day = finish_trade_day    # 盘后及时做一些总结汇报入库类的整理工作
+        self.finish_call_hour = finish_call_hour
 
         self.custom_begin_sub = custom_sub_begin
         self.custom_end_unsub = custom_unsub_end
@@ -164,10 +166,17 @@ class BaseSubscriber:
     def clear_all(self):
         self.history_day_klines.clear()
 
+    def refresh_stock_names(self):
+        try:
+            self.stock_names.load_codes_and_names()
+        except Exception as e:
+            print(f'[更新缓存] 股票名称刷新失败: {e}\n', end='')
+
     def before_trade_day_wrapper(self):
         if not check_is_open_day(get_today()):
             return
 
+        self.refresh_stock_names()
         self.clear_all()
 
         if self.before_trade_day is not None:
@@ -317,9 +326,9 @@ class BaseSubscriber:
             random_minute = random.randint(0, 59)
             self.scheduler.add_job(self.check_before_finished, 'cron', hour=8, minute=random_minute)
 
-        if self.finish_trade_day is not None:   # 16:05 ~ 16:15
-            random_minute = random.randint(0, 10) + 5
-            self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=16, minute=random_minute)
+        if self.finish_trade_day is not None:
+            random_minute = random.randint(0, 10) + 15
+            self.scheduler.add_job(self.finish_trade_day_wrapper, 'cron', hour=self.finish_call_hour, minute=random_minute)
 
         if self.execute_call_end is not None:
             self.scheduler.add_job(self.execute_call_end_wrapper, 'cron', hour=9, minute=25, second=45)
@@ -492,7 +501,7 @@ class HistorySubscriber(BaseSubscriber):
                 self.history_day_klines = get_tdxzip_history(adjust=adjust)
 
         # ======== 预加载每日增量数据源 ========
-        elif data_source == DataSource.TUSHARE or data_source == DataSource.MOOTDX:
+        elif data_source in (DataSource.TUSHARE, DataSource.MOOTDX, DataSource.MINIQMT):
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
             if hc.daily_history is not None:

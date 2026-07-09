@@ -188,9 +188,29 @@ def on_trade_data_disconnected():
     print('[掘金回调] 交易服务已断开\n', end='')
 
 
-def on_account_status(account_status: AccountStatus):
-    print(f'[掘金回调] 账户状态已变化 状态：{account_status}\n', end='')
-
 
 def on_error(error_code, error_info):
     print(f'[掘金报错] 错误码:{error_code} 错误信息:{error_info}\n', end='')
+
+
+GM_ACCOUNT_STATE_LABELS = {
+    0: '未知',
+    1: '连接中',
+    2: '已连接',
+    3: '已登录',
+    4: '断开中',
+    5: '已断开',
+    6: '错误',
+}
+
+GmAccountStatus: Optional[int] = None
+
+
+def on_account_status(account_status: AccountStatus):
+    global GmAccountStatus
+    state = account_status.status.state
+    if GmAccountStatus == state:
+        return
+    GmAccountStatus = state
+    label = GM_ACCOUNT_STATE_LABELS.get(state, f'未知({state})')
+    print(f'[掘金回调] 账户状态：{label}\n', end='')

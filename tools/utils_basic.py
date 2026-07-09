@@ -197,6 +197,24 @@ def is_stock_cy(code_or_symbol: str | int):
     return code_or_symbol[:2] == '30'
 
 
+def is_stock_sz(code_or_symbol: str | int):
+    """ 判断是不是深交所股票 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    symbol, *exchange = code_or_symbol.split('.')
+    if exchange:
+        return exchange[0].upper() == 'SZ' and symbol[:2] in ['00', '30']
+    return symbol[:2] in ['00', '30']
+
+
+def is_stock_sh(code_or_symbol: str | int):
+    """ 判断是不是上交所股票 """
+    code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol
+    symbol, *exchange = code_or_symbol.split('.')
+    if exchange:
+        return exchange[0].upper() == 'SH' and symbol[:2] in ['60', '68']
+    return symbol[:2] in ['60', '68']
+
+
 def is_stock_kc(code_or_symbol: str | int):
     """ 判断是不是科创板 """
     code_or_symbol = str(code_or_symbol) if type(code_or_symbol) == int else code_or_symbol

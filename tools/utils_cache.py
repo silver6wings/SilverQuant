@@ -67,7 +67,7 @@ class StockNames:
 CODE_NAME_CACHE_PATH = './_cache/_code_names.csv'
 
 
-def load_stock_code_and_names(retention_day: int = 1):
+def load_stock_code_and_names(retention_hours: int = 12):
     cache_available = False
     df = pd.DataFrame(columns=['代码', '名称', '日期'])
 
@@ -77,7 +77,7 @@ def load_stock_code_and_names(retention_day: int = 1):
         cache_date_str = df['日期'].head(1).values[0]
         cache_date = datetime.datetime.strptime(cache_date_str, '%Y-%m-%d')
         curr_date = datetime.datetime.today()
-        if curr_date - cache_date < datetime.timedelta(days=retention_day):
+        if curr_date - cache_date < datetime.timedelta(hours=retention_hours):
             cache_available = True
 
     # 过期就尝试下载并缓存新的覆盖旧版本
