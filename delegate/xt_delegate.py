@@ -1,9 +1,13 @@
-import sys
+from __future__ import annotations
+
 import time
 import datetime
 import logging
 from threading import Thread
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from delegate.xt_subscriber import XtSubscriber
 
 from xtquant import xtconstant, xtdata
 from xtquant.xtconstant import STOCK_BUY, STOCK_SELL
@@ -19,8 +23,6 @@ from tools.utils_ding import BaseMessager
 
 from delegate.base_delegate import BaseDelegate
 from delegate.xt_callback import XtDefaultCallback
-if 'delegate.xt_subscriber' not in sys.modules:
-    from delegate.xt_subscriber import XtSubscriber
 
 
 DEFAULT_RECONNECT_SECONDS = 60

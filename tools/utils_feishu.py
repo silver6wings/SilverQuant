@@ -12,6 +12,21 @@ import traceback
 from tools.utils_ding import BaseMessager
 
 
+# 与 delegate.daily_reporter.colour_text 的 hex 色值保持一致
+_HTML_COLOUR_TO_FEISHU = (
+    ('#DC2832', 'red'),
+    ('#16BC50', 'green'),
+    ('#3366FF', 'blue'),
+)
+
+
+def adapt_html_colour_for_feishu(text: str) -> str:
+    """将 colour_text 的标准 hex 色值转为飞书 lark_md 命名色。"""
+    for hex_color, feishu_color in _HTML_COLOUR_TO_FEISHU:
+        text = text.replace(f'<font color="{hex_color}">', f"<font color='{feishu_color}'>")
+    return text
+
+
 class FeishuMessager(BaseMessager):
     def __init__(self, secret: str = None, webhook_url: str = None):
         """
@@ -115,7 +130,9 @@ class FeishuMessager(BaseMessager):
         return self.send_markdown(title, text, output, alert)
 
     def send_markdown(self, title: str, text: str, output: str = '', alert: bool = False) -> bool:
+        text = adapt_html_colour_for_feishu(text)
         text += "\n<at id=all></at>" if alert else ""
+
         timestamp = round(time.time())
         sign = self.gen_sign(self.secret)
         my_data = {
@@ -124,6 +141,7 @@ class FeishuMessager(BaseMessager):
             'msg_type': 'interactive',
             "card": self._get_markdown_card(title, text)
         }
+
         res = self.send_message(data=my_data)
         if res['msg'] == 'success':
             if len(output) > 0:
@@ -146,7 +164,7 @@ class FeishuMessager(BaseMessager):
                         "normal_v2": {
                             "default": "normal",
                             "pc": "normal",
-                            "mobile": "heading"
+                            "mobile": "normal"
                         }
                     }
                 }

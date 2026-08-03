@@ -24,6 +24,72 @@ DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
 PATH_TDX_HISTORY = f'./_cache/_daily_tdxzip/history_tdxhsj.pkl'
 PATH_TDX_XDXR = f'./_cache/_daily_tdxzip/xdxr.pkl'
 
+# 经 bestip 测速后较稳定的节点；bestip 全量测速较慢时作默认直连
+_DEFAULT_MOOTDX_SERVERS: tuple[tuple[str, int], ...] = (
+    ('202.108.253.139', 80),
+    ('123.125.108.14', 7709),
+    ('180.153.18.170', 7709),
+)
+
+
+def _load_mootdx_credentials() -> tuple[tuple[str, int] | None, bool, bool]:
+    try:
+        from credentials import MOOTDX_SERVER, MOOTDX_USE_BESTIP, MOOTDX_HEARTBEAT
+    except ImportError:
+        return None, False, False
+    return MOOTDX_SERVER or None, bool(MOOTDX_USE_BESTIP), bool(MOOTDX_HEARTBEAT)
+
+
+def _create_mootdx_quotes_client(tdxdir: str | None = None):
+    from mootdx.quotes import Quotes
+
+    server, use_bestip, heartbeat = _load_mootdx_credentials()
+    kwargs = dict(
+        market='std',
+        heartbeat=heartbeat,
+        timeout=15,
+    )
+    if tdxdir:
+        kwargs['tdxdir'] = tdxdir
+
+    if use_bestip:
+        print('[MOOTDX] 使用 bestip 自动测速（首次较慢）')
+        return Quotes.factory(**kwargs, bestip=True)
+
+    candidates: list[tuple[str, int]] = []
+    if server:
+        candidates.append(server)
+    candidates.extend(_DEFAULT_MOOTDX_SERVERS)
+
+    seen: set[tuple[str, int]] = set()
+    last_err: Exception | None = None
+    for host, port in candidates:
+        key = (host, port)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            client = Quotes.factory(**kwargs, server=key, bestip=False)
+            print(f'[MOOTDX] 使用行情服务器 {host}:{port}')
+            return client
+        except Exception as e:
+            last_err = e
+
+    print(f'[MOOTDX] 预设服务器不可用，回退 bestip=True：{last_err}')
+    return Quotes.factory(**kwargs, bestip=True)
+
+
+def close_mootdx_client() -> None:
+    """关闭 mootdx 在线连接，避免 heartbeat 线程导致脚本无法退出。"""
+    inst = MootdxClientInstance._instance
+    if inst is None or inst.client is None:
+        return
+    try:
+        inst.client.close()
+    except Exception:
+        pass
+    inst.client = None
+
 
 class MootdxClientInstance:
     _instance = None
@@ -37,17 +103,16 @@ class MootdxClientInstance:
 
     def __init__(self):
         if self.client is None:
-            from mootdx.quotes import Quotes
             pd.set_option('future.no_silent_downcasting', True)
             from credentials import TDX_FOLDER
             if TDX_FOLDER is not None and len(TDX_FOLDER) > 0:
                 try:
-                    self.client = Quotes.factory(market='std', tdxdir=TDX_FOLDER)
+                    self.client = _create_mootdx_quotes_client(tdxdir=TDX_FOLDER)
                 except Exception as e:
                     print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
-                    self.client = Quotes.factory(market='std')
+                    self.client = _create_mootdx_quotes_client()
             else:
-                self.client = Quotes.factory(market='std')
+                self.client = _create_mootdx_quotes_client()
 
 
 class MootdxDailyBarReaderInstance:

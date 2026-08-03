@@ -7,6 +7,23 @@
 - LimitSeller 逻辑优化
 
 
+## [ 4.9.0 ] 2026-08-03
+
+### 添加
+
+- README 英文首页
+- Buyer 盘前单仓容量自动更新
+- mootdx 节点配置（credentials）
+
+### 修改
+
+- feishu Messager 颜色优化
+- xtdata daily_history 下载超时调整
+- 掘金回调，限制交易时段
+- Buyer 市价单价格优化，以及废单不判重
+- 其他小问题优化
+
+
 ## [ 4.8.0 ] 2026-07-09
 
 ### 添加

@@ -15,6 +15,7 @@ from tools.utils_basic import code_to_symbol, code_to_sina_symbol, code_to_tdxsy
 
 from tools.utils_remote_ts import get_ts_daily_histories, get_ts_daily_history, get_ts_stk_daily_history
 from tools.utils_remote_sv import pull_stock_today_codes, push_stock_today_codes
+from delegate.daily_reporter import colour_text
 
 
 class BaoStockInstance:
@@ -179,6 +180,30 @@ def get_wencai_codes(queries: list[str]) -> list[str]:
 # ================
 # QMT Quote 数据格式处理
 # ================
+
+
+def is_tick_quote(data) -> bool:
+    """sickle 统一 tick quote（timestamp + 扁平五档，见 sickle/data/tick/tick_quote.py）。"""
+    return isinstance(data, dict) and 'timestamp' in data
+
+
+def tick_quote_to_qmt_quote(quote: dict) -> dict:
+    """统一 tick quote -> QMT subscribe_whole_quote 字段（time + 五档 list）。"""
+    q = quote or {}
+    return {
+        'time': int(q.get('timestamp', 0) or 0),
+        'lastClose': q.get('lastClose', 0) or 0,
+        'open': q.get('open', 0) or 0,
+        'high': q.get('high', 0) or 0,
+        'low': q.get('low', 0) or 0,
+        'lastPrice': q.get('lastPrice', 0) or 0,
+        'volume': q.get('volume', 0) or 0,
+        'amount': q.get('amount', 0) or 0,
+        'askPrice': [float(q.get(f'askPrice{i}', 0) or 0) for i in range(1, 6)],
+        'bidPrice': [float(q.get(f'bidPrice{i}', 0) or 0) for i in range(1, 6)],
+        'askVol': [int(q.get(f'askVol{i}', 0) or 0) for i in range(1, 6)],
+        'bidVol': [int(q.get(f'bidVol{i}', 0) or 0) for i in range(1, 6)],
+    }
 
 
 # tick 统一列定义（list 行 / DataFrame / parquet 共用，改列只改此处）
@@ -537,8 +562,59 @@ def get_ths_concept_ranking_str(
 
     longest_name = len(max(name, key=len))
     for i in range(len(name)):
-        ans += f'[{i}]\t{name[i]} ' \
+        amount = float(rate[i][0])
+        amount_text = colour_text(f'{amount}亿', to_red=amount > 0, to_green=amount < 0)
+        ans += f'[{i + 1}]\t{name[i]} ' \
                f'{" " * ((longest_name - len(name[i])) * 1)}' \
-               f'\t{rate[i][0]}亿\n'
+               f'\t{amount_text}\n'
+
+    return ans
+
+
+def get_ths_industry_ranking_df(
+    *,
+    key_index: int = 0,
+    is_fall: bool = False,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    key = THS_CONCEPT_KEYS[key_index]
+    rate_col = key[3]
+
+    df = ak.stock_fund_flow_industry(symbol=key[0])
+    if key[0] != '即时':
+        df[rate_col] = df[rate_col].str.strip('%').astype(float)
+    else:
+        df[rate_col] = df[rate_col].astype(float)
+
+    return df.sort_values(by=rate_col, ascending=is_fall)
+
+
+def get_ths_industry_ranking_str(
+    *,
+    up_df: pd.DataFrame = None,
+    key_index: int = 0,
+    top_n: int = 5,
+    is_fall: bool = False,
+) -> str:
+    if up_df is None:
+        up_df = get_ths_industry_ranking_df(key_index=key_index, is_fall=is_fall)
+
+    key = THS_CONCEPT_KEYS[key_index]
+    rate_col = key[3]
+
+    rise_or_fall = '跌幅' if is_fall else '涨幅'
+    ans = f'同花顺{key[2]}{rise_or_fall}前{top_n}行业板块：\n'
+
+    name = up_df.head(top_n)['行业'].values
+    rate = up_df.head(top_n)[rate_col].values
+    if len(name) == 0:
+        return ans
+
+    longest_name = len(max(name, key=len))
+    for i in range(len(name)):
+        pct = float(rate[i])
+        pct_text = colour_text(f'{pct:.2f} %', to_red=pct > 0, to_green=pct < 0)
+        ans += f'[{i + 1}]\t{name[i]} {" " * ((longest_name - len(name[i])) * 2)}\t{pct_text}\n'
 
     return ans
