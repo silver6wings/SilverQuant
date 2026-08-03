@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import os
 import shutil
 import time
 import datetime
 import random
 import threading
-from typing import Dict, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
+
+if TYPE_CHECKING:
+    from delegate.xt_delegate import XtDelegate
 
 import pandas as pd
 from xtquant import xtdata
 from credentials import QMT_CLIENT_PATH
 
 from delegate.base_subscriber import HistorySubscriber
-from delegate.xt_delegate import XtDelegate
 from delegate.daily_reporter import DailyReporter
 
 from tools.utils_cache import check_is_open_day
