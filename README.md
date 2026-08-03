@@ -29,7 +29,7 @@ There is currently no official paid channel for this project. Please verify auth
 GitHub deployment on mainland China servers can be inconvenient. A mirror is available here: [Gitee mirror](https://gitee.com/silver6wings/silverQuant)
 
 
-# Overview
+## Overview
 
 SilverQuant is an out-of-the-box, fully automated China A-share trading framework built on [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html).
 
@@ -37,14 +37,14 @@ It helps newcomers to quantitative trading get past most of the technical setup 
 
 Its modular design lets you quickly prototype ideas, run paper tests, and switch to live trading with one flag.
 
-# Highlights
+## Highlights
 
 * Supports 24/7 fully automated trading
 * One-flag switch between paper trading and live trading
 * Pre-built components for common tasks; custom components supported
 * Backtesting is not supported yet
 
-# Design
+## Design
 
 > The `release_x.x.x` branch is the stable release line.
 
@@ -75,13 +75,13 @@ Trading
 > TWAP, VWAP, and iceberg order algorithms are not supported yet
 
 
-# Quick Start
+## Quick Start
 
-## System Requirements
+### System Requirements
 
 > Windows is required. Most domestic trading software ecosystems do not support macOS or Linux.
 
-## Software Downloads
+### Software Downloads
 
 > GitHub Desktop
 > 
@@ -124,7 +124,7 @@ Trading
 > https://github.com/MicrosoftArchive/redis/releases
 
 
-## Environment Setup
+### Environment Setup
 
 Clone the repository locally
 
@@ -204,7 +204,7 @@ When running in paper mode (`IS_PROD = False`), in addition to configuring `GM_X
 > 3. Paper mode (`IS_PROD = False`): confirm the MyQuant client is open and connected to the simulation account; live mode (`IS_PROD = True`): confirm QMT is running
 > 4. Run `run_xxxxxx.py` with the green play button
 
-# Entry Points
+## Entry Points
 
 The project includes several ready-to-run strategy launchers.
 
@@ -242,11 +242,11 @@ run_ai_gen.py
 Advanced learning sample for formula-based stock selection. Not recommended for live trading.
 ```
 
-# Advanced Configuration
+## Advanced Configuration
 
 > See the advanced configuration guide: [[CONFIGURATION]](_doc/CONFIGURATION.md)
 
-# Known Issues
+## Known Issues
 
 > Entry prices are read directly from `Mini QMT` and are not adjusted dynamically for corporate actions. Ex-dividend price drops may trigger unintended stop-loss sells.
 > 
@@ -256,7 +256,7 @@ Advanced learning sample for formula-based stock selection. Not recommended for 
 > 
 > ETF daily data coverage is incomplete, so daily-indicator sell strategies may silently fail for ETFs during testing.
 
-# FAQ
+## FAQ
 
 ### About QMT
 
@@ -324,7 +324,7 @@ Enhanced versions are also provided for core functions that do not support dynam
 
 ---
 
-# Disclaimer
+## Disclaimer
 
 This project is licensed under Apache 2.0.
 
@@ -333,7 +333,7 @@ This project is licensed under Apache 2.0.
 * Suggestions and bug reports are welcome via [Issues](https://github.com/silver6wings/SilverQuant/issues) or pull requests.
 
 
-# Acknowledgements
+## Acknowledgements
 
 * Thanks to [@owen590](https://github.com/owen590) for valuable feedback from the very first line of code to today
 * Thanks to [@dominicx](https://github.com/dominicx) for a PR that fixed trading edge cases the author had not covered
@@ -341,7 +341,7 @@ This project is licensed under Apache 2.0.
 * Thanks to [@vipally](https://github.com/vipally) for a PR improving parts of MyTT formulas and VS Code configuration
 
 
-# About the Author
+## About the Author
 
 The author is a long-time corporate employee with no background in financial institutions.
 
