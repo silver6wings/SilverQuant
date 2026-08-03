@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 
 _DAILY_FIELDS = ("time", "open", "high", "low", "close", "volume", "amount")
 # 单股 download_history_data 超时（沿用原 miniqmt 行为）
-_QMT_SINGLE_DOWNLOAD_TIMEOUT = 3.0
+_QMT_SINGLE_DOWNLOAD_TIMEOUT = 30.0
 # download_history_data2 分批大小；过大时 QMT 回调/内存压力更高
 _QMT_BATCH_DOWNLOAD_SIZE = 100
 # 每批 download_history_data2 最长等待（秒）；超时则回退单股下载
-_QMT_BATCH_DOWNLOAD_TIMEOUT = 90.0
+_QMT_BATCH_DOWNLOAD_TIMEOUT = 300.0
 # 至少 2 只股票才走 batch2，单股仍用同步 download_history_data
 _QMT_BATCH_MIN_COUNT = 2
 

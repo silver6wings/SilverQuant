@@ -12,13 +12,17 @@ from tools.utils_cache import StockNames, get_prev_trading_date_str
 from tools.utils_ding import BaseMessager
 
 
+COLOUR_RED = '#DC2832'
+COLOUR_GREEN = '#16BC50'
+COLOUR_BLUE = '#3366FF'
+
+
 def colour_text(text: str, to_red: bool, to_green: bool):
-    color = '#3366FF'
-    # （红色RGB为：220、40、50，绿色RGB为：22、188、80）
+    color = COLOUR_BLUE
     if to_red:
-        color = '#DC2832'
+        color = COLOUR_RED
     if to_green:
-        color = '#16BC50'
+        color = COLOUR_GREEN
 
     return f'<font color="{color}">{text}</font>'
 
