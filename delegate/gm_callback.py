@@ -8,7 +8,7 @@ from gmtrade.pb.account_pb2 import Order, ExecRpt, AccountStatus
 
 from tools.constants import MSG_OUTER_SEPARATOR
 from tools.utils_basic import gmsymbol_to_code
-from tools.utils_cache import StockNames, record_deal, new_held, del_key, del_held_day
+from tools.utils_cache import StockNames, record_deal, new_held, del_key, del_held_day, check_is_open_day
 from tools.utils_ding import BaseMessager
 
 
@@ -131,6 +131,9 @@ class GmCallback:
         pass
 
     def on_order_status(self, order: Order):
+        if not _is_gm_trading_session():
+            return
+
         if order.status == OrderStatus_Rejected:
             self.ding_messager.send_text_as_md(f'订单驳回：{order.symbol} {order.ord_rej_reason_detail}')
 
@@ -168,6 +171,15 @@ class GmCallback:
 
 class GmCache:
     gm_callback: Optional[GmCallback] = None
+
+
+def _is_gm_trading_session(now: Optional[datetime.datetime] = None) -> bool:
+    """交易日且在 09:30~11:30、13:00~15:00 连续竞价时段。"""
+    now = now or datetime.datetime.now()
+    if not check_is_open_day(now.strftime('%Y-%m-%d')):
+        return False
+    curr_time = now.strftime('%H:%M')
+    return ('09:30' <= curr_time <= '11:30') or ('13:00' <= curr_time <= '15:00')
 
 
 def on_execution_report(rpt: ExecRpt):
