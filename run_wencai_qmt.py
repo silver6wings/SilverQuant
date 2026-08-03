@@ -51,7 +51,7 @@ class BuyConf:
     order_premium = 0.02    # 保证市价单成交的溢价，单位（元）
 
     slot_count = 10         # 持股数量上限
-    slot_capacity = 10000   # 每个仓的资金上限
+    slot_capacity = 10000   # 每个仓的资金上限，盘前按总资产更新
     daily_buy_max = 10      # 单日买入股票上限
     once_buy_limit = 10     # 单次选股最多买入股票数量
     inc_limit = 1.07        # 相对于昨日收盘的涨幅限制
@@ -100,6 +100,14 @@ def before_trade_day() -> None:
     if all_held_inc(disk_lock, PATH_HELD):
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'[持仓计数] All stocks held day +1')
+
+    try:
+        asset = my_delegate.check_asset()
+        BuyConf.slot_capacity = round(asset.total_asset * (1.1 / BuyConf.slot_count + 0.01), 3)
+        my_buyer.update_config(BuyConf)
+        print(f'[单仓容量] {BuyConf.slot_capacity} 元')
+    except Exception as e:
+        print(f'[单仓容量] 设置失败：{e}')
 
     # refresh_code_list() -> None:
     my_pool.refresh()
