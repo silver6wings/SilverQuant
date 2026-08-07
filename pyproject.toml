@@ -1,0 +1,35 @@
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+priority = "primary"
+
+[tool.poetry]
+name = "silverquant"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+akshare = ">=1.15.67"
+numpy = ">=1.23.5"
+pandas = ">=2.2.2"
+pywencai = ">=0.12.2"
+schedule = "1.2.1"
+typing = ">=3.7.4.3"
+requests = ">=2.31.0"
+
+
+[tool.poetry.group.dev.dependencies]
+isort = "^5.13.2"
+pylint = "^3.2.2"
+mypy = "^1.10.0"
+black = "^24.4.2"
+ruff = "^0.4.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
