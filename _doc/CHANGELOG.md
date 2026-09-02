@@ -7,6 +7,22 @@
 - LimitSeller 逻辑优化
 
 
+## [ 5.0.0 ] 2026-09-02
+
+### 添加
+
+- 大 QMT 桥接方案（btquant + BIGQMTHELPER）
+- DailyHistory 模块重构，拆分 Tushare / MiniQMT 子类
+
+### 修改
+
+- 临盘任务 near_trade_begin，持仓订阅移至 09:05 执行
+- 各主策略统一临盘拉持仓更新订阅列表
+- Buyer 防重复买入，未成交委托检查
+- Buyer 市价单保护价按比例适配价格笼子
+- xt_subscriber 竞价 tick 落盘与重订阅优化
+
+
 ## [ 4.9.0 ] 2026-08-03
 
 ### 添加

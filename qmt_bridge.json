@@ -1,0 +1,18 @@
+{
+  "_comment": "大 QMT 桥接配置，由 btquant 读取。部署说明见 _doc/BIG_QMT.md",
+
+  "gateway_url": "http://127.0.0.1:9000",
+  "gateway_password": "change_me_gateway_password",
+  "gateway_secret": "change_me_hmac_secret",
+
+  "account_id": "8886685510",
+  "account_type": "stock",
+
+  "request_timeout_seconds": 15,
+  "tick_poll_interval_seconds": 1,
+  "callback_poll_interval_seconds": 3,
+  "market_order_premium": 0.02,
+
+  "enable_trade_callbacks": true,
+  "enable_http_log": false
+}

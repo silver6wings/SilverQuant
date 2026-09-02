@@ -4,7 +4,7 @@ import logging
 import pandas as pd
 from typing import List, Dict, Optional
 
-from xtquant.xttype import XtPosition
+from tools.utils_xtquant import XtPosition
 
 from delegate.base_delegate import BaseDelegate
 from tools.utils_basic import get_limit_down_price

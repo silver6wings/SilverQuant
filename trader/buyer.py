@@ -5,11 +5,14 @@ import logging
 from delegate.base_delegate import BaseDelegate
 
 from tools.utils_basic import get_limit_up_price, debug, is_stock_kc
+from tools.utils_xtquant import xtconstant
 
 
 DEFAULT_BUY_REMARK = '买入委托'
 PENDING_CONFIRM_TICKS = 3           # 下单后等待持仓确认的轮数（如每秒一轮，则约 3 秒）
 MARKET_ORDER_PRICE_RATE = 1.017     # 市价单保护价：现价 101.7%，留余量应对 tick 延迟与 2% 价格笼子
+# 掘金等模拟盘委托状态：新建 / 部分成交
+_GM_PENDING_ORDER_STATUSES = frozenset({1, 2})
 
 
 class SelectionItem:
@@ -86,6 +89,8 @@ class BaseBuyer:
             buy_count = min(buy_count, self.once_buy_limit)         # 限制一秒内下单数量
             buy_count = int(buy_count)
 
+            pending_buy_codes = self._collect_pending_buy_codes()
+
             for code in selections:  # 依次买入
                 if buy_count > 0:
                     if code in today_buy[curr_date]:
@@ -106,6 +111,8 @@ class BaseBuyer:
                         debug(f'[{code} 不够一手]')
                     elif code in position_codes:
                         debug(f'[{code} 正在持仓]')
+                    elif code in pending_buy_codes:
+                        debug(f'[{code} 有未成交买单]')
                     else:
                         buy_count = buy_count - 1
                         if self.order_buy(
@@ -132,11 +139,54 @@ class BaseBuyer:
             self._order_status_date = curr_date
 
     @staticmethod
-    def _is_today_locked_position(code: str, positions: list) -> bool:
+    def _is_holding_position(code: str, positions: list) -> bool:
         for position in positions:
             if position.stock_code == code:
-                return position.volume > 0 and position.can_use_volume == 0
+                return position.volume > 0
         return False
+
+    def _fetch_orders(self) -> list:
+        try:
+            return self.delegate.check_orders(cancelable_only=False) or []
+        except TypeError:
+            return self.delegate.check_orders() or []
+        except Exception as e:
+            logging.warning(f'[查询委托] 失败: {e}')
+            return []
+
+    @staticmethod
+    def _is_pending_buy_order(order) -> bool:
+        order_type = getattr(order, 'order_type', None)
+        if order_type == xtconstant.STOCK_SELL:
+            return False
+
+        order_volume = getattr(order, 'order_volume', 0) or 0
+        traded_volume = getattr(order, 'traded_volume', None)
+        if order_type == xtconstant.STOCK_BUY:
+            if traded_volume is not None:
+                return order_volume > traded_volume
+            order_status = getattr(order, 'order_status', None)
+            return order_status not in (
+                xtconstant.ORDER_SUCC,
+                xtconstant.ORDER_CANCEL,
+                xtconstant.ORDER_REJECTED,
+                xtconstant.ORDER_DELETED,
+            )
+
+        order_status = getattr(order, 'order_status', None)
+        if traded_volume is None and order_status in _GM_PENDING_ORDER_STATUSES:
+            return True
+        if traded_volume is not None:
+            return order_volume > traded_volume
+        return False
+
+    def _collect_pending_buy_codes(self) -> set[str]:
+        pending_codes: set[str] = set()
+        for order in self._fetch_orders():
+            code = getattr(order, 'stock_code', None)
+            if code and self._is_pending_buy_order(order):
+                pending_codes.add(code)
+        return pending_codes
 
     def _tick_pending_orders(
         self,
@@ -149,10 +199,10 @@ class BaseBuyer:
             if self.order_status[code] < PENDING_CONFIRM_TICKS:
                 continue
 
-            if self._is_today_locked_position(code, positions):
+            if self._is_holding_position(code, positions):
                 del self.order_status[code]
                 today_buy[curr_date].add(code)
-                logging.warning(f'[确认买入]{code} 持仓已锁定(can_use_volume=0)，记入当日买入')
+                logging.warning(f'[确认买入]{code} 持仓已确认(volume>0)，记入当日买入')
             else:
                 del self.order_status[code]
                 logging.warning(f'[待确认买入]{code} 超时未确认，允许重试')

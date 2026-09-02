@@ -75,14 +75,22 @@ def before_trade_day() -> None:
         logging.warning('===== 所有持仓计数 +1 =====')
         print(f'[持仓计数] All stocks held day +1')
 
-    # refresh_code_list() -> None:
     my_pool.refresh()
+
+
+# ======== 临盘 ========
+
+
+def near_trade_begin() -> None:
+    # QMT/桥接在凌晨盘前常未就绪，临盘再拉持仓并更新订阅列表
     positions = my_delegate.check_positions()
     hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
     full_list = my_pool.get_code_list() + hold_list
     target_list = [code for code in full_list if code not in PoolConf.ignore_stocks]
 
     my_suber.update_code_list(target_list)
+    print(f'[持仓列表] {hold_list}')
+    print(f'[订阅列表] {target_list}')
 
 
 # ======== 买点 ========
@@ -262,6 +270,7 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
         before_trade_day=before_trade_day,
+        near_trade_begin=near_trade_begin,
         use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_tick_memory_cache=True,

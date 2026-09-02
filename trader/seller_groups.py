@@ -57,8 +57,8 @@ class ClassicMAGroupSeller(GroupSellers, HardSeller, FallSeller, ReturnSeller, M
         self.group_check_sell(code, quote, curr_date, curr_time, position, held_day, max_price, history, ticks, extra)
 
 
-# 监控卖出
-class ShieldGroupSeller(GroupSellers, HardSeller, FallSeller, MoveSeller):
+# 监控卖出：早盘走低 → 硬止损 → 移动止盈 → 回落兜底
+class ShieldGroupSeller(GroupSellers, SafeSeller, HardSeller, MoveSeller, FallSeller):
     def __init__(self, strategy_name, delegate, parameters):
         super().__init__()
         self.group_init(strategy_name, delegate, parameters)

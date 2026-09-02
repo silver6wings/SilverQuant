@@ -109,9 +109,6 @@ def before_trade_day() -> None:
 
     # refresh_code_list() -> None:
     my_pool.refresh()
-    positions = my_delegate.check_positions()
-    hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
-    my_suber.update_code_list(my_pool.get_code_list() + hold_list)
 
     # prepare_history() -> None:
     now = datetime.datetime.now()
@@ -139,6 +136,13 @@ def before_trade_day() -> None:
 
 
 def near_trade_begin():
+    # QMT/桥接在凌晨盘前常未就绪，临盘再拉持仓并更新订阅列表
+    positions = my_delegate.check_positions()
+    hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
+    my_suber.update_code_list(my_pool.get_code_list() + hold_list)
+    print(f'[持仓列表] {hold_list}')
+    print(f'[订阅列表] {my_pool.get_code_list() + hold_list}')
+
     now = datetime.datetime.now()
     start = get_prev_trading_date(now, PoolConf.day_count)
     end = get_prev_trading_date(now, 1)

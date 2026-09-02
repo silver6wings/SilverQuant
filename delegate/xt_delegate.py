@@ -9,10 +9,7 @@ from typing import TYPE_CHECKING, List, Optional
 if TYPE_CHECKING:
     from delegate.xt_subscriber import XtSubscriber
 
-from xtquant import xtconstant, xtdata
-from xtquant.xtconstant import STOCK_BUY, STOCK_SELL
-from xtquant.xttrader import XtQuantTrader
-from xtquant.xttype import StockAccount, XtPosition, XtOrder, XtAsset
+from tools.utils_xtquant import xtconstant, xtdata, STOCK_BUY, STOCK_SELL, XtQuantTrader, StockAccount, XtPosition, XtOrder, XtAsset
 
 from credentials import *
 

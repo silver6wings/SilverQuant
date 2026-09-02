@@ -260,6 +260,8 @@ class BaseSubscriber:
                 print('[每日总结] 交易报告出错: ', e)
                 traceback.print_exc()
 
+        time.sleep(3)
+
         if self.open_today_hold_report:
             try:
                 if self.delegate is not None:
@@ -274,6 +276,8 @@ class BaseSubscriber:
                 print('[每日总结] 持仓报告出错: ', e)
                 traceback.print_exc()
 
+        time.sleep(3)
+
         try:
             if self.delegate is not None:
                 asset = self.delegate.check_asset()
@@ -287,6 +291,76 @@ class BaseSubscriber:
     # -----------------------
     # 定时器
     # -----------------------
+    def _format_job_trigger_time(self, trigger) -> str:
+        try:
+            from apscheduler.triggers.cron import CronTrigger
+            if not isinstance(trigger, CronTrigger):
+                return str(trigger)
+
+            fields = {f.name: str(f) for f in trigger.fields}
+            hour = fields.get('hour', '0')
+            minute = fields.get('minute', '0')
+            second = fields.get('second', '0')
+
+            def _to_int(value: str, default: int = 0) -> int:
+                if value.isdigit():
+                    return int(value)
+                if '-' in value:
+                    return int(value.split('-')[0])
+                return default
+
+            def _to_end_int(value: str, default: int = 0) -> int:
+                if value.isdigit():
+                    return int(value)
+                if '-' in value:
+                    return int(value.split('-')[-1])
+                return default
+
+            has_range = any('-' in v or v == '*' for v in (hour, minute, second))
+            if not has_range:
+                return f'[{_to_int(hour):02d}:{_to_int(minute):02d}:{_to_int(second):02d}]'
+
+            start = f'{_to_int(hour):02d}:{_to_int(minute):02d}:{_to_int(second):02d}'
+            end = f'{_to_end_int(hour):02d}:{_to_end_int(minute):02d}:{_to_end_int(second):02d}'
+            if start == end:
+                return f'[{start}]'
+            return f'[{start}-{end}]'
+        except Exception:
+            return str(trigger)
+
+    def _job_time_sort_key(self, trigger):
+        try:
+            from apscheduler.triggers.cron import CronTrigger
+            if not isinstance(trigger, CronTrigger):
+                return (99, 99, 99)
+            fields = {f.name: str(f) for f in trigger.fields}
+            hour = fields.get('hour', '0')
+            minute = fields.get('minute', '0')
+            second = fields.get('second', '0')
+
+            def _to_int(value: str) -> int:
+                if value.isdigit():
+                    return int(value)
+                if '-' in value:
+                    return int(value.split('-')[0])
+                return 99
+
+            return (_to_int(hour), _to_int(minute), _to_int(second))
+        except Exception:
+            return (99, 99, 99)
+
+    def _print_scheduled_jobs(self):
+        jobs = self.scheduler.get_jobs()
+        visible_jobs = [
+            job for job in jobs
+            if getattr(job.func, '__name__', '') != 'callback_monitor'
+        ]
+        print(f'[定时任务] 计划列表 ({len(visible_jobs)} 项):')
+        for job in sorted(visible_jobs, key=lambda j: self._job_time_sort_key(j.trigger)):
+            func_name = getattr(job.func, '__qualname__', getattr(job.func, '__name__', repr(job.func)))
+            time_label = self._format_job_trigger_time(job.trigger)
+            print(f'  {time_label}  {func_name}')
+
     def _start_scheduler(self):
         run_time_ranges = [
             # 上午时间段: 09:15:00 到 11:29:59
@@ -344,6 +418,7 @@ class BaseSubscriber:
         self.scheduler.add_job(self.daily_summary, 'cron', hour=15, minute=2)
 
         try:
+            self._print_scheduled_jobs()
             print('[定时任务] 计划启动')
             self.scheduler.start()
         except KeyboardInterrupt:
@@ -465,7 +540,8 @@ class HistorySubscriber(BaseSubscriber):
             adjust: ExitRight,
             columns: list[str],
             data_source: DataSource,
-    ):
+    ) -> bool:
+        """加载策略所需历史日线。返回 False 表示增量下载或内存加载失败。"""
         # ======== 每日一次性全量数据源 ========
         if data_source == DataSource.AKSHARE or data_source == DataSource.TDXZIP:
             temp_indicators = load_pickle(cache_path)
@@ -499,28 +575,34 @@ class HistorySubscriber(BaseSubscriber):
 
             if data_source == DataSource.TDXZIP and (self.history_day_klines is None or len(self.history_day_klines) == 0):
                 self.history_day_klines = get_tdxzip_history(adjust=adjust)
+            return True
 
         # ======== 预加载每日增量数据源 ========
         elif data_source in (DataSource.TUSHARE, DataSource.MOOTDX, DataSource.MINIQMT):
             hc = DailyHistoryCache()
             hc.set_data_source(data_source=data_source)
-            if hc.daily_history is not None:
-                if self.history_download_date == get_today():
-                    print(f'[历史日线] {get_today()} 已下载过，跳过重复下载')
-                    return
+            if hc.daily_history is None:
+                print('[历史日线] daily_history 未初始化')
+                return False
 
+            if self.history_download_date != get_today():
                 hc.daily_history.remove_recent_exit_right_histories(5)  # 一周数据
-                hc.daily_history.download_recent_daily(20)  # 一个月数据
+                if not hc.daily_history.download_recent_daily(20):  # 一个月数据
+                    return False
                 self.history_download_date = get_today()
-                # 下载后加载进内存
-                start_date = datetime.datetime.strptime(start, '%Y%m%d')
-                end_date = datetime.datetime.strptime(end, '%Y%m%d')
-                delta = abs(end_date - start_date)
-                self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
+            else:
+                print(f'[历史日线] {get_today()} 已下载过，跳过重复下载')
+
+            start_date = datetime.datetime.strptime(start, '%Y%m%d')
+            end_date = datetime.datetime.strptime(end, '%Y%m%d')
+            delta = abs(end_date - start_date)
+            self.cache_history = hc.daily_history.get_subset_copy(code_list, delta.days + 1)
+            return True
 
         else:
             if self.messager is not None:
                 self.messager.send_text_as_md(f'[{self.account_id}]{self.strategy_name}:\n无法识别的数据源')
+            return False
 
 
     # 重新加载历史数据进内存

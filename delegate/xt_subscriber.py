@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from delegate.xt_delegate import XtDelegate
 
 import pandas as pd
-from xtquant import xtdata
+from tools.utils_xtquant import xtdata
 from credentials import QMT_CLIENT_PATH
 
 from delegate.base_subscriber import HistorySubscriber
@@ -37,7 +37,7 @@ class XtSubscriber(HistorySubscriber):
         execute_call_end: Callable = None,  # 竞价结束回调函数
         execute_interval: int = 1,          # 策略执行间隔，单位（秒）
         before_trade_day: Callable = None,  # 盘前函数
-        near_trade_begin: Callable = None,  # 盘后函数
+        near_trade_begin: Callable = None,  # 临盘函数
         finish_trade_day: Callable = None,  # 盘后函数
         finish_call_hour: int = 15,         # 盘后执行小时（方便延迟事件应对特殊情况）
         # 订阅
@@ -91,7 +91,7 @@ class XtSubscriber(HistorySubscriber):
         self.__extend_codes = ['399001.SZ', '399006.SZ', '159101.SZ', '159315.SZ', '159915.SZ',
                                '510500.SH', '510230.SH', '512680.SH', '588000.SH']
 
-        self.code_list = ['000001.SH'] + self.__extend_codes
+        self.code_list: list[str] = []
 
         self.daily_reporter = DailyReporter(
             account_id=self.account_id,
@@ -165,7 +165,7 @@ class XtSubscriber(HistorySubscriber):
                     f'[{self.account_id}]{self.strategy_name}:中断\n请检查QMT数据源 ',
                     alert=True,
                 )
-            if len(self.code_list) > 1 and xtdata.get_client():
+            if len(self._build_subscribe_codes()) > 1 and xtdata.get_client():
                 print('[恢复行情订阅] 断线尝试重连\n', end='')
                 time.sleep(1)
                 self.resubscribe_tick(notice=True)
@@ -173,18 +173,31 @@ class XtSubscriber(HistorySubscriber):
     # -----------------------
     # 订阅 tick 相关
     # -----------------------
+    def _build_subscribe_codes(self) -> list[str]:
+        codes = ['000001.SH'] + self.code_list
+        extend = 10 - len(codes)
+        if extend > 0:
+            codes.extend(self.__extend_codes[:extend])  # 防止数据太少长时间不返回数据导致断流
+        return codes
+
+    def _subscribe_count_text(self, subscribe_codes: list[str] | None = None) -> str:
+        codes = subscribe_codes if subscribe_codes is not None else self._build_subscribe_codes()
+        return f'{len(self.code_list)}/{len(codes)}支'
+
     def subscribe_tick(self, resume: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
             return
 
+        subscribe_codes = self._build_subscribe_codes()
+        count_text = self._subscribe_count_text(subscribe_codes)
         if self.messager is not None:
             self.messager.send_text_as_md(
                 f'[{self.account_id}]{self.strategy_name}:{"恢复" if resume else "开启"} '
-                f'{len(self.code_list)}支',
+                f'{count_text}',
                 output='[Message] BEGIN SUBSCRIBING\n')
         xtdata.enable_hello = False
-        self.sub_sequence = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
-        print(f'[开启行情订阅] 订阅数:{len(self.code_list)} 订阅号:{self.sub_sequence}', end='')
+        self.sub_sequence = xtdata.subscribe_whole_quote(subscribe_codes, callback=self.callback_sub_whole)
+        print(f'[开启行情订阅] 订阅数:{count_text} 订阅号:{self.sub_sequence}', end='')
 
     def unsubscribe_tick(self, pause: bool = False):
         if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
@@ -192,7 +205,7 @@ class XtSubscriber(HistorySubscriber):
 
         if self.sub_sequence is not None:
             xtdata.unsubscribe_quote(self.sub_sequence)
-            print(f'\n[结束行情订阅] 订阅数:{len(self.code_list)} 订阅号:{self.sub_sequence}\n', end='')
+            print(f'\n[结束行情订阅] 订阅数:{self._subscribe_count_text()} 订阅号:{self.sub_sequence}\n', end='')
             if self.messager is not None:
                 self.messager.send_text_as_md(
                     f'[{self.account_id}]{self.strategy_name}:{"暂停" if pause else "关闭"}',
@@ -207,21 +220,19 @@ class XtSubscriber(HistorySubscriber):
             prev_sub_sequence = self.sub_sequence
             xtdata.unsubscribe_quote(self.sub_sequence)
 
-        self.sub_sequence = xtdata.subscribe_whole_quote(self.code_list, callback=self.callback_sub_whole)
+        subscribe_codes = self._build_subscribe_codes()
+        self.sub_sequence = xtdata.subscribe_whole_quote(subscribe_codes, callback=self.callback_sub_whole)
 
+        count_text = self._subscribe_count_text(subscribe_codes)
         if self.messager is not None and notice:
             self.messager.send_text_as_md(
-                f'[{self.account_id}]{self.strategy_name}:重启 {len(self.code_list)}支',
+                f'[{self.account_id}]{self.strategy_name}:重启 {count_text}',
                 output='\n[Message] FINISH RESUBSCRIBING')
-        print(f'\n[重启行情订阅] 订阅数:{len(self.code_list)} 订阅号:{prev_sub_sequence} -> {self.sub_sequence}', end='')
+        print(f'\n[重启行情订阅] 订阅数:{count_text} 订阅号:{prev_sub_sequence} -> {self.sub_sequence}', end='')
 
     def update_code_list(self, code_list: list[str]):
         print(f'[订阅更新] {code_list}\n', end='')
-        # 加上证指数防止没数据不打点
-        self.code_list = ['000001.SH'] + code_list
-        extend = 10 - len(self.code_list)
-        if extend > 0:
-            self.code_list.extend(self.__extend_codes[:extend])  # 防止数据太少长时间不返回数据导致断流
+        self.code_list = code_list
 
     # -----------------------
     # 盘中实时的 tick 历史
@@ -348,15 +359,33 @@ class XtSubscriber(HistorySubscriber):
         self.cache_history.clear()
         self.today_ticks.clear()
         self._tick_n.clear()
-        self.code_list = ['000001.SH'] + self.__extend_codes  # 这是唯一跟base不一样的地方
+        self.code_list = []  # 这是唯一跟base不一样的地方
 
         clean_qmt_datadir_contents()
+
+    def execute_call_end_wrapper(self):
+        if not check_is_open_day(datetime.datetime.now().strftime('%Y-%m-%d')):
+            return
+
+        # 竞价任务与回调线程异步：先把 cache_quotes 落盘到 today_ticks，减少尾部 tick 缺失
+        if self.open_tick:
+            with self.lock_quotes_update:
+                if self.cache_quotes:
+                    self.record_tick_to_memory(self.cache_quotes)
+
+        if self.execute_call_end is not None:
+            print('[定时任务] 竞价任务开始')
+            self.execute_call_end()
+            try:
+                print('[定时任务] 竞价任务完成\n', end='')
+            except Exception as e:
+                print(f'[定时任务] 竞价任务出错: {e}\n', end='')
 
     def _start_qmt_scheduler(self):
         # 默认定时任务列表
         cron_jobs = [
             ['01:00', self.prev_check_open_day, None],
-            ['08:30', self.near_trade_begin_wrapper, None],
+            ['09:05', self.near_trade_begin_wrapper, None],
             ['09:14', self.subscribe_tick, None],
             ['11:31', self.unsubscribe_tick, (True, )],
             ['12:59', self.subscribe_tick, (True, )],
@@ -415,6 +444,7 @@ class XtSubscriber(HistorySubscriber):
 
         # 启动定时器
         try:
+            self._print_scheduled_jobs()
             print('[定时任务] 计划启动')
             self.scheduler.start()
         except KeyboardInterrupt:
