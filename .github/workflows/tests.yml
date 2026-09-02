@@ -2,7 +2,13 @@ name: Run Tests
 
 permissions:
   contents: read
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'btquant/**'
+  pull_request:
+    paths-ignore:
+      - 'btquant/**'
 
 jobs:
   test:
@@ -27,7 +33,7 @@ jobs:
       - name: Run tests with pytest
         run: |
           export PYTHONPATH="${PYTHONPATH}:${{ github.workspace }}"
-          pytest tests/ --cov=src --cov-report=xml -m "not local_only"
+          pytest tests/ --cov=. --cov-report=xml -m "not local_only"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
