@@ -1,0 +1,6 @@
+name: "SilverQuant CodeQL config"
+
+# btquant 为大 QMT 本地桥接（含需粘贴进 QMT 的 gateway 样例），
+# 非 SilverQuant 主仓 Web 服务；排除 CodeQL 误报（MD5 订单 ID、本地 JSON API 等）。
+paths-ignore:
+  - btquant
