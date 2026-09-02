@@ -107,7 +107,7 @@ class DailyReporter:
                     from tools.utils_remote import get_mootdx_quotes
                     quotes = get_mootdx_quotes([code])
                 else:
-                    from xtquant import xtdata
+                    from tools.utils_xtquant import xtdata
                     quotes = xtdata.get_full_tick([code])
 
                 curr_price = None

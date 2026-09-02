@@ -4,7 +4,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 from mytt.MyTT import MA, MACD, CCI, WR
-from xtquant.xttype import XtPosition
+from tools.utils_xtquant import XtPosition
 from tools.utils_basic import get_limit_up_price
 from tools.utils_remote import concat_ak_quote_dict
 from trader.seller import BaseSeller
@@ -54,17 +54,21 @@ class HardSeller(BaseSeller):
 
 
 # --------------------------------
-# 以开盘价/最高价/昨收价中的最大值为参考，回落一定比例即卖出
+# 参考价走低卖出；可选弱于开盘价过滤，可选是否纳入日内最高价
 # 参数示例：
-# safe_time_range = ['09:30', '14:57']
-# safe_rate = 0.02
+# safe_time_range = ['09:31', '09:50']
+# safe_rate = 0.04
+# safe_break_rate = 0.003   # 可选：现价须低于开盘价该比例；不设则不过滤
+# safe_use_high = False     # 可选：False=仅昨收/开盘作参考，防开盘冲高震荡误卖
 # --------------------------------
 class SafeSeller(BaseSeller):
     def __init__(self, strategy_name, delegate, parameters):
         print('走低卖点模块', end=' ')
         super().__init__(strategy_name, delegate, parameters)
         self.safe_time_range = parameters.safe_time_range
-        self.safe_rate = parameters.safe_rate   # 当日开盘和最高下行百分之多少卖出，例：0.01 = 1% 走低时就开始挂卖单
+        self.safe_rate = parameters.safe_rate
+        self.safe_break_rate = getattr(parameters, 'safe_break_rate', None)
+        self.safe_use_high = getattr(parameters, 'safe_use_high', True)
 
     def check_sell(
             self, code: str, quote: Dict, curr_date: str, curr_time: str,
@@ -78,20 +82,33 @@ class SafeSeller(BaseSeller):
             last_close = quote['lastClose']
             sell_volume = position.can_use_volume
 
-            stop_price = max(last_close, high_price, open_price) * (1 - self.safe_rate)
+            if open_price <= 0 or last_close <= 0:
+                return False
 
-            if curr_price <= stop_price:
-                self.order_sell(code, quote, sell_volume, f'走低{int(self.safe_rate * 100)}%')
+            if self.safe_use_high:
+                ref_price = max(last_close, high_price, open_price)
+            else:
+                ref_price = max(last_close, open_price)
 
-                cost_price = position.open_price
-                logging.warning(f'[触发卖出]走低 '
-                    f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
-                    f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
-                    f'开盘价:{round(open_price, 3)} '
-                    f'最高价:{round(high_price, 3)} '
-                    f'昨收价:{round(last_close, 3)} '
-                )
-                return True
+            stop_price = ref_price * (1 - self.safe_rate)
+            if curr_price > stop_price:
+                return False
+
+            if self.safe_break_rate is not None and curr_price >= open_price * (1 - self.safe_break_rate):
+                return False
+
+            self.order_sell(code, quote, sell_volume, f'走低{int(self.safe_rate * 100)}%')
+
+            cost_price = position.open_price
+            logging.warning(
+                f'[触发卖出]走低 '
+                f'成本:{round(cost_price, 3)} 现价:{round(curr_price, 3)} '
+                f'涨跌:{round((curr_price / cost_price - 1) * 100, 3)} '
+                f'开盘价:{round(open_price, 3)} '
+                f'昨收价:{round(last_close, 3)} '
+                f'参考价:{round(ref_price, 3)} '
+            )
+            return True
         return False
 
 

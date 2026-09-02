@@ -109,16 +109,23 @@ def before_trade_day() -> None:
     except Exception as e:
         print(f'[单仓容量] 设置失败：{e}')
 
-    # refresh_code_list() -> None:
     my_pool.refresh()
+
+
+# ======== 临盘 ========
+
+
+def near_trade_begin() -> None:
+    # QMT/桥接在凌晨盘前常未就绪，临盘再拉持仓并更新订阅列表
     positions = my_delegate.check_positions()
     if positions is not None:
         hold_list = [position.stock_code for position in positions if is_symbol(position.stock_code)]
-        my_suber.update_code_list(hold_list)
     else:
         held = load_json(PATH_HELD)
         hold_list = [code for code in held if is_symbol(code)]
-        my_suber.update_code_list(hold_list)
+    my_suber.update_code_list(hold_list)
+    print(f'[持仓列表] {hold_list}')
+    print(f'[订阅列表] {hold_list}')
 
 
 # ======== 买点 ========
@@ -272,6 +279,7 @@ if __name__ == '__main__':
         path_assets=PATH_ASSETS,
         execute_strategy=execute_strategy,
         before_trade_day=before_trade_day,
+        near_trade_begin=near_trade_begin,
         use_ap_scheduler=True,
         ding_messager=DING_MESSAGER,
         open_today_deal_report=True,

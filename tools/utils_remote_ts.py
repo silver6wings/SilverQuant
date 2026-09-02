@@ -59,8 +59,8 @@ def get_ts_daily_history(
             df = None
             if _is_tushare_rate_limit_error(e):
                 break
-            if try_times < 3:
-                time.sleep(0.5)
+        if (df is None or len(df) <= 0) and try_times < 3:
+            time.sleep(0.5)
 
     if last_exception is not None and df is None:
         print(f'[TUSHARE] skip {code} {start_date}-{end_date}: {last_exception}')
@@ -181,8 +181,8 @@ def _get_ts_daily_histories_by_batch(
         print(f'[TUSHARE] batch failed {len(codes)} codes {start_date}-{end_date}, split retry: {last_exception}')
 
         ans = {}
-        ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1))
-        ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1))
+        ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
+        ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
         return ans
 
     ans = {}
@@ -197,8 +197,8 @@ def _get_ts_daily_histories_by_batch(
             right_codes = codes[mid:]
             print(f'[TUSHARE] batch malformed {len(codes)} codes {start_date}-{end_date}, split retry: missing ts_code column')
 
-            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1))
-            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1))
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
             return ans
 
         returned_codes = set(df['ts_code'].dropna().unique())
@@ -222,8 +222,8 @@ def _get_ts_daily_histories_by_batch(
             right_codes = codes[mid:]
             print(f'[TUSHARE] batch unmatched {len(codes)} codes {start_date}-{end_date}, split retry')
 
-            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1))
-            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1))
+            ans.update(_get_ts_daily_histories_by_batch(left_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
+            ans.update(_get_ts_daily_histories_by_batch(right_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
             return ans
 
         missing_codes = [code for code in codes if code not in returned_codes]
@@ -235,7 +235,7 @@ def _get_ts_daily_histories_by_batch(
                 print(f'[TUSHARE] skip retry missing {len(missing_codes)} codes {start_date}-{end_date}: below retry split size')
                 return ans
             print(f'[TUSHARE] partial result {len(returned_codes)}/{len(codes)} codes {start_date}-{end_date}, retry missing {len(missing_codes)} codes')
-            ans.update(_get_ts_daily_histories_by_batch(missing_codes, start_date, end_date, columns, retry_depth + 1))
+            ans.update(_get_ts_daily_histories_by_batch(missing_codes, start_date, end_date, columns, retry_depth + 1, interval=interval))
     return ans
 
 
@@ -245,6 +245,7 @@ def get_ts_daily_histories(
     end_date: str,
     columns: list[str] = DEFAULT_DAILY_COLUMNS,
     adjust: ExitRight = ExitRight.BFQ,
+    interval: float = 1,
 ) -> dict[str, pd.DataFrame]:
     # 当前使用 tushare daily 接口，只返回不复权数据；保留 adjust 参数兼容旧调用。
     for code in codes:
@@ -252,4 +253,67 @@ def get_ts_daily_histories(
             print(f'存在不符合格式要求的code: {code}')
             return {}
 
-    return _get_ts_daily_histories_by_batch(codes, start_date, end_date, columns)
+    return _get_ts_daily_histories_by_batch(codes, start_date, end_date, columns, interval=interval)
+
+
+def get_ts_daily_histories_flat(
+    codes: list[str],
+    start_date: str,
+    end_date: str,
+    columns: list[str] = DEFAULT_DAILY_COLUMNS,
+    interval: float = 1,
+) -> dict[str, pd.DataFrame]:
+    """批量拉取，失败仅重试整批，不做二分拆分；缺失由调用方单股补。"""
+    if len(codes) == 0:
+        return {}
+
+    for code in codes:
+        if not is_stock(code):
+            print(f'存在不符合格式要求的code: {code}')
+            return {}
+
+    from reader.tushare_agent import get_tushare_pro
+
+    try_times = 0
+    df = None
+    last_exception = None
+    while (df is None or len(df) <= 0) and try_times < TUSHARE_BATCH_RETRY_TIMES:
+        try_times += 1
+        try:
+            pro = get_tushare_pro()
+            df = pro.daily(ts_code=','.join(codes), start_date=start_date, end_date=end_date)
+            time.sleep(interval)
+        except Exception as e:
+            last_exception = e
+            df = None
+            if _is_tushare_rate_limit_error(e):
+                break
+            if try_times < TUSHARE_BATCH_RETRY_TIMES:
+                time.sleep(interval)
+
+    if df is None or len(df) <= 0:
+        if last_exception is not None:
+            print(
+                f'[TUSHARE] batch flat failed {len(codes)} codes '
+                f'{start_date}-{end_date}: {last_exception}',
+            )
+        return {}
+
+    if 'ts_code' not in df.columns:
+        print(
+            f'[TUSHARE] batch flat malformed {len(codes)} codes '
+            f'{start_date}-{end_date}: missing ts_code column',
+        )
+        return {}
+
+    ans: dict[str, pd.DataFrame] = {}
+    returned_codes = set(df['ts_code'].dropna().unique())
+    for code in codes:
+        if code in returned_codes:
+            temp_df = df[df['ts_code'] == code]
+            temp_df = _ts_to_standard(temp_df)
+            if columns is None:
+                ans[code] = temp_df
+            else:
+                ans[code] = temp_df[columns]
+    return ans

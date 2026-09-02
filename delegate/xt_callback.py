@@ -4,9 +4,8 @@ import logging
 
 from typing import Callable
 
-from xtquant import xtconstant
-from xtquant.xttrader import XtQuantTraderCallback
-from xtquant.xttype import XtOrder, XtTrade, XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
+from tools.utils_xtquant import xtconstant, XtQuantTraderCallback
+from tools.utils_xtquant import XtOrder, XtTrade, XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
 
 from tools.constants import MSG_OUTER_SEPARATOR, MSG_INNER_SEPARATOR
 from tools.utils_cache import record_deal, new_held, del_key, del_held_day, StockNames

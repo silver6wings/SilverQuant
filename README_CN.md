@@ -89,6 +89,8 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 > 交易端可以对接 QMT 实盘和掘金的模拟盘，支持市价单、限价单以及撤单
 
+> 默认使用 **MiniQMT**（`userdata_mini` + 原生 `xtquant`）。若券商仅提供大 QMT、无法使用 MiniQMT，可使用 **大 QMT 桥接**（`btquant` + HTTP helper），详见 [[BIG_QMT 桥接说明]](_doc/BIG_QMT.md)
+
 > 目前暂无TWAP，VWAP以及冰山指令等拆单算法
 
 
@@ -187,9 +189,10 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > 1. `AUTHENTICATION` 是远程策略获取推送服务的密钥，其他策略不需要可置空
 > 2. `CACHE_BASE_PATH` 是本地策略缓存文件夹路径，可不用修改
-> 3. `QMT_XXX`的两项是账户相关，需要股票账户id和QMT安装位置，找不到`userdata_mini`文件夹需要先运行QMT一次
-> 4. `DING_XXX`的两项是群通知相关，钉钉通知需要建群，然后建立机器人获取 Webhook URL
-> 5. `GM_XXX`的两项是模拟盘相关，模拟盘需要自行获取掘金的 Secret Tokens
+> 3. `QMT_XXX` 的两项是账户相关，需要股票账户 id 和 QMT 安装位置（MiniQMT 模式需要 `userdata_mini` 路径）
+> 4. 若使用大 QMT 桥接，设置 `USE_BIG_QMT = True`，并参阅 [[BIG_QMT]](_doc/BIG_QMT.md)，无需配置 `QMT_CLIENT_PATH`
+> 5. `DING_XXX` 的两项是群通知相关，钉钉通知需要建群，然后建立机器人获取 Webhook URL
+> 6. `GM_XXX` 的两项是模拟盘相关，模拟盘需要自行获取掘金的 Secret Tokens
 
 ### 申请钉钉机器人
 
@@ -262,6 +265,8 @@ run_ai_gen.py
 # 高级配置
 
 > 查看进阶配置文档: [[CONFIGURATION]](_doc/CONFIGURATION.md)
+
+> 大 QMT 桥接（无 MiniQMT 时使用）: [[BIG_QMT]](_doc/BIG_QMT.md)
 
 # 已知问题
 
