@@ -39,6 +39,7 @@ if TYPE_CHECKING:
         XtOrderResponse as XtOrderResponse,
         XtPosition as XtPosition,
         XtTrade as XtTrade,
+        XtAccountStatus as XtAccountStatus,
     )
 
 _logger = logging.getLogger(__name__)
