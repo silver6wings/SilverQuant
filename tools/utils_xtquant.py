@@ -39,6 +39,7 @@ if TYPE_CHECKING:
         XtOrderResponse as XtOrderResponse,
         XtPosition as XtPosition,
         XtTrade as XtTrade,
+        XtAccountStatus as XtAccountStatus,
     )
 
 _logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ def _bind_package(_pkg: Any) -> None:
     global xtquant, xtdata, xtconstant, xttrader, xttype
     global XtQuantTrader, XtQuantTraderCallback
     global StockAccount, XtAsset, XtPosition, XtOrder, XtTrade
-    global XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse
+    global XtOrderError, XtCancelError, XtOrderResponse, XtCancelOrderResponse, XtAccountStatus
     global STOCK_BUY, STOCK_SELL
 
     xtquant = _pkg
@@ -130,6 +131,7 @@ def _bind_package(_pkg: Any) -> None:
     XtCancelError = _xttype.XtCancelError
     XtOrderResponse = _xttype.XtOrderResponse
     XtCancelOrderResponse = _xttype.XtCancelOrderResponse
+    XtAccountStatus = _xttype.XtAccountStatus
     STOCK_BUY = _xtconstant.STOCK_BUY
     STOCK_SELL = _xtconstant.STOCK_SELL
 
@@ -182,6 +184,7 @@ __all__ = [
     "XtCancelError",
     "XtOrderResponse",
     "XtCancelOrderResponse",
+    "XtAccountStatus",
     "STOCK_BUY",
     "STOCK_SELL",
     "FIX_PRICE",
