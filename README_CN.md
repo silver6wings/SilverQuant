@@ -33,8 +33,8 @@ Github 因某些原因不便境内服务器部署，这里有：[国内镜像](h
 
 # 项目简介
 
-SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html)
-开发的A股证券🇨🇳全自动交易框架，开箱即可运行
+SilverQuant 是基于券商 **[迅投 QMT](https://dict.thinktrader.net/)** 开发的 A 股证券🇨🇳全自动交易框架。
+通过 **大 QMT 客户端 + `btquant` HTTP 桥接**（与 `xtquant` 同名的 API）对接实盘与行情，开箱即可运行。
 
 旨在帮助新进入量化领域的同学解决大部分技术启动问题，支持在本地执行策略
 
@@ -77,9 +77,9 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 数据源
 
-> 历史数据源：主要使用第三方`AKShare`, `Tushare`, `TDX` 以及 `MiniQMT` 自带的数据源
+> 历史数据源：主要使用第三方 `AKShare`、`Tushare`、`TDX` 等；亦可选用 QMT 本地缓存（见 [[BIG_QMT]](_doc/BIG_QMT.md) 能力说明）
 
-> 盘中数据源：主要使用 `MiniQMT` 提供的 Tick 级别的数据源
+> 盘中数据源：通过 **迅投 QMT** 获取 Tick 级行情（大 QMT 桥接模式下由 helper 按订阅代码轮询）
 
 策略
 
@@ -87,9 +87,9 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 交易端
 
-> 交易端可以对接 QMT 实盘和掘金的模拟盘，支持市价单、限价单以及撤单
+> 交易端对接 **迅投 QMT 实盘**与掘金模拟盘，支持市价单、限价单以及撤单
 
-> 默认使用 **MiniQMT**（`userdata_mini` + 原生 `xtquant`）。若券商仅提供大 QMT、无法使用 MiniQMT，可使用 **大 QMT 桥接**（`btquant` + HTTP helper），详见 [[BIG_QMT 桥接说明]](_doc/BIG_QMT.md)
+> 默认使用 **大 QMT 桥接**（`credentials.USE_BIG_QMT = True` + `btquant` + 粘贴至 QMT 的 HTTP helper），业务层仍按 `xtquant` 方式编写。部署步骤见 [[BIG_QMT 桥接说明]](_doc/BIG_QMT.md)
 
 > 目前暂无TWAP，VWAP以及冰山指令等拆单算法
 
@@ -114,7 +114,7 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 
 > 下载对应的券商版 QMT（需要提前找券商客户经理开通账户的 QMT 权限）
 > 
-> 截至2024年底，支持QMT的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询，以[某券商](https://miniqmt.com/)为例：
+> 截至2024年底，支持 QMT 的券商可以在[这里](https://www.bilibili.com/opus/1014402646051651589)查询。请安装券商提供的 **迅投 QMT 完整客户端**（在本项目中通过大 QMT + helper 桥接使用，而非单独的 Mini 进程）：
 > 
 > WinRAR下载
 > 
@@ -189,8 +189,8 @@ SilverQuant 是基于 [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now
 > 
 > 1. `AUTHENTICATION` 是远程策略获取推送服务的密钥，其他策略不需要可置空
 > 2. `CACHE_BASE_PATH` 是本地策略缓存文件夹路径，可不用修改
-> 3. `QMT_XXX` 的两项是账户相关，需要股票账户 id 和 QMT 安装位置（MiniQMT 模式需要 `userdata_mini` 路径）
-> 4. 若使用大 QMT 桥接，设置 `USE_BIG_QMT = True`，并参阅 [[BIG_QMT]](_doc/BIG_QMT.md)，无需配置 `QMT_CLIENT_PATH`
+> 3. `QMT_XXX`：`QMT_ACCOUNT_ID` 为股票资金账号；大 QMT 桥接下 **无需** `QMT_CLIENT_PATH` / `userdata_mini`
+> 4. 保持 `USE_BIG_QMT = True`，按 [[BIG_QMT]](_doc/BIG_QMT.md) 在大 QMT 中部署 helper 策略并配置 `qmt_bridge.json`
 > 5. `DING_XXX` 的两项是群通知相关，钉钉通知需要建群，然后建立机器人获取 Webhook URL
 > 6. `GM_XXX` 的两项是模拟盘相关，模拟盘需要自行获取掘金的 Secret Tokens
 
@@ -266,11 +266,11 @@ run_ai_gen.py
 
 > 查看进阶配置文档: [[CONFIGURATION]](_doc/CONFIGURATION.md)
 
-> 大 QMT 桥接（无 MiniQMT 时使用）: [[BIG_QMT]](_doc/BIG_QMT.md)
+> 迅投 QMT / 大 QMT 桥接部署: [[BIG_QMT]](_doc/BIG_QMT.md)
 
 # 已知问题
 
-> 开仓价从`Mini QMT`直接获取，目前不会根据除权情况动态调整，可能会因为除权价格降低导致非正常止损卖出。
+> 开仓价从 QMT 持仓接口直接获取，目前不会根据除权情况动态调整，可能会因为除权价格降低导致非正常止损卖出。
 > 
 > Akshare & Pywencai 等库由于各大网站限流策略，经常被Ban IP，注意数据量控制问题。
 > 

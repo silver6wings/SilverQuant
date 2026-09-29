@@ -31,7 +31,9 @@ GitHub deployment on mainland China servers can be inconvenient. A mirror is ava
 
 ## Overview
 
-SilverQuant is an out-of-the-box, fully automated China A-share trading framework built on [MiniQMT](https://dict.thinktrader.net/nativeApi/start_now.html).
+SilverQuant is a fully automated China A-share trading framework built on broker **[XunTou QMT](https://dict.thinktrader.net/)**.
+
+It connects to live trading and market data via the **full QMT client + `btquant` HTTP bridge** (an API with the same names as `xtquant`) and runs out of the box.
 
 It helps newcomers to quantitative trading get past most of the technical setup hurdles and run strategies locally.
 
@@ -60,9 +62,9 @@ Architecture overview for contributors and extenders:
 
 Data sources
 
-> Historical data: mainly third-party `AKShare`, `Tushare`, `TDX`, and MiniQMT built-in sources
+> Historical data: mainly third-party `AKShare`, `Tushare`, `TDX`, etc.; QMT local cache is also available (see [[BIG_QMT]](_doc/BIG_QMT.md))
 
-> Intraday data: mainly tick-level data from `MiniQMT`
+> Intraday data: tick-level quotes from **XunTou QMT** (in big-QMT bridge mode, the helper polls subscribed symbols)
 
 Strategy
 
@@ -70,7 +72,9 @@ Strategy
 
 Trading
 
-> Supports QMT live trading and MyQuant paper trading, including market orders, limit orders, and cancellations
+> Supports **XunTou QMT live trading** and MyQuant paper trading, including market orders, limit orders, and cancellations
+
+> Default setup uses **big QMT bridge** (`credentials.USE_BIG_QMT = True` + `btquant` + HTTP helper pasted into QMT). Application code still uses the `xtquant`-style API. See [[BIG_QMT bridge guide]](_doc/BIG_QMT.md) for deployment.
 
 > TWAP, VWAP, and iceberg order algorithms are not supported yet
 
@@ -95,7 +99,7 @@ Trading
 
 > Broker edition QMT (ask your broker relationship manager to enable QMT access first)
 > 
-> As of late 2024, brokers supporting QMT can be found [here](https://www.bilibili.com/opus/1014402646051651589). Example from [one broker](https://miniqmt.com/):
+> As of late 2024, brokers supporting QMT can be found [here](https://www.bilibili.com/opus/1014402646051651589). Install the broker-provided **full XunTou QMT client** (this project uses big QMT + helper bridge, not a standalone Mini process):
 > 
 > WinRAR
 > 
@@ -170,9 +174,10 @@ When running in paper mode (`IS_PROD = False`), in addition to configuring `GM_X
 > 
 > 1. `AUTHENTICATION`: key for remote strategy push services; leave empty if unused
 > 2. `CACHE_BASE_PATH`: local strategy cache directory; default is usually fine
-> 3. `QMT_XXX`: account ID and QMT install path; run QMT once if you cannot find `userdata_mini`
-> 4. `DING_XXX`: DingTalk group bot settings; create a group bot to obtain the webhook URL
-> 5. `GM_XXX`: paper trading settings; obtain MyQuant secret tokens yourself
+> 3. `QMT_XXX`: `QMT_ACCOUNT_ID` is your brokerage account ID; with big QMT bridge you do **not** need `QMT_CLIENT_PATH` / `userdata_mini`
+> 4. Keep `USE_BIG_QMT = True`, deploy the helper strategy in full QMT per [[BIG_QMT]](_doc/BIG_QMT.md), and configure `qmt_bridge.json`
+> 5. `DING_XXX`: DingTalk group bot settings; create a group bot to obtain the webhook URL
+> 6. `GM_XXX`: paper trading settings; obtain MyQuant secret tokens yourself
 
 ### Set Up a DingTalk Bot
 
@@ -246,9 +251,11 @@ Advanced learning sample for formula-based stock selection. Not recommended for 
 
 > See the advanced configuration guide: [[CONFIGURATION]](_doc/CONFIGURATION.md)
 
+> XunTou QMT / big QMT bridge deployment: [[BIG_QMT]](_doc/BIG_QMT.md)
+
 ## Known Issues
 
-> Entry prices are read directly from `Mini QMT` and are not adjusted dynamically for corporate actions. Ex-dividend price drops may trigger unintended stop-loss sells.
+> Entry prices are read directly from the QMT position API and are not adjusted dynamically for corporate actions. Ex-dividend price drops may trigger unintended stop-loss sells.
 > 
 > Libraries such as Akshare and Pywencai are often rate-limited or IP-banned by data sites. Control request volume carefully.
 > 
