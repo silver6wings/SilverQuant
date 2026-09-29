@@ -80,8 +80,70 @@ def _is_market_price_type(price_type: int) -> bool:
 def _side_to_order_type(side: Any) -> int:
     """gateway side 字符串 -> SilverQuant order_type 整数。"""
     text = str(side or "").strip().upper()
-    if text in ("SELL", "24", xtconstant.CREDIT_SELL):
+    if text in ("SELL", "24", str(xtconstant.CREDIT_SELL)):
         return xtconstant.STOCK_SELL
+    if text in ("BUY", "23", str(xtconstant.CREDIT_BUY)):
+        return xtconstant.STOCK_BUY
+    return xtconstant.STOCK_BUY
+
+
+_QMT_OFFSET_BUY = 48
+_QMT_OFFSET_SELL = 49
+_QMT_OP_BUY = 23
+_QMT_OP_SELL = 24
+
+
+def _resolve_order_type_from_row(row: Dict[str, Any]) -> int:
+    """从 gateway 返回的 dict 解析买卖方向。"""
+    side = row.get("side")
+    if side not in (None, ""):
+        text = str(side).strip().upper()
+        if text in ("SELL", "24", str(xtconstant.CREDIT_SELL)):
+            return xtconstant.STOCK_SELL
+        if text in ("BUY", "23", str(xtconstant.CREDIT_BUY)):
+            return xtconstant.STOCK_BUY
+
+    order_type = row.get("order_type")
+    if order_type not in (None, "", 0):
+        try:
+            value = int(order_type)
+            if value in (xtconstant.STOCK_SELL, xtconstant.CREDIT_SELL):
+                return xtconstant.STOCK_SELL
+            if value in (xtconstant.STOCK_BUY, xtconstant.CREDIT_BUY):
+                return xtconstant.STOCK_BUY
+        except (TypeError, ValueError):
+            pass
+
+    raw = row.get("raw")
+    if isinstance(raw, dict):
+        offset_flag = raw.get("m_nOffsetFlag")
+        if offset_flag is not None:
+            try:
+                flag = int(offset_flag)
+                if flag == _QMT_OFFSET_SELL:
+                    return xtconstant.STOCK_SELL
+                if flag == _QMT_OFFSET_BUY:
+                    return xtconstant.STOCK_BUY
+            except (TypeError, ValueError):
+                pass
+        for key in ("m_nOpType", "m_eEntrustType"):
+            val = raw.get(key)
+            if val is None:
+                continue
+            try:
+                op = int(val)
+                if op == _QMT_OP_SELL:
+                    return xtconstant.STOCK_SELL
+                if op == _QMT_OP_BUY:
+                    return xtconstant.STOCK_BUY
+            except (TypeError, ValueError):
+                pass
+
+    _LOGGER.debug(
+        "could not resolve order side from row, defaulting to BUY: order_id=%s trade_id=%s",
+        row.get("order_id"),
+        row.get("trade_id"),
+    )
     return xtconstant.STOCK_BUY
 
 
@@ -377,7 +439,7 @@ class XtQuantTrader:
     def query_stock_orders(self, account: Any, cancelable_only: bool = False) -> List[XtOrder]:
         account_id = _resolve_account_id(account)
         rows = get_client().orders(account_id, _resolve_account_type(account))
-        orders = [build_order(account_id, row, _side_to_order_type(row.get("side"))) for row in (rows or [])]
+        orders = [build_order(account_id, row, _resolve_order_type_from_row(row)) for row in (rows or [])]
         if cancelable_only:
             return [o for o in orders if o.price_type not in [
                 xtconstant.BROKER_PRICE_PROP_SUBSCRIBE,
@@ -392,12 +454,12 @@ class XtQuantTrader:
         rows = get_client().orders(account_id, _resolve_account_type(account), order_id=str(order_id))
         if not rows:
             return None
-        return build_order(account_id, rows[0], _side_to_order_type(rows[0].get("side")))
+        return build_order(account_id, rows[0], _resolve_order_type_from_row(rows[0]))
 
     def query_stock_trades(self, account: Any) -> List[XtTrade]:
         account_id = _resolve_account_id(account)
         rows = get_client().trades(account_id, _resolve_account_type(account))
-        return [build_trade(account_id, row, _side_to_order_type(row.get("side"))) for row in (rows or [])]
+        return [build_trade(account_id, row, _resolve_order_type_from_row(row)) for row in (rows or [])]
 
     def query_ipo_data(self) -> Dict[str, Any]:
         # helper 未提供 IPO 数据接口，返回空 dict 保持兼容
@@ -448,7 +510,7 @@ class XtQuantTrader:
             if not order_id or order_id in self._seen_order_ids:
                 continue
             self._seen_order_ids.add(order_id)
-            order = build_order(account_id, row, _side_to_order_type(row.get("side")))
+            order = build_order(account_id, row, _resolve_order_type_from_row(row))
             try:
                 self._callback.on_stock_order(order)
             except Exception as exc:
@@ -465,7 +527,7 @@ class XtQuantTrader:
             if not trade_id or trade_id in self._seen_trade_ids:
                 continue
             self._seen_trade_ids.add(trade_id)
-            trade = build_trade(account_id, row, _side_to_order_type(row.get("side")))
+            trade = build_trade(account_id, row, _resolve_order_type_from_row(row))
             try:
                 self._callback.on_stock_trade(trade)
             except Exception as exc:
