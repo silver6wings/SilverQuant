@@ -167,10 +167,11 @@ class BaseBuyer:
                 return order_volume > traded_volume
             order_status = getattr(order, 'order_status', None)
             return order_status not in (
-                xtconstant.ORDER_SUCC,
-                xtconstant.ORDER_CANCEL,
-                xtconstant.ORDER_REJECTED,
-                xtconstant.ORDER_DELETED,
+                xtconstant.ORDER_SUCCEEDED,
+                xtconstant.ORDER_CANCELED,
+                xtconstant.ORDER_JUNK,
+                xtconstant.ORDER_PART_CANCEL,
+                xtconstant.ORDER_UNKNOWN,
             )
 
         order_status = getattr(order, 'order_status', None)

@@ -24,12 +24,69 @@ DEFAULT_XDXR_CACHE_PATH = './_cache/_daily_mootdx/xdxr'
 PATH_TDX_HISTORY = f'./_cache/_daily_tdxzip/history_tdxhsj.pkl'
 PATH_TDX_XDXR = f'./_cache/_daily_tdxzip/xdxr.pkl'
 
-# 经 bestip 测速后较稳定的节点；bestip 全量测速较慢时作默认直连
+# 经实测探活后较稳定的节点（部分节点能连但返回空数据，需 probe 校验）
 _DEFAULT_MOOTDX_SERVERS: tuple[tuple[str, int], ...] = (
+    ('180.153.18.170', 7709),
+    ('115.238.56.198', 7709),
+    ('218.75.126.9', 7709),
     ('202.108.253.139', 80),
     ('123.125.108.14', 7709),
-    ('180.153.18.170', 7709),
 )
+
+PATH_RETRO_FUPAN_STATS = './_cache/retro_fupan_market_stats.pkl'
+PATH_MOOTDX_SERVER_CACHE = './_cache/mootdx_working_server.pkl'
+
+_RETRO_STAT_SYMBOLS = frozenset({'880001', '880002', '880005', '880006'})
+
+# 用真实 K 线验活：TCP 能连 ≠ 能取数（部分节点只回 2 字节 body）
+_VALIDATE_SYMBOL = '600519'
+_VALIDATE_MARKET = 1
+_VALIDATE_FREQUENCY = 9
+
+_SINA_INDEX_CODES = {
+    '000001': 's_sh000001',
+    '000300': 's_sh000300',
+    '000905': 's_sh000905',
+    '000852': 's_sh000852',
+    '399006': 's_sz399006',
+    '000688': 's_sh000688',
+}
+
+
+def _load_tdx_connect_servers(tdxdir: str, max_hosts: int = 12) -> list[tuple[str, int]]:
+    """从本地通达信 connect.cfg 读取行情服务器列表。"""
+    import re
+
+    cfg = os.path.join(tdxdir, 'connect.cfg')
+    if not os.path.isfile(cfg):
+        return []
+
+    with open(cfg, 'r', encoding='gbk', errors='ignore') as f:
+        text = f.read()
+
+    ips = dict(re.findall(r'IPAddress(\d+)=(\d+\.\d+\.\d+\.\d+)', text))
+    ports = dict(re.findall(r'Port(\d+)=(\d+)', text))
+    keys = sorted(set(ips) & set(ports), key=lambda x: int(x))
+
+    primary = re.search(r'PrimaryHost=(\d+)', text)
+    if primary:
+        primary_key = primary.group(1)
+        if primary_key in keys:
+            keys.remove(primary_key)
+            keys.insert(0, primary_key)
+
+    keys = keys[:max_hosts]
+    return [(ips[k], int(ports[k])) for k in keys]
+
+
+def _get_tdx_folder() -> str | None:
+    try:
+        from credentials import TDX_FOLDER
+    except ImportError:
+        return None
+    if TDX_FOLDER and os.path.isdir(TDX_FOLDER):
+        return TDX_FOLDER
+    return None
 
 
 def _load_mootdx_credentials() -> tuple[tuple[str, int] | None, bool, bool]:
@@ -40,6 +97,98 @@ def _load_mootdx_credentials() -> tuple[tuple[str, int] | None, bool, bool]:
     return MOOTDX_SERVER or None, bool(MOOTDX_USE_BESTIP), bool(MOOTDX_HEARTBEAT)
 
 
+def _probe_mootdx_client(client) -> bool:
+    """真实 K 线验活，避免 TCP 假通节点（只回 2 字节 body 导致静默空表）。"""
+    try:
+        df = client.bars(symbol=_VALIDATE_SYMBOL, frequency=_VALIDATE_FREQUENCY, offset=1)
+        return df is not None and len(df) > 0
+    except Exception:
+        return False
+
+
+def _validate_tdx_server(host: str, port: int, timeout: float = 4) -> bool:
+    from tdxpy.hq import TdxHq_API
+
+    api = TdxHq_API(raise_exception=True, auto_retry=False)
+    try:
+        api.connect(host, port, time_out=timeout)
+        bars = api.get_security_bars(
+            _VALIDATE_FREQUENCY,
+            _VALIDATE_MARKET,
+            _VALIDATE_SYMBOL,
+            0,
+            1,
+        )
+        return bool(bars and len(bars) > 0)
+    except Exception:
+        return False
+    finally:
+        try:
+            api.disconnect()
+        except Exception:
+            pass
+
+
+def _load_cached_tdx_server() -> tuple[str, int] | None:
+    cached = load_pickle(PATH_MOOTDX_SERVER_CACHE)
+    if not cached:
+        return None
+    host, port = cached
+    if _validate_tdx_server(host, int(port), timeout=3):
+        return host, int(port)
+    return None
+
+
+def _save_cached_tdx_server(server: tuple[str, int]) -> None:
+    save_pickle(PATH_MOOTDX_SERVER_CACHE, server)
+
+
+def _iter_tdx_server_candidates(tdxdir: str | None, server: tuple[str, int] | None) -> list[tuple[str, int]]:
+    candidates: list[tuple[str, int]] = []
+    if server:
+        candidates.append(server)
+
+    cached = load_pickle(PATH_MOOTDX_SERVER_CACHE)
+    if cached:
+        cached_server = (cached[0], int(cached[1]))
+        if cached_server not in candidates:
+            candidates.append(cached_server)
+
+    folder = tdxdir or _get_tdx_folder()
+    if folder:
+        candidates.extend(_load_tdx_connect_servers(folder))
+    candidates.extend(_DEFAULT_MOOTDX_SERVERS)
+
+    if server is None:
+        try:
+            from credentials import MOOTDX_USE_BESTIP
+            use_bestip = bool(MOOTDX_USE_BESTIP)
+        except ImportError:
+            use_bestip = False
+        if use_bestip:
+            from tdxpy.constants import hq_hosts
+            from mootdx.consts import HQ_HOSTS
+
+            for hs in list(hq_hosts[:20]) + list(HQ_HOSTS[:10]):
+                candidates.append((hs[1], int(hs[2])))
+
+    seen: set[tuple[str, int]] = set()
+    ordered: list[tuple[str, int]] = []
+    for item in candidates:
+        if item in seen:
+            continue
+        seen.add(item)
+        ordered.append(item)
+    return ordered
+
+
+def _find_working_tdx_server(candidates: list[tuple[str, int]], max_attempts: int = 18) -> tuple[str, int] | None:
+    for host, port in candidates[:max_attempts]:
+        if _validate_tdx_server(host, port):
+            return host, port
+    return None
+
+
 def _create_mootdx_quotes_client(tdxdir: str | None = None):
     from mootdx.quotes import Quotes
 
@@ -47,36 +196,28 @@ def _create_mootdx_quotes_client(tdxdir: str | None = None):
     kwargs = dict(
         market='std',
         heartbeat=heartbeat,
-        timeout=15,
+        timeout=5,
     )
     if tdxdir:
         kwargs['tdxdir'] = tdxdir
 
-    if use_bestip:
-        print('[MOOTDX] 使用 bestip 自动测速（首次较慢）')
-        return Quotes.factory(**kwargs, bestip=True)
+    candidates = _iter_tdx_server_candidates(tdxdir, server)
+    cached = _load_cached_tdx_server()
+    if cached:
+        working = cached
+    else:
+        working = _find_working_tdx_server(candidates)
+    if working is None:
+        raise RuntimeError(
+            'mootdx 无可用行情服务器：当前网络下节点可连但 K 线返回空数据（TCP 假通）。'
+            '可尝试：1) 在 credentials 配置 MOOTDX_SERVER 2) 开启 MOOTDX_USE_BESTIP '
+            '3) 使用本地 vipdoc 或 akshare 备用源'
+        )
 
-    candidates: list[tuple[str, int]] = []
-    if server:
-        candidates.append(server)
-    candidates.extend(_DEFAULT_MOOTDX_SERVERS)
-
-    seen: set[tuple[str, int]] = set()
-    last_err: Exception | None = None
-    for host, port in candidates:
-        key = (host, port)
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            client = Quotes.factory(**kwargs, server=key, bestip=False)
-            print(f'[MOOTDX] 使用行情服务器 {host}:{port}')
-            return client
-        except Exception as e:
-            last_err = e
-
-    print(f'[MOOTDX] 预设服务器不可用，回退 bestip=True：{last_err}')
-    return Quotes.factory(**kwargs, bestip=True)
+    host, port = working
+    _save_cached_tdx_server(working)
+    print(f'[MOOTDX] 使用行情服务器 {host}:{port}（真实 K 线验活通过）')
+    return Quotes.factory(**kwargs, server=working, bestip=False)
 
 
 def close_mootdx_client() -> None:
@@ -91,9 +232,212 @@ def close_mootdx_client() -> None:
     inst.client = None
 
 
+def _try_mootdx_index_df(symbol: str, market, offset: int) -> pd.DataFrame | None:
+    from mootdx.consts import MARKET_SH
+
+    if market is None:
+        market = MARKET_SH
+
+    try:
+        client = MootdxClientInstance().client
+        if client is None:
+            return None
+        df = client.index(
+            symbol=symbol,
+            frequency=9,
+            market=market,
+            start=0,
+            offset=offset,
+        )
+        if df is None or len(df) == 0:
+            return None
+        return df
+    except Exception as e:
+        logging.debug('mootdx index %s 失败: %s', symbol, e)
+        return None
+
+
+def _try_local_tdx_index_df(symbol: str, offset: int, reference_date: datetime.date | None) -> pd.DataFrame | None:
+    tdx_folder = _get_tdx_folder()
+    if not tdx_folder:
+        return None
+
+    try:
+        from mootdx.reader import Reader
+
+        df = Reader.factory(market='std', tdxdir=tdx_folder).daily(symbol=symbol)
+        if df is None or len(df) == 0:
+            return None
+
+        if 'datetime' not in df.columns:
+            df = df.reset_index()
+            if 'date' in df.columns:
+                df['datetime'] = pd.to_datetime(df['date'])
+            elif 'index' in df.columns:
+                df['datetime'] = pd.to_datetime(df['index'])
+
+        df = df.sort_values('datetime').tail(offset)
+        if reference_date is not None:
+            last_date = pd.to_datetime(df.iloc[-1]['datetime']).date()
+            if last_date != reference_date:
+                return None
+        return df.reset_index(drop=True)
+    except Exception as e:
+        logging.debug('本地 TDX 指数 %s 失败: %s', symbol, e)
+        return None
+
+
+def _fetch_akshare_market_snapshot() -> dict:
+    import akshare as ak
+    import requests
+
+    legu = ak.stock_market_activity_legu()
+    stat_date = pd.to_datetime(str(legu.iloc[-1]['value'])).date()
+
+    rising = float(legu.iloc[0]['value'])
+    limit_up = float(legu.iloc[1]['value'])
+    falling = float(legu.iloc[4]['value'])
+    limit_down = float(legu.iloc[5]['value'])
+
+    sse = ak.stock_sse_summary()
+    szse = ak.stock_szse_summary()
+    szse_stock = szse.loc[szse.iloc[:, 0] == '股票'].iloc[0]
+
+    sse_total_cap = float(sse.loc[sse.iloc[:, 0] == '总市值'].iloc[0, 1])
+    sse_float_cap = float(sse.loc[sse.iloc[:, 0] == '流通市值'].iloc[0, 1])
+    szse_amount = float(szse_stock['成交金额'])
+    szse_total_cap = float(szse_stock['总市值']) / 1e8
+    szse_float_cap = float(szse_stock['流通市值']) / 1e8
+
+    headers = {'Referer': 'https://finance.sina.com.cn/', 'User-Agent': 'Mozilla/5.0'}
+    resp = requests.get('https://hq.sinajs.cn/list=s_sh000001', headers=headers, timeout=15)
+    resp.raise_for_status()
+    fields = resp.text.split('="')[1].split('";')[0].split(',')
+    sse_amount = float(fields[5]) * 1e4
+
+    total_amount = sse_amount + szse_amount
+    total_cap_baiyi = (sse_total_cap + szse_total_cap) / 100
+    float_cap_baiyi = (sse_float_cap + szse_float_cap) / 100
+
+    return {
+        'date': stat_date,
+        '880001': {'close': total_cap_baiyi},
+        '880002': {'close': float_cap_baiyi, 'amount': total_amount},
+        '880005': {'close': rising, 'open': falling, 'amount': total_amount},
+        '880006': {'close': limit_up, 'open': limit_down},
+    }
+
+
+def _build_stat_index_df(symbol: str, snapshot: dict, cache: dict | None) -> pd.DataFrame:
+    today = snapshot[symbol]
+    rows = []
+
+    if cache and cache.get('date') and symbol in cache:
+        prev = dict(cache[symbol])
+        prev['datetime'] = pd.Timestamp(cache['date'])
+        rows.append(prev)
+
+    today_row = dict(today)
+    today_row['datetime'] = pd.Timestamp(snapshot['date'])
+    rows.append(today_row)
+    return pd.DataFrame(rows)
+
+
+def _load_retro_fupan_stats_cache() -> dict | None:
+    return load_pickle(PATH_RETRO_FUPAN_STATS)
+
+
+def save_retro_fupan_stats_cache(snapshot: dict) -> None:
+    payload = {'date': snapshot['date']}
+    for symbol in _RETRO_STAT_SYMBOLS:
+        if symbol in snapshot:
+            payload[symbol] = snapshot[symbol]
+    save_pickle(PATH_RETRO_FUPAN_STATS, payload)
+
+
+def get_retro_fupan_market_snapshot() -> dict:
+    """获取复盘用的大盘统计快照（不写缓存，缓存应在复盘结束后写入）。"""
+    return _get_retro_market_snapshot_cached()
+
+
+_retro_market_snapshot_cache: dict | None = None
+
+
+def clear_retro_market_snapshot_cache() -> None:
+    global _retro_market_snapshot_cache
+    _retro_market_snapshot_cache = None
+
+
+def consume_retro_market_snapshot_cache() -> dict | None:
+    global _retro_market_snapshot_cache
+    snapshot = _retro_market_snapshot_cache
+    _retro_market_snapshot_cache = None
+    return snapshot
+
+
+def _get_retro_market_snapshot_cached() -> dict:
+    global _retro_market_snapshot_cache
+    if _retro_market_snapshot_cache is None:
+        _retro_market_snapshot_cache = _fetch_akshare_market_snapshot()
+    return _retro_market_snapshot_cache
+
+
+def get_retro_index_df(
+    symbol: str,
+    market=None,
+    offset: int = 15,
+    reference_date: datetime.date | None = None,
+) -> pd.DataFrame:
+    """
+    复盘指数/统计序列：880xxx 走 akshare 备用；普通指数优先本地 TDX，再尝试 mootdx 在线。
+    """
+    if symbol.startswith('88'):
+        df = _try_mootdx_index_df(symbol, market, offset)
+        if df is not None:
+            return df
+
+        snapshot = _get_retro_market_snapshot_cached()
+        if symbol not in snapshot:
+            raise ValueError(f'备用数据源无 {symbol} 数据')
+        cache = _load_retro_fupan_stats_cache()
+        return _build_stat_index_df(symbol, snapshot, cache)
+
+    df = _try_local_tdx_index_df(symbol, offset, reference_date)
+    if df is not None:
+        return df
+
+    df = _try_mootdx_index_df(symbol, market, offset)
+    if df is not None:
+        return df
+
+    raise ValueError(f'无法获取 {symbol} 指数数据（本地 TDX / mootdx 均不可用）')
+
+
+def fetch_sina_index_quote(symbol: str) -> dict | None:
+    """新浪精简指数行情：name, price, pct。"""
+    import requests
+
+    sina_code = _SINA_INDEX_CODES.get(symbol)
+    if not sina_code:
+        return None
+
+    headers = {'Referer': 'https://finance.sina.com.cn/', 'User-Agent': 'Mozilla/5.0'}
+    resp = requests.get(f'https://hq.sinajs.cn/list={sina_code}', headers=headers, timeout=15)
+    resp.raise_for_status()
+    fields = resp.text.split('="')[1].split('";')[0].split(',')
+    if len(fields) < 4:
+        return None
+    return {
+        'name': fields[0],
+        'price': float(fields[1]),
+        'pct': float(fields[3]),
+    }
+
+
 class MootdxClientInstance:
     _instance = None
     client = None
+    _init_attempted = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -102,17 +446,15 @@ class MootdxClientInstance:
         return cls._instance
 
     def __init__(self):
-        if self.client is None:
+        if self.client is None and not MootdxClientInstance._init_attempted:
+            MootdxClientInstance._init_attempted = True
             pd.set_option('future.no_silent_downcasting', True)
-            from credentials import TDX_FOLDER
-            if TDX_FOLDER is not None and len(TDX_FOLDER) > 0:
-                try:
-                    self.client = _create_mootdx_quotes_client(tdxdir=TDX_FOLDER)
-                except Exception as e:
-                    print('未找到本地TDX目录，使用默认TDX数据源配置：', e)
-                    self.client = _create_mootdx_quotes_client()
-            else:
-                self.client = _create_mootdx_quotes_client()
+            tdx_folder = _get_tdx_folder()
+            try:
+                self.client = _create_mootdx_quotes_client(tdxdir=tdx_folder)
+            except Exception as e:
+                logging.warning('mootdx 在线行情不可用，将使用备用数据源：%s', e)
+                self.client = None
 
 
 class MootdxDailyBarReaderInstance:
@@ -409,6 +751,41 @@ def _get_offset_start(csv_path: str, start_date_str: str, end_date_str: str) -> 
     return days_between, days_from_end_to_today
 
 
+def _get_local_tdx_bars(symbol: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """从本地通达信 vipdoc 读取日线，在线 mootdx 不可用时的稳定回退。"""
+    tdx_folder = _get_tdx_folder()
+    if not tdx_folder:
+        return None
+
+    try:
+        from mootdx.reader import Reader
+
+        raw_symbol = symbol.split('.')[0] if '.' in symbol else symbol
+        df = Reader.factory(market='std', tdxdir=tdx_folder).daily(symbol=raw_symbol)
+        if df is None or len(df) == 0:
+            return None
+
+        if 'datetime' not in df.columns:
+            df = df.reset_index()
+            if 'date' in df.columns:
+                df['datetime'] = pd.to_datetime(df['date'])
+            else:
+                df['datetime'] = pd.to_datetime(df.index)
+
+        df = df.sort_values('datetime').reset_index(drop=True)
+        if 'vol' not in df.columns and 'volume' in df.columns:
+            df['vol'] = df['volume']
+
+        start_ts = pd.to_datetime(start_date, format='%Y%m%d')
+        end_ts = pd.to_datetime(end_date, format='%Y%m%d')
+        mask = (df['datetime'] >= start_ts) & (df['datetime'] <= end_ts)
+        clipped = df.loc[mask].copy()
+        return clipped if len(clipped) > 0 else None
+    except Exception as e:
+        logging.debug('本地 TDX 日线 %s 失败: %s', symbol, e)
+        return None
+
+
 def _get_bars_with_offset(client, symbol, total_offset, start=0):
     all_dfs = []
     remaining = total_offset
@@ -496,13 +873,22 @@ def get_mootdx_daily_history(
     offset, start = _get_offset_start(TRADE_DAY_CACHE_PATH, start_date, end_date)
     symbol = code_to_symbol(code)
 
+    df = None
     client = MootdxClientInstance().client
-    try:
-        df = _get_bars_with_offset(client, symbol, offset, start)
-        # TODO_List: 对于有些期间停牌过的票，发现时间对不上这里要校正，优先级不高因为只会多不会少
-    except Exception as e:
-        print(f' mootdx get daily {code} error: ', e)
-        return None
+    if client is not None:
+        try:
+            df = _get_bars_with_offset(client, symbol, offset, start)
+        except Exception as e:
+            print(f' mootdx get daily {code} error: ', e)
+
+    if df is None or len(df) == 0:
+        local_df = _get_local_tdx_bars(symbol, start_date, end_date)
+        if local_df is not None:
+            print(f'[MOOTDX] 在线不可用，使用本地 TDX vipdoc: {code}')
+            df = local_df
+        elif client is None:
+            print(f' mootdx get daily {code} error: 在线与本地 TDX 均不可用')
+            return None
 
     if adjust != ExitRight.BFQ:
             xdxr = _get_xdxr(symbol=symbol)

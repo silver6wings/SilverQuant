@@ -785,7 +785,7 @@ def _apply_order_tag(row: Dict[str, Any], tag: Dict[str, Any]) -> bool:
     if qmt_user_order_id not in (None, "") and not row.get("qmt_user_order_id"):
         row["qmt_user_order_id"] = qmt_user_order_id
         changed = True
-    for key in ("order_remark", "remark", "strategy_name", "sub_account_id", "virtual_account_id"):
+    for key in ("order_remark", "remark", "strategy_name", "sub_account_id", "virtual_account_id", "side"):
         value = tag.get(key)
         current = row.get(key)
         should_replace_qmt_id = (
@@ -796,6 +796,8 @@ def _apply_order_tag(row: Dict[str, Any], tag: Dict[str, Any]) -> bool:
         if value not in (None, "") and (not current or should_replace_qmt_id):
             row[key] = value
             changed = True
+            if key == "side":
+                row["order_type"] = _order_type_from_side(str(value))
     return changed
 
 
@@ -1100,6 +1102,54 @@ def _position_to_dict(position: Any) -> Dict[str, Any]:
     }
 
 
+_QMT_OFFSET_BUY = 48
+_QMT_OFFSET_SELL = 49
+_QMT_OP_BUY = 23
+_QMT_OP_SELL = 24
+
+
+def _int_attr(row: Any, *names: str) -> Optional[int]:
+    for name in names:
+        try:
+            value = getattr(row, name, None)
+        except Exception:
+            value = None
+        if value in (None, ""):
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _side_from_qmt_row(row: Any) -> str:
+    # Resolve BUY/SELL from QMT order/deal object.
+    # Prefer m_nOffsetFlag (48=buy, 49=sell). m_nDirection may stay 48 on sells.
+    # passorder op_type: 23=buy, 24=sell.
+    offset_flag = _int_attr(row, "m_nOffsetFlag")
+    if offset_flag == _QMT_OFFSET_SELL:
+        return "SELL"
+    if offset_flag == _QMT_OFFSET_BUY:
+        return "BUY"
+
+    op_type = _int_attr(row, "m_nOpType", "m_eEntrustType")
+    if op_type == _QMT_OP_SELL:
+        return "SELL"
+    if op_type == _QMT_OP_BUY:
+        return "BUY"
+
+    direction = _int_attr(row, "m_nDirection")
+    if direction == _QMT_OFFSET_SELL:
+        return "SELL"
+    # Do not treat direction==48 as buy; stock sells may also report 48.
+    return ""
+
+
+def _order_type_from_side(side: str) -> int:
+    return 24 if side == "SELL" else (23 if side == "BUY" else 0)
+
+
 def _order_to_dict(order: Any) -> Dict[str, Any]:
     raw_status = getattr(order, "m_nOrderStatus", None)
     order_remark = getattr(order, "m_strRemark", None)
@@ -1114,12 +1164,15 @@ def _order_to_dict(order: Any) -> Dict[str, Any]:
         virtual_account_id = getattr(order, "virtual_account_id", None)
     if virtual_account_id in (None, ""):
         virtual_account_id = _extract_virtual_account_id_from_remark(order_remark)
+    side = _side_from_qmt_row(order)
     return {
         "order_id": str(getattr(order, "m_strOrderSysID", "") or ""),
         "security": _security(
             getattr(order, "m_strInstrumentID", ""),
             getattr(order, "m_strExchangeID", ""),
         ),
+        "side": side,
+        "order_type": _order_type_from_side(side),
         "raw_status": raw_status,
         "volume_left": int(getattr(order, "m_nVolumeTotal", 0) or 0),
         "amount": int(getattr(order, "m_nVolumeTotalOriginal", 0) or 0),
@@ -1152,6 +1205,7 @@ def _trade_to_dict(trade: Any) -> Dict[str, Any]:
         virtual_account_id = getattr(trade, "virtual_account_id", None)
     if virtual_account_id in (None, ""):
         virtual_account_id = _extract_virtual_account_id_from_remark(order_remark)
+    side = _side_from_qmt_row(trade)
     return {
         "trade_id": str(getattr(trade, "m_strTradeID", "") or ""),
         "order_id": str(getattr(trade, "m_strOrderSysID", "") or ""),
@@ -1159,6 +1213,8 @@ def _trade_to_dict(trade: Any) -> Dict[str, Any]:
             getattr(trade, "m_strInstrumentID", ""),
             getattr(trade, "m_strExchangeID", ""),
         ),
+        "side": side,
+        "order_type": _order_type_from_side(side),
         "amount": int(getattr(trade, "m_nVolume", 0) or 0),
         "price": float(price or 0.0),
         "order_remark": order_remark,
@@ -1285,6 +1341,9 @@ def _query_trades(account_id: str, account_type: str, payload: Optional[Dict[str
         if not trade.get("sub_account_id") and order.get("sub_account_id"):
             trade["sub_account_id"] = order.get("sub_account_id")
             trade["virtual_account_id"] = order.get("virtual_account_id") or order.get("sub_account_id")
+        if not trade.get("side") and order.get("side"):
+            trade["side"] = order.get("side")
+            trade["order_type"] = order.get("order_type") or _order_type_from_side(trade["side"])
     order_id = payload.get("order_id") if payload else None
     if order_id:
         trades = [item for item in trades if str(item.get("order_id")) == str(order_id)]
